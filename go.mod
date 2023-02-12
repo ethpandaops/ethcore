@@ -1,4 +1,4 @@
-module github.com/ethpandaops/execution
+module github.com/ethpandaops/ethcore
 
 go 1.19
 
