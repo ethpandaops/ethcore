@@ -21,7 +21,7 @@ func (msg *GetReceipts) Code() int { return GetReceiptsCode }
 
 func (msg *GetReceipts) ReqID() uint64 { return msg.RequestId }
 
-func (m *Mimicry) receiveGetReceipts(ctx context.Context, data []byte) (*GetReceipts, error) {
+func (c *Client) receiveGetReceipts(ctx context.Context, data []byte) (*GetReceipts, error) {
 	s := new(GetReceipts)
 	if err := rlp.DecodeBytes(data, &s); err != nil {
 		return nil, fmt.Errorf("error decoding get block receipts: %w", err)
@@ -30,28 +30,28 @@ func (m *Mimicry) receiveGetReceipts(ctx context.Context, data []byte) (*GetRece
 	return s, nil
 }
 
-func (m *Mimicry) handleGetReceipts(ctx context.Context, code uint64, data []byte) error {
-	m.log.WithField("code", code).Debug("received GetReceipts")
+func (c *Client) handleGetReceipts(ctx context.Context, code uint64, data []byte) error {
+	c.log.WithField("code", code).Debug("received GetReceipts")
 
-	blockBodies, err := m.receiveGetReceipts(ctx, data)
+	blockBodies, err := c.receiveGetReceipts(ctx, data)
 	if err != nil {
 		return err
 	}
 
-	err = m.sendReceipts(ctx, &Receipts{
+	err = c.sendReceipts(ctx, &Receipts{
 		RequestId:      blockBodies.RequestId,
 		ReceiptsPacket: [][]*types.Receipt{},
 	})
 	if err != nil {
-		m.handleSessionError(ctx, err)
+		c.handleSessionError(ctx, err)
 		return err
 	}
 
 	return nil
 }
 
-func (m *Mimicry) sendGetReceipts(ctx context.Context, bh *GetReceipts) error {
-	m.log.WithFields(logrus.Fields{
+func (c *Client) sendGetReceipts(ctx context.Context, bh *GetReceipts) error {
+	c.log.WithFields(logrus.Fields{
 		"code":       GetReceiptsCode,
 		"request_id": bh.RequestId,
 		"receipts":   bh.GetReceiptsPacket,
@@ -62,7 +62,7 @@ func (m *Mimicry) sendGetReceipts(ctx context.Context, bh *GetReceipts) error {
 		return fmt.Errorf("error encoding get block receipts: %w", err)
 	}
 
-	if _, err := m.rlpxConn.Write(GetReceiptsCode, encodedData); err != nil {
+	if _, err := c.rlpxConn.Write(GetReceiptsCode, encodedData); err != nil {
 		return fmt.Errorf("error sending get block receipts: %w", err)
 	}
 

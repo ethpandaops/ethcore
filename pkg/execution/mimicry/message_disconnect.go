@@ -20,7 +20,7 @@ func (h *Disconnect) Code() int { return DisconnectCode }
 
 func (h *Disconnect) ReqID() uint64 { return 0 }
 
-func (m *Mimicry) receiveDisconnect(ctx context.Context, data []byte) *Disconnect {
+func (c *Client) receiveDisconnect(ctx context.Context, data []byte) *Disconnect {
 	reason := data[0:1]
 	// besu sends 2 byte disconnect message
 	if len(data) > 1 {
@@ -29,16 +29,16 @@ func (m *Mimicry) receiveDisconnect(ctx context.Context, data []byte) *Disconnec
 
 	d := new(p2p.DiscReason)
 	if err := rlp.DecodeBytes(reason, &d); err != nil {
-		m.log.WithError(err).Debug("Error decoding disconnect")
+		c.log.WithError(err).Debug("Error decoding disconnect")
 	}
 
 	return &Disconnect{Reason: *d}
 }
 
-func (m *Mimicry) handleDisconnect(ctx context.Context, code uint64, data []byte) {
-	m.log.WithField("code", code).Debug("received Disconnect")
+func (c *Client) handleDisconnect(ctx context.Context, code uint64, data []byte) {
+	c.log.WithField("code", code).Debug("received Disconnect")
 
-	disconnect := m.receiveDisconnect(ctx, data)
+	disconnect := c.receiveDisconnect(ctx, data)
 
-	m.disconnect(ctx, disconnect)
+	c.disconnect(ctx, disconnect)
 }

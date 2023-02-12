@@ -20,7 +20,7 @@ func (msg *Transactions) Code() int { return TransactionsCode }
 
 func (msg *Transactions) ReqID() uint64 { return 0 }
 
-func (m *Mimicry) receiveTransactions(ctx context.Context, data []byte) (*Transactions, error) {
+func (c *Client) receiveTransactions(ctx context.Context, data []byte) (*Transactions, error) {
 	s := new(Transactions)
 	if err := rlp.DecodeBytes(data, &s); err != nil {
 		return nil, fmt.Errorf("error decoding transactions: %w", err)
@@ -29,21 +29,21 @@ func (m *Mimicry) receiveTransactions(ctx context.Context, data []byte) (*Transa
 	return s, nil
 }
 
-func (m *Mimicry) handleTransactions(ctx context.Context, code uint64, data []byte) error {
-	m.log.WithField("code", code).Debug("received Transactions")
+func (c *Client) handleTransactions(ctx context.Context, code uint64, data []byte) error {
+	c.log.WithField("code", code).Debug("received Transactions")
 
-	txs, err := m.receiveTransactions(ctx, data)
+	txs, err := c.receiveTransactions(ctx, data)
 	if err != nil {
 		return err
 	}
 
-	m.publishTransactions(ctx, txs)
+	c.publishTransactions(ctx, txs)
 
 	return err
 }
 
-func (m *Mimicry) sendTransactions(ctx context.Context, transactions *Transactions) error {
-	m.log.WithFields(logrus.Fields{
+func (c *Client) sendTransactions(ctx context.Context, transactions *Transactions) error {
+	c.log.WithFields(logrus.Fields{
 		"code":         TransactionsCode,
 		"transactions": transactions,
 	}).Debug("sending Transactions")
@@ -53,13 +53,13 @@ func (m *Mimicry) sendTransactions(ctx context.Context, transactions *Transactio
 		return fmt.Errorf("error encoding transactions: %w", err)
 	}
 
-	if _, err := m.rlpxConn.Write(TransactionsCode, encodedData); err != nil {
+	if _, err := c.rlpxConn.Write(TransactionsCode, encodedData); err != nil {
 		return fmt.Errorf("error sending transactions: %w", err)
 	}
 
 	return nil
 }
 
-func (m *Mimicry) Transactions(ctx context.Context, transactions *Transactions) error {
-	return m.sendTransactions(ctx, transactions)
+func (c *Client) Transactions(ctx context.Context, transactions *Transactions) error {
+	return c.sendTransactions(ctx, transactions)
 }

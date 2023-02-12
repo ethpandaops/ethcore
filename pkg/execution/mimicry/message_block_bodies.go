@@ -20,7 +20,7 @@ func (msg *BlockBodies) Code() int { return BlockBodiesCode }
 
 func (msg *BlockBodies) ReqID() uint64 { return msg.RequestId }
 
-func (m *Mimicry) handleBlockBodies(ctx context.Context, data []byte) (*BlockBodies, error) {
+func (c *Client) handleBlockBodies(ctx context.Context, data []byte) (*BlockBodies, error) {
 	s := new(BlockBodies)
 	if err := rlp.DecodeBytes(data, &s); err != nil {
 		return nil, fmt.Errorf("error decoding block bodies: %w", err)
@@ -29,8 +29,8 @@ func (m *Mimicry) handleBlockBodies(ctx context.Context, data []byte) (*BlockBod
 	return s, nil
 }
 
-func (m *Mimicry) sendBlockBodies(ctx context.Context, bh *BlockBodies) error {
-	m.log.WithFields(logrus.Fields{
+func (c *Client) sendBlockBodies(ctx context.Context, bh *BlockBodies) error {
+	c.log.WithFields(logrus.Fields{
 		"code":         BlockBodiesCode,
 		"request_id":   bh.RequestId,
 		"bodies_count": len(bh.BlockBodiesPacket),
@@ -41,7 +41,7 @@ func (m *Mimicry) sendBlockBodies(ctx context.Context, bh *BlockBodies) error {
 		return fmt.Errorf("error encoding block bodies: %w", err)
 	}
 
-	if _, err := m.rlpxConn.Write(BlockBodiesCode, encodedData); err != nil {
+	if _, err := c.rlpxConn.Write(BlockBodiesCode, encodedData); err != nil {
 		return fmt.Errorf("error sending block bodies: %w", err)
 	}
 

@@ -20,7 +20,7 @@ func (msg *Receipts) Code() int { return ReceiptsCode }
 
 func (msg *Receipts) ReqID() uint64 { return msg.RequestId }
 
-func (m *Mimicry) handleReceipts(ctx context.Context, data []byte) (*Receipts, error) {
+func (c *Client) handleReceipts(ctx context.Context, data []byte) (*Receipts, error) {
 	s := new(Receipts)
 	if err := rlp.DecodeBytes(data, &s); err != nil {
 		return nil, fmt.Errorf("error decoding block receipts: %w", err)
@@ -29,8 +29,8 @@ func (m *Mimicry) handleReceipts(ctx context.Context, data []byte) (*Receipts, e
 	return s, nil
 }
 
-func (m *Mimicry) sendReceipts(ctx context.Context, r *Receipts) error {
-	m.log.WithFields(logrus.Fields{
+func (c *Client) sendReceipts(ctx context.Context, r *Receipts) error {
+	c.log.WithFields(logrus.Fields{
 		"code":           ReceiptsCode,
 		"request_id":     r.RequestId,
 		"receipts_count": len(r.ReceiptsPacket),
@@ -41,7 +41,7 @@ func (m *Mimicry) sendReceipts(ctx context.Context, r *Receipts) error {
 		return fmt.Errorf("error encoding block receipts: %w", err)
 	}
 
-	if _, err := m.rlpxConn.Write(ReceiptsCode, encodedData); err != nil {
+	if _, err := c.rlpxConn.Write(ReceiptsCode, encodedData); err != nil {
 		return fmt.Errorf("error sending block receipts: %w", err)
 	}
 

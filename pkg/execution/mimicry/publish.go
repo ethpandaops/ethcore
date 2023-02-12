@@ -13,68 +13,68 @@ const (
 	topicNewPooledTransactionHashes68 = "new_pooled_transaction_hashes_68"
 )
 
-func (m *Mimicry) publishDisconnect(ctx context.Context, reason *Disconnect) {
-	m.broker.Emit(topicDisconnect, reason)
+func (c *Client) publishDisconnect(ctx context.Context, reason *Disconnect) {
+	c.broker.Emit(topicDisconnect, reason)
 }
 
-func (m *Mimicry) publishHello(ctx context.Context, status *Hello) {
-	m.broker.Emit(topicHello, status)
+func (c *Client) publishHello(ctx context.Context, status *Hello) {
+	c.broker.Emit(topicHello, status)
 }
 
-func (m *Mimicry) publishStatus(ctx context.Context, status *Status) {
-	m.broker.Emit(topicStatus, status)
+func (c *Client) publishStatus(ctx context.Context, status *Status) {
+	c.broker.Emit(topicStatus, status)
 }
 
-func (m *Mimicry) publishTransactions(ctx context.Context, transactions *Transactions) {
-	m.broker.Emit(topicTransactions, transactions)
+func (c *Client) publishTransactions(ctx context.Context, transactions *Transactions) {
+	c.broker.Emit(topicTransactions, transactions)
 }
 
-func (m *Mimicry) publishNewPooledTransactionHashes(ctx context.Context, hashes *NewPooledTransactionHashes) {
-	m.broker.Emit(topicNewPooledTransactionHashes, hashes)
+func (c *Client) publishNewPooledTransactionHashes(ctx context.Context, hashes *NewPooledTransactionHashes) {
+	c.broker.Emit(topicNewPooledTransactionHashes, hashes)
 }
 
-func (m *Mimicry) publishNewPooledTransactionHashes68(ctx context.Context, hashes *NewPooledTransactionHashes68) {
-	m.broker.Emit(topicNewPooledTransactionHashes68, hashes)
+func (c *Client) publishNewPooledTransactionHashes68(ctx context.Context, hashes *NewPooledTransactionHashes68) {
+	c.broker.Emit(topicNewPooledTransactionHashes68, hashes)
 }
 
-func (m *Mimicry) handleSubscriberError(err error, topic string) {
+func (c *Client) handleSubscriberError(err error, topic string) {
 	if err != nil {
-		m.log.WithError(err).WithField("topic", topic).Error("Subscriber error")
+		c.log.WithError(err).WithField("topic", topic).Error("Subscriber error")
 	}
 }
 
-func (m *Mimicry) OnDisconnect(ctx context.Context, handler func(ctx context.Context, reason *Disconnect) error) {
-	m.broker.On(topicDisconnect, func(reason *Disconnect) {
-		m.handleSubscriberError(handler(ctx, reason), topicDisconnect)
+func (c *Client) OnDisconnect(ctx context.Context, handler func(ctx context.Context, reason *Disconnect) error) {
+	c.broker.On(topicDisconnect, func(reason *Disconnect) {
+		c.handleSubscriberError(handler(ctx, reason), topicDisconnect)
 	})
 }
 
-func (m *Mimicry) OnHello(ctx context.Context, handler func(ctx context.Context, status *Hello) error) {
-	m.broker.On(topicHello, func(status *Hello) {
-		m.handleSubscriberError(handler(ctx, status), topicHello)
+func (c *Client) OnHello(ctx context.Context, handler func(ctx context.Context, status *Hello) error) {
+	c.broker.On(topicHello, func(status *Hello) {
+		c.handleSubscriberError(handler(ctx, status), topicHello)
 	})
 }
 
-func (m *Mimicry) OnStatus(ctx context.Context, handler func(ctx context.Context, status *Status) error) {
-	m.broker.On(topicStatus, func(status *Status) {
-		m.handleSubscriberError(handler(ctx, status), topicStatus)
+func (c *Client) OnStatus(ctx context.Context, handler func(ctx context.Context, status *Status) error) {
+	c.broker.On(topicStatus, func(status *Status) {
+		c.handleSubscriberError(handler(ctx, status), topicStatus)
 	})
 }
 
-func (m *Mimicry) OnTransactions(ctx context.Context, handler func(ctx context.Context, transactions *Transactions) error) {
-	m.broker.On(topicTransactions, func(transactions *Transactions) {
-		m.handleSubscriberError(handler(ctx, transactions), topicTransactions)
+func (c *Client) OnTransactions(ctx context.Context, handler func(ctx context.Context, transactions *Transactions) error) {
+	c.broker.On(topicTransactions, func(transactions *Transactions) {
+		c.handleSubscriberError(handler(ctx, transactions), topicTransactions)
 	})
 }
 
-func (m *Mimicry) OnNewPooledTransactionHashes(ctx context.Context, handler func(ctx context.Context, hashes *NewPooledTransactionHashes) error) {
-	m.broker.On(topicNewPooledTransactionHashes, func(hashes *NewPooledTransactionHashes) {
-		m.handleSubscriberError(handler(ctx, hashes), topicNewPooledTransactionHashes)
+func (c *Client) OnNewPooledTransactionHashes(ctx context.Context, handler func(ctx context.Context, hashes *NewPooledTransactionHashes) error) {
+	c.broker.On(topicNewPooledTransactionHashes, func(hashes *NewPooledTransactionHashes) {
+		c.handleSubscriberError(handler(ctx, hashes), topicNewPooledTransactionHashes)
 	})
 }
 
-func (m *Mimicry) OnNewPooledTransactionHashes68(ctx context.Context, handler func(ctx context.Context, hashes *NewPooledTransactionHashes68) error) {
-	m.broker.On(topicNewPooledTransactionHashes68, func(hashes *NewPooledTransactionHashes68) {
-		m.handleSubscriberError(handler(ctx, hashes), topicNewPooledTransactionHashes68)
+func (c *Client) OnNewPooledTransactionHashes68(ctx context.Context, handler func(ctx context.Context, hashes *NewPooledTransactionHashes68) error) {
+	c.broker.On(topicNewPooledTransactionHashes68, func(hashes *NewPooledTransactionHashes68) {
+		c.handleSubscriberError(handler(ctx, hashes), topicNewPooledTransactionHashes68)
 	})
 }

@@ -18,12 +18,12 @@ func (h *Pong) Code() int { return PongCode }
 
 func (h *Pong) ReqID() uint64 { return 0 }
 
-func (m *Mimicry) sendPong(ctx context.Context) error {
-	m.log.WithFields(logrus.Fields{
+func (c *Client) sendPong(ctx context.Context) error {
+	c.log.WithFields(logrus.Fields{
 		"code": PongCode,
 	}).Debug("sending Pong")
 
-	if _, err := m.rlpxConn.Write(PongCode, []byte{}); err != nil {
+	if _, err := c.rlpxConn.Write(PongCode, []byte{}); err != nil {
 		return fmt.Errorf("error sending pong: %w", err)
 	}
 

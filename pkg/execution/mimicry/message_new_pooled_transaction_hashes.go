@@ -29,7 +29,7 @@ func (msg *NewPooledTransactionHashes68) Code() int { return NewPooledTransactio
 func (msg *NewPooledTransactionHashes) ReqID() uint64   { return 0 }
 func (msg *NewPooledTransactionHashes68) ReqID() uint64 { return 0 }
 
-func (m *Mimicry) receiveNewPooledTransactionHashes(ctx context.Context, data []byte) (*NewPooledTransactionHashes, error) {
+func (c *Client) receiveNewPooledTransactionHashes(ctx context.Context, data []byte) (*NewPooledTransactionHashes, error) {
 	s := new(NewPooledTransactionHashes)
 	if err := rlp.DecodeBytes(data, &s); err != nil {
 		return nil, fmt.Errorf("error decoding new pooled transaction hashes: %w", err)
@@ -38,7 +38,7 @@ func (m *Mimicry) receiveNewPooledTransactionHashes(ctx context.Context, data []
 	return s, nil
 }
 
-func (m *Mimicry) receiveNewPooledTransactionHashes68(ctx context.Context, data []byte) (*NewPooledTransactionHashes68, error) {
+func (c *Client) receiveNewPooledTransactionHashes68(ctx context.Context, data []byte) (*NewPooledTransactionHashes68, error) {
 	s := new(NewPooledTransactionHashes68)
 	if err := rlp.DecodeBytes(data, &s); err != nil {
 		return nil, fmt.Errorf("error decoding new pooled transaction hashes: %w", err)
@@ -47,8 +47,8 @@ func (m *Mimicry) receiveNewPooledTransactionHashes68(ctx context.Context, data 
 	return s, nil
 }
 
-func (m *Mimicry) sendNewPooledTransactionHashes(ctx context.Context, pth *NewPooledTransactionHashes) error {
-	m.log.WithFields(logrus.Fields{
+func (c *Client) sendNewPooledTransactionHashes(ctx context.Context, pth *NewPooledTransactionHashes) error {
+	c.log.WithFields(logrus.Fields{
 		"code":         NewPooledTransactionHashesCode,
 		"hashes_count": len(*pth),
 	}).Debug("sending NewPooledTransactionHashes")
@@ -58,37 +58,37 @@ func (m *Mimicry) sendNewPooledTransactionHashes(ctx context.Context, pth *NewPo
 		return fmt.Errorf("error encoding new pooled transaction hashes: %w", err)
 	}
 
-	if _, err := m.rlpxConn.Write(NewPooledTransactionHashesCode, encodedData); err != nil {
+	if _, err := c.rlpxConn.Write(NewPooledTransactionHashesCode, encodedData); err != nil {
 		return fmt.Errorf("error sending new pooled transaction hashes: %w", err)
 	}
 
 	return nil
 }
 
-func (m *Mimicry) handleNewPooledTransactionHashes(ctx context.Context, code uint64, data []byte) error {
-	m.log.WithField("code", code).Debug("received NewPooledTransactionHashes")
+func (c *Client) handleNewPooledTransactionHashes(ctx context.Context, code uint64, data []byte) error {
+	c.log.WithField("code", code).Debug("received NewPooledTransactionHashes")
 
-	if m.ethCapVersion < 68 {
-		hashes, err := m.receiveNewPooledTransactionHashes(ctx, data)
+	if c.ethCapVersion < 68 {
+		hashes, err := c.receiveNewPooledTransactionHashes(ctx, data)
 		if err != nil {
 			return err
 		}
 
-		m.publishNewPooledTransactionHashes(ctx, hashes)
+		c.publishNewPooledTransactionHashes(ctx, hashes)
 	} else {
-		hashes, err := m.receiveNewPooledTransactionHashes68(ctx, data)
+		hashes, err := c.receiveNewPooledTransactionHashes68(ctx, data)
 		if err != nil {
 			return err
 		}
 
-		m.publishNewPooledTransactionHashes68(ctx, hashes)
+		c.publishNewPooledTransactionHashes68(ctx, hashes)
 	}
 
 	return nil
 }
 
-func (m *Mimicry) sendNewPooledTransactionHashes68(ctx context.Context, pth *NewPooledTransactionHashes68) error {
-	m.log.WithFields(logrus.Fields{
+func (c *Client) sendNewPooledTransactionHashes68(ctx context.Context, pth *NewPooledTransactionHashes68) error {
+	c.log.WithFields(logrus.Fields{
 		"code":         NewPooledTransactionHashesCode,
 		"hashes_count": len(pth.Transactions),
 	}).Debug("sending NewPooledTransactionHashes")
@@ -98,7 +98,7 @@ func (m *Mimicry) sendNewPooledTransactionHashes68(ctx context.Context, pth *New
 		return fmt.Errorf("error encoding new pooled transaction hashes: %w", err)
 	}
 
-	if _, err := m.rlpxConn.Write(NewPooledTransactionHashesCode, encodedData); err != nil {
+	if _, err := c.rlpxConn.Write(NewPooledTransactionHashesCode, encodedData); err != nil {
 		return fmt.Errorf("error sending new pooled transaction hashes: %w", err)
 	}
 

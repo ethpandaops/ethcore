@@ -20,7 +20,7 @@ func (msg *Status) Code() int { return StatusCode }
 
 func (msg *Status) ReqID() uint64 { return 0 }
 
-func (m *Mimicry) receiveStatus(ctx context.Context, data []byte) (*Status, error) {
+func (c *Client) receiveStatus(ctx context.Context, data []byte) (*Status, error) {
 	s := new(Status)
 	if err := rlp.DecodeBytes(data, &s); err != nil {
 		return nil, fmt.Errorf("error decoding status: %w", err)
@@ -29,8 +29,8 @@ func (m *Mimicry) receiveStatus(ctx context.Context, data []byte) (*Status, erro
 	return s, nil
 }
 
-func (m *Mimicry) sendStatus(ctx context.Context, status *Status) error {
-	m.log.WithFields(logrus.Fields{
+func (c *Client) sendStatus(ctx context.Context, status *Status) error {
+	c.log.WithFields(logrus.Fields{
 		"code":   StatusCode,
 		"status": status,
 	}).Debug("sending Status")
@@ -40,24 +40,24 @@ func (m *Mimicry) sendStatus(ctx context.Context, status *Status) error {
 		return fmt.Errorf("error encoding status: %w", err)
 	}
 
-	if _, err := m.rlpxConn.Write(StatusCode, encodedData); err != nil {
+	if _, err := c.rlpxConn.Write(StatusCode, encodedData); err != nil {
 		return fmt.Errorf("error sending status: %w", err)
 	}
 
 	return nil
 }
 
-func (m *Mimicry) handleStatus(ctx context.Context, code uint64, data []byte) error {
-	m.log.WithField("code", code).Debug("received Status")
+func (c *Client) handleStatus(ctx context.Context, code uint64, data []byte) error {
+	c.log.WithField("code", code).Debug("received Status")
 
-	status, err := m.receiveStatus(ctx, data)
+	status, err := c.receiveStatus(ctx, data)
 	if err != nil {
 		return err
 	}
 
-	m.publishStatus(ctx, status)
+	c.publishStatus(ctx, status)
 
-	if err := m.sendStatus(ctx, status); err != nil {
+	if err := c.sendStatus(ctx, status); err != nil {
 		return err
 	}
 

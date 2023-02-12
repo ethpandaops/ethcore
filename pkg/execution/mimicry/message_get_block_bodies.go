@@ -20,7 +20,7 @@ func (msg *GetBlockBodies) Code() int { return GetBlockBodiesCode }
 
 func (msg *GetBlockBodies) ReqID() uint64 { return msg.RequestId }
 
-func (m *Mimicry) receiveGetBlockBodies(ctx context.Context, data []byte) (*GetBlockBodies, error) {
+func (c *Client) receiveGetBlockBodies(ctx context.Context, data []byte) (*GetBlockBodies, error) {
 	s := new(GetBlockBodies)
 	if err := rlp.DecodeBytes(data, &s); err != nil {
 		return nil, fmt.Errorf("error decoding get block bodies: %w", err)
@@ -29,15 +29,15 @@ func (m *Mimicry) receiveGetBlockBodies(ctx context.Context, data []byte) (*GetB
 	return s, nil
 }
 
-func (m *Mimicry) handleGetBlockBodies(ctx context.Context, code uint64, data []byte) error {
-	m.log.WithField("code", code).Debug("received GetBlockBodies")
+func (c *Client) handleGetBlockBodies(ctx context.Context, code uint64, data []byte) error {
+	c.log.WithField("code", code).Debug("received GetBlockBodies")
 
-	blockBodies, err := m.receiveGetBlockBodies(ctx, data)
+	blockBodies, err := c.receiveGetBlockBodies(ctx, data)
 	if err != nil {
 		return err
 	}
 
-	err = m.sendBlockBodies(ctx, &BlockBodies{
+	err = c.sendBlockBodies(ctx, &BlockBodies{
 		RequestId:         blockBodies.RequestId,
 		BlockBodiesPacket: []*eth.BlockBody{},
 	})
@@ -48,8 +48,8 @@ func (m *Mimicry) handleGetBlockBodies(ctx context.Context, code uint64, data []
 	return nil
 }
 
-func (m *Mimicry) sendGetBlockBodies(ctx context.Context, bh *GetBlockBodies) error {
-	m.log.WithFields(logrus.Fields{
+func (c *Client) sendGetBlockBodies(ctx context.Context, bh *GetBlockBodies) error {
+	c.log.WithFields(logrus.Fields{
 		"code":       GetBlockBodiesCode,
 		"request_id": bh.RequestId,
 		"bodies":     bh.GetBlockBodiesPacket,
@@ -60,7 +60,7 @@ func (m *Mimicry) sendGetBlockBodies(ctx context.Context, bh *GetBlockBodies) er
 		return fmt.Errorf("error encoding get block bodies: %w", err)
 	}
 
-	if _, err := m.rlpxConn.Write(GetBlockBodiesCode, encodedData); err != nil {
+	if _, err := c.rlpxConn.Write(GetBlockBodiesCode, encodedData); err != nil {
 		return fmt.Errorf("error sending get block bodies: %w", err)
 	}
 
