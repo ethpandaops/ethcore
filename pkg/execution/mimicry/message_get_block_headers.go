@@ -20,7 +20,7 @@ func (msg *GetBlockHeaders) Code() int { return GetBlockHeadersCode }
 
 func (msg *GetBlockHeaders) ReqID() uint64 { return msg.RequestId }
 
-func (m *Mimicry) receiveGetBlockHeaders(ctx context.Context, data []byte) (*GetBlockHeaders, error) {
+func (c *Client) receiveGetBlockHeaders(ctx context.Context, data []byte) (*GetBlockHeaders, error) {
 	s := new(GetBlockHeaders)
 	if err := rlp.DecodeBytes(data, &s); err != nil {
 		return nil, fmt.Errorf("error decoding get block headers: %w", err)
@@ -29,15 +29,15 @@ func (m *Mimicry) receiveGetBlockHeaders(ctx context.Context, data []byte) (*Get
 	return s, nil
 }
 
-func (m *Mimicry) handleGetBlockHeaders(ctx context.Context, code uint64, data []byte) error {
-	m.log.WithField("code", code).Debug("received GetBlockHeaders")
+func (c *Client) handleGetBlockHeaders(ctx context.Context, code uint64, data []byte) error {
+	c.log.WithField("code", code).Debug("received GetBlockHeaders")
 
-	blockHeaders, err := m.receiveGetBlockHeaders(ctx, data)
+	blockHeaders, err := c.receiveGetBlockHeaders(ctx, data)
 	if err != nil {
 		return err
 	}
 
-	err = m.sendGetBlockHeaders(ctx, blockHeaders)
+	err = c.sendGetBlockHeaders(ctx, blockHeaders)
 	if err != nil {
 		return err
 	}
@@ -45,8 +45,8 @@ func (m *Mimicry) handleGetBlockHeaders(ctx context.Context, code uint64, data [
 	return nil
 }
 
-func (m *Mimicry) sendGetBlockHeaders(ctx context.Context, bh *GetBlockHeaders) error {
-	m.log.WithFields(logrus.Fields{
+func (c *Client) sendGetBlockHeaders(ctx context.Context, bh *GetBlockHeaders) error {
+	c.log.WithFields(logrus.Fields{
 		"code":       GetBlockHeadersCode,
 		"request_id": bh.RequestId,
 		"headers":    bh.GetBlockHeadersPacket,
@@ -57,7 +57,7 @@ func (m *Mimicry) sendGetBlockHeaders(ctx context.Context, bh *GetBlockHeaders) 
 		return fmt.Errorf("error encoding get block headers: %w", err)
 	}
 
-	if _, err := m.rlpxConn.Write(GetBlockHeadersCode, encodedData); err != nil {
+	if _, err := c.rlpxConn.Write(GetBlockHeadersCode, encodedData); err != nil {
 		return fmt.Errorf("error sending get block headers: %w", err)
 	}
 

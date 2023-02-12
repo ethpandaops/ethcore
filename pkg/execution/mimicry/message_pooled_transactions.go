@@ -20,7 +20,7 @@ func (msg *PooledTransactions) Code() int { return PooledTransactionsCode }
 
 func (msg *PooledTransactions) ReqID() uint64 { return msg.RequestId }
 
-func (m *Mimicry) receivePooledTransactions(ctx context.Context, data []byte) (*PooledTransactions, error) {
+func (c *Client) receivePooledTransactions(ctx context.Context, data []byte) (*PooledTransactions, error) {
 	s := new(PooledTransactions)
 	if err := rlp.DecodeBytes(data, &s); err != nil {
 		return nil, fmt.Errorf("error decoding get block headers: %w", err)
@@ -29,23 +29,23 @@ func (m *Mimicry) receivePooledTransactions(ctx context.Context, data []byte) (*
 	return s, nil
 }
 
-func (m *Mimicry) handlePooledTransactions(ctx context.Context, code uint64, data []byte) error {
-	m.log.WithField("code", code).Debug("received PooledTransactions")
+func (c *Client) handlePooledTransactions(ctx context.Context, code uint64, data []byte) error {
+	c.log.WithField("code", code).Debug("received PooledTransactions")
 
-	txs, err := m.receivePooledTransactions(ctx, data)
+	txs, err := c.receivePooledTransactions(ctx, data)
 	if err != nil {
 		return err
 	}
 
-	if m.pooledTransactionsMap[txs.ReqID()] != nil {
-		m.pooledTransactionsMap[txs.ReqID()] <- txs
+	if c.pooledTransactionsMap[txs.ReqID()] != nil {
+		c.pooledTransactionsMap[txs.ReqID()] <- txs
 	}
 
 	return nil
 }
 
-func (m *Mimicry) sendPooledTransactions(ctx context.Context, pt *PooledTransactions) error {
-	m.log.WithFields(logrus.Fields{
+func (c *Client) sendPooledTransactions(ctx context.Context, pt *PooledTransactions) error {
+	c.log.WithFields(logrus.Fields{
 		"code":       PooledTransactionsCode,
 		"request_id": pt.RequestId,
 		"txs_count":  len(pt.PooledTransactionsPacket),
@@ -56,7 +56,7 @@ func (m *Mimicry) sendPooledTransactions(ctx context.Context, pt *PooledTransact
 		return fmt.Errorf("error encoding get block headers: %w", err)
 	}
 
-	if _, err := m.rlpxConn.Write(PooledTransactionsCode, encodedData); err != nil {
+	if _, err := c.rlpxConn.Write(PooledTransactionsCode, encodedData); err != nil {
 		return fmt.Errorf("error sending get block headers: %w", err)
 	}
 

@@ -20,7 +20,7 @@ func (msg *BlockHeaders) Code() int { return BlockHeadersCode }
 
 func (msg *BlockHeaders) ReqID() uint64 { return msg.RequestId }
 
-func (m *Mimicry) receiveBlockHeaders(ctx context.Context, data []byte) (*BlockHeaders, error) {
+func (c *Client) receiveBlockHeaders(ctx context.Context, data []byte) (*BlockHeaders, error) {
 	s := new(BlockHeaders)
 	if err := rlp.DecodeBytes(data, &s); err != nil {
 		return nil, fmt.Errorf("error decoding block headers: %w", err)
@@ -29,15 +29,15 @@ func (m *Mimicry) receiveBlockHeaders(ctx context.Context, data []byte) (*BlockH
 	return s, nil
 }
 
-func (m *Mimicry) handleBlockHeaders(ctx context.Context, code uint64, data []byte) error {
-	m.log.WithField("code", code).Debug("received BlockHeaders")
+func (c *Client) handleBlockHeaders(ctx context.Context, code uint64, data []byte) error {
+	c.log.WithField("code", code).Debug("received BlockHeaders")
 
-	blockHeaders, err := m.receiveBlockHeaders(ctx, data)
+	blockHeaders, err := c.receiveBlockHeaders(ctx, data)
 	if err != nil {
 		return err
 	}
 
-	err = m.sendBlockHeaders(ctx, blockHeaders)
+	err = c.sendBlockHeaders(ctx, blockHeaders)
 	if err != nil {
 		return err
 	}
@@ -45,8 +45,8 @@ func (m *Mimicry) handleBlockHeaders(ctx context.Context, code uint64, data []by
 	return nil
 }
 
-func (m *Mimicry) sendBlockHeaders(ctx context.Context, bh *BlockHeaders) error {
-	m.log.WithFields(logrus.Fields{
+func (c *Client) sendBlockHeaders(ctx context.Context, bh *BlockHeaders) error {
+	c.log.WithFields(logrus.Fields{
 		"code":          BlockHeadersCode,
 		"request_id":    bh.RequestId,
 		"headers_count": len(bh.BlockHeadersPacket),
@@ -57,7 +57,7 @@ func (m *Mimicry) sendBlockHeaders(ctx context.Context, bh *BlockHeaders) error 
 		return fmt.Errorf("error encoding block headers: %w", err)
 	}
 
-	if _, err := m.rlpxConn.Write(BlockHeadersCode, encodedData); err != nil {
+	if _, err := c.rlpxConn.Write(BlockHeadersCode, encodedData); err != nil {
 		return fmt.Errorf("error sending block headers: %w", err)
 	}
 

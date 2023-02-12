@@ -23,7 +23,7 @@ func (msg *GetPooledTransactions) Code() int { return GetPooledTransactionsCode 
 
 func (msg *GetPooledTransactions) ReqID() uint64 { return msg.RequestId }
 
-func (m *Mimicry) handleGetPooledTransactions(ctx context.Context, data []byte) (*GetPooledTransactions, error) {
+func (c *Client) handleGetPooledTransactions(ctx context.Context, data []byte) (*GetPooledTransactions, error) {
 	s := new(GetPooledTransactions)
 	if err := rlp.DecodeBytes(data, &s); err != nil {
 		return nil, fmt.Errorf("error decoding get block headers: %w", err)
@@ -32,8 +32,8 @@ func (m *Mimicry) handleGetPooledTransactions(ctx context.Context, data []byte) 
 	return s, nil
 }
 
-func (m *Mimicry) sendGetPooledTransactions(ctx context.Context, pt *GetPooledTransactions) error {
-	m.log.WithFields(logrus.Fields{
+func (c *Client) sendGetPooledTransactions(ctx context.Context, pt *GetPooledTransactions) error {
+	c.log.WithFields(logrus.Fields{
 		"code":       GetPooledTransactionsCode,
 		"request_id": pt.RequestId,
 		"txs_count":  len(pt.GetPooledTransactionsPacket),
@@ -44,27 +44,27 @@ func (m *Mimicry) sendGetPooledTransactions(ctx context.Context, pt *GetPooledTr
 		return fmt.Errorf("error encoding get block headers: %w", err)
 	}
 
-	if _, err := m.rlpxConn.Write(GetPooledTransactionsCode, encodedData); err != nil {
+	if _, err := c.rlpxConn.Write(GetPooledTransactionsCode, encodedData); err != nil {
 		return fmt.Errorf("error sending get block headers: %w", err)
 	}
 
 	return nil
 }
 
-func (m *Mimicry) GetPooledTransactions(ctx context.Context, hashes []common.Hash) (*PooledTransactions, error) {
+func (c *Client) GetPooledTransactions(ctx context.Context, hashes []common.Hash) (*PooledTransactions, error) {
 	//nolint:gosec // not a security issue
 	requestID := uint64(rand.Uint32())<<32 + uint64(rand.Uint32())
 
 	defer func() {
-		if m.pooledTransactionsMap[requestID] == nil {
-			close(m.pooledTransactionsMap[requestID])
-			delete(m.pooledTransactionsMap, requestID)
+		if c.pooledTransactionsMap[requestID] == nil {
+			close(c.pooledTransactionsMap[requestID])
+			delete(c.pooledTransactionsMap, requestID)
 		}
 	}()
 
-	m.pooledTransactionsMap[requestID] = make(chan *PooledTransactions)
+	c.pooledTransactionsMap[requestID] = make(chan *PooledTransactions)
 
-	if err := m.sendGetPooledTransactions(ctx, &GetPooledTransactions{
+	if err := c.sendGetPooledTransactions(ctx, &GetPooledTransactions{
 		RequestId:                   requestID,
 		GetPooledTransactionsPacket: hashes,
 	}); err != nil {
@@ -72,7 +72,7 @@ func (m *Mimicry) GetPooledTransactions(ctx context.Context, hashes []common.Has
 	}
 
 	select {
-	case res := <-m.pooledTransactionsMap[requestID]:
+	case res := <-c.pooledTransactionsMap[requestID]:
 		return res, nil
 	case <-time.After(10 * time.Second):
 		return nil, fmt.Errorf("timeout")

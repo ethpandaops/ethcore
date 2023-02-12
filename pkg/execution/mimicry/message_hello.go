@@ -104,13 +104,13 @@ func SupportedEthCaps() []p2p.Cap {
 	return caps
 }
 
-func (m *Mimicry) receiveHello(ctx context.Context, data []byte) (*Hello, error) {
+func (c *Client) receiveHello(ctx context.Context, data []byte) (*Hello, error) {
 	h := new(Hello)
 	if err := rlp.DecodeBytes(data, &h); err != nil {
 		return nil, fmt.Errorf("error decoding hello: %w", err)
 	}
 
-	m.log.WithFields(logrus.Fields{
+	c.log.WithFields(logrus.Fields{
 		"version": h.Version,
 		"caps":    h.Caps,
 		"id":      h.ID,
@@ -123,12 +123,12 @@ func (m *Mimicry) receiveHello(ctx context.Context, data []byte) (*Hello, error)
 	return h, nil
 }
 
-func (m *Mimicry) sendHello(ctx context.Context) error {
-	m.log.WithFields(logrus.Fields{
+func (c *Client) sendHello(ctx context.Context) error {
+	c.log.WithFields(logrus.Fields{
 		"code": HelloCode,
 	}).Debug("sending Hello")
 
-	pub0 := crypto.FromECDSAPub(&m.privateKey.PublicKey)[1:]
+	pub0 := crypto.FromECDSAPub(&c.privateKey.PublicKey)[1:]
 	hello := &Hello{
 		Version: P2PProtocolVersion,
 		Caps:    SupportedEthCaps(),
@@ -140,27 +140,27 @@ func (m *Mimicry) sendHello(ctx context.Context) error {
 		return fmt.Errorf("error encoding hello: %w", err)
 	}
 
-	if _, err := m.rlpxConn.Write(HelloCode, encodedData); err != nil {
+	if _, err := c.rlpxConn.Write(HelloCode, encodedData); err != nil {
 		return fmt.Errorf("error sending hello: %w", err)
 	}
 
 	return nil
 }
 
-func (m *Mimicry) handleHello(ctx context.Context, code uint64, data []byte) error {
-	m.log.WithField("code", code).Debug("received Hello")
+func (c *Client) handleHello(ctx context.Context, code uint64, data []byte) error {
+	c.log.WithField("code", code).Debug("received Hello")
 
-	hello, err := m.receiveHello(ctx, data)
+	hello, err := c.receiveHello(ctx, data)
 	if err != nil {
 		return err
 	}
 
-	m.ethCapVersion = hello.ETHProtocolVersion()
+	c.ethCapVersion = hello.ETHProtocolVersion()
 
-	m.publishHello(ctx, hello)
+	c.publishHello(ctx, hello)
 
 	// always enable snappy to avoid jank
-	m.rlpxConn.SetSnappy(true)
+	c.rlpxConn.SetSnappy(true)
 
 	return nil
 }

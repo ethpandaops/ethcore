@@ -13,10 +13,10 @@ func (h *Ping) Code() int { return PingCode }
 
 func (h *Ping) ReqID() uint64 { return 0 }
 
-func (m *Mimicry) handlePing(ctx context.Context, code uint64, data []byte) error {
-	m.log.WithField("code", code).Debug("received Ping")
+func (c *Client) handlePing(ctx context.Context, code uint64, data []byte) error {
+	c.log.WithField("code", code).Debug("received Ping")
 
-	if err := m.sendPong(ctx); err != nil {
+	if err := c.sendPong(ctx); err != nil {
 		return err
 	}
 
