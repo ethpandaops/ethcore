@@ -29,7 +29,7 @@ func (c *Client) publishTransactions(ctx context.Context, transactions *Transact
 	c.broker.Emit(topicTransactions, transactions)
 }
 
-func (c *Client) publishNewPooledTransactionHashes(ctx context.Context, hashes *NewPooledTransactionHashes) {
+func (c *Client) publishNewPooledTransactionHashes66(ctx context.Context, hashes *NewPooledTransactionHashes66) {
 	c.broker.Emit(topicNewPooledTransactionHashes, hashes)
 }
 
@@ -67,8 +67,8 @@ func (c *Client) OnTransactions(ctx context.Context, handler func(ctx context.Co
 	})
 }
 
-func (c *Client) OnNewPooledTransactionHashes(ctx context.Context, handler func(ctx context.Context, hashes *NewPooledTransactionHashes) error) {
-	c.broker.On(topicNewPooledTransactionHashes, func(hashes *NewPooledTransactionHashes) {
+func (c *Client) OnNewPooledTransactionHashes66(ctx context.Context, handler func(ctx context.Context, hashes *NewPooledTransactionHashes66) error) {
+	c.broker.On(topicNewPooledTransactionHashes, func(hashes *NewPooledTransactionHashes66) {
 		c.handleSubscriberError(handler(ctx, hashes), topicNewPooledTransactionHashes)
 	})
 }
