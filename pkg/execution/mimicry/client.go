@@ -7,6 +7,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/chuckpreslar/emission"
@@ -35,6 +36,7 @@ type Client struct {
 	rlpxConn *rlpx.Conn
 
 	pooledTransactionsMap map[uint64]chan *PooledTransactions
+	pooledTransactionsMux sync.Mutex
 
 	ethCapVersion uint
 }
