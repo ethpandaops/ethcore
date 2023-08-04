@@ -55,14 +55,19 @@ func (c *Client) GetPooledTransactions(ctx context.Context, hashes []common.Hash
 	//nolint:gosec // not a security issue
 	requestID := uint64(rand.Uint32())<<32 + uint64(rand.Uint32())
 
+	c.pooledTransactionsMux.Lock()
+	c.pooledTransactionsMap[requestID] = make(chan *PooledTransactions)
+	c.pooledTransactionsMux.Unlock()
+
 	defer func() {
-		if c.pooledTransactionsMap[requestID] == nil {
-			close(c.pooledTransactionsMap[requestID])
+		c.pooledTransactionsMux.Lock()
+		defer c.pooledTransactionsMux.Unlock()
+
+		if ch, exists := c.pooledTransactionsMap[requestID]; exists {
+			close(ch)
 			delete(c.pooledTransactionsMap, requestID)
 		}
 	}()
-
-	c.pooledTransactionsMap[requestID] = make(chan *PooledTransactions)
 
 	if err := c.sendGetPooledTransactions(ctx, &GetPooledTransactions{
 		RequestId:                   requestID,
