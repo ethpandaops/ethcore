@@ -64,7 +64,7 @@ func New(ctx context.Context, log logrus.FieldLogger, record, name string) (*Cli
 	}, nil
 }
 
-func (c *Client) Start(ctx context.Context) error {
+func (c *Client) Start(ctx context.Context, privKey string) error {
 	c.log.Debug("starting execution mimicry client")
 	c.peer = p2p.NewPeer(c.nodeRecord.ID(), c.name, SupportedEthCaps())
 
@@ -94,7 +94,9 @@ func (c *Client) Start(ctx context.Context) error {
 		return err
 	}
 
-	c.privateKey, _ = crypto.GenerateKey()
+	// Assign a fixed ECDSA key
+	// c.privateKey, _ = crypto.GenerateKey()
+	c.privateKey, _ = crypto.HexToECDSA(privKey)
 
 	peerPublicKey, err := c.rlpxConn.Handshake(c.privateKey)
 	if err != nil {
