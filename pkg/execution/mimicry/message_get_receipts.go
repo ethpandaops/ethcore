@@ -8,14 +8,13 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/eth/protocols/eth"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/sirupsen/logrus"
 )
 
 const (
 	GetReceiptsCode = 0x1f
 )
 
-type GetReceipts eth.GetReceiptsPacket66
+type GetReceipts eth.GetReceiptsPacket
 
 func (msg *GetReceipts) Code() int { return GetReceiptsCode }
 
@@ -39,31 +38,13 @@ func (c *Client) handleGetReceipts(ctx context.Context, code uint64, data []byte
 	}
 
 	err = c.sendReceipts(ctx, &Receipts{
-		RequestId:      blockBodies.RequestId,
-		ReceiptsPacket: [][]*types.Receipt{},
+		RequestId:        blockBodies.RequestId,
+		ReceiptsResponse: [][]*types.Receipt{},
 	})
 	if err != nil {
 		c.handleSessionError(ctx, err)
+
 		return err
-	}
-
-	return nil
-}
-
-func (c *Client) sendGetReceipts(ctx context.Context, bh *GetReceipts) error {
-	c.log.WithFields(logrus.Fields{
-		"code":       GetReceiptsCode,
-		"request_id": bh.RequestId,
-		"receipts":   bh.GetReceiptsPacket,
-	}).Debug("sending GetReceipts")
-
-	encodedData, err := rlp.EncodeToBytes(bh)
-	if err != nil {
-		return fmt.Errorf("error encoding get block receipts: %w", err)
-	}
-
-	if _, err := c.rlpxConn.Write(GetReceiptsCode, encodedData); err != nil {
-		return fmt.Errorf("error sending get block receipts: %w", err)
 	}
 
 	return nil

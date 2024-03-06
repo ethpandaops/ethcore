@@ -14,7 +14,7 @@ const (
 	GetBlockHeadersCode = 0x13
 )
 
-type GetBlockHeaders eth.GetBlockHeadersPacket66
+type GetBlockHeaders eth.GetBlockHeadersPacket
 
 func (msg *GetBlockHeaders) Code() int { return GetBlockHeadersCode }
 
@@ -49,7 +49,7 @@ func (c *Client) sendGetBlockHeaders(ctx context.Context, bh *GetBlockHeaders) e
 	c.log.WithFields(logrus.Fields{
 		"code":       GetBlockHeadersCode,
 		"request_id": bh.RequestId,
-		"headers":    bh.GetBlockHeadersPacket,
+		"headers":    bh.GetBlockHeadersRequest,
 	}).Debug("sending GetBlockHeaders")
 
 	encodedData, err := rlp.EncodeToBytes(bh)
