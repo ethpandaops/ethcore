@@ -15,7 +15,7 @@ const (
 	GetReceiptsCode = 0x1f
 )
 
-type GetReceipts eth.GetReceiptsPacket66
+type GetReceipts eth.GetReceiptsPacket
 
 func (msg *GetReceipts) Code() int { return GetReceiptsCode }
 
@@ -39,8 +39,8 @@ func (c *Client) handleGetReceipts(ctx context.Context, code uint64, data []byte
 	}
 
 	err = c.sendReceipts(ctx, &Receipts{
-		RequestId:      blockBodies.RequestId,
-		ReceiptsPacket: [][]*types.Receipt{},
+		RequestId:        blockBodies.RequestId,
+		ReceiptsResponse: [][]*types.Receipt{},
 	})
 	if err != nil {
 		c.handleSessionError(ctx, err)
@@ -54,7 +54,7 @@ func (c *Client) sendGetReceipts(ctx context.Context, bh *GetReceipts) error {
 	c.log.WithFields(logrus.Fields{
 		"code":       GetReceiptsCode,
 		"request_id": bh.RequestId,
-		"receipts":   bh.GetReceiptsPacket,
+		"receipts":   bh.GetReceiptsRequest,
 	}).Debug("sending GetReceipts")
 
 	encodedData, err := rlp.EncodeToBytes(bh)

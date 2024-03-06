@@ -14,7 +14,7 @@ const (
 	PooledTransactionsCode = 0x1a
 )
 
-type PooledTransactions eth.PooledTransactionsPacket66
+type PooledTransactions eth.PooledTransactionsPacket
 
 func (msg *PooledTransactions) Code() int { return PooledTransactionsCode }
 
@@ -48,7 +48,7 @@ func (c *Client) sendPooledTransactions(ctx context.Context, pt *PooledTransacti
 	c.log.WithFields(logrus.Fields{
 		"code":       PooledTransactionsCode,
 		"request_id": pt.RequestId,
-		"txs_count":  len(pt.PooledTransactionsPacket),
+		"txs_count":  len(pt.PooledTransactionsResponse),
 	}).Debug("sending PooledTransactions")
 
 	encodedData, err := rlp.EncodeToBytes(pt)

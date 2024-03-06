@@ -14,7 +14,7 @@ const (
 	ReceiptsCode = 0x20
 )
 
-type Receipts eth.ReceiptsPacket66
+type Receipts eth.ReceiptsPacket
 
 func (msg *Receipts) Code() int { return ReceiptsCode }
 
@@ -33,7 +33,7 @@ func (c *Client) sendReceipts(ctx context.Context, r *Receipts) error {
 	c.log.WithFields(logrus.Fields{
 		"code":           ReceiptsCode,
 		"request_id":     r.RequestId,
-		"receipts_count": len(r.ReceiptsPacket),
+		"receipts_count": len(r.ReceiptsResponse),
 	}).Debug("sending Receipts")
 
 	encodedData, err := rlp.EncodeToBytes(r)

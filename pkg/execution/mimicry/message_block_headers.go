@@ -14,7 +14,7 @@ const (
 	BlockHeadersCode = 0x14
 )
 
-type BlockHeaders eth.BlockHeadersPacket66
+type BlockHeaders eth.BlockHeadersPacket
 
 func (msg *BlockHeaders) Code() int { return BlockHeadersCode }
 
@@ -49,7 +49,7 @@ func (c *Client) sendBlockHeaders(ctx context.Context, bh *BlockHeaders) error {
 	c.log.WithFields(logrus.Fields{
 		"code":          BlockHeadersCode,
 		"request_id":    bh.RequestId,
-		"headers_count": len(bh.BlockHeadersPacket),
+		"headers_count": len(bh.BlockHeadersRequest),
 	}).Debug("sending BlockHeaders")
 
 	encodedData, err := rlp.EncodeToBytes(bh)

@@ -14,7 +14,7 @@ const (
 	BlockBodiesCode = 0x16
 )
 
-type BlockBodies eth.BlockBodiesPacket66
+type BlockBodies eth.BlockBodiesPacket
 
 func (msg *BlockBodies) Code() int { return BlockBodiesCode }
 
@@ -33,7 +33,7 @@ func (c *Client) sendBlockBodies(ctx context.Context, bh *BlockBodies) error {
 	c.log.WithFields(logrus.Fields{
 		"code":         BlockBodiesCode,
 		"request_id":   bh.RequestId,
-		"bodies_count": len(bh.BlockBodiesPacket),
+		"bodies_count": len(bh.BlockBodiesResponse),
 	}).Debug("sending BlockBodies")
 
 	encodedData, err := rlp.EncodeToBytes(bh)

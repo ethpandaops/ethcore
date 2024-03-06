@@ -15,9 +15,8 @@ const (
 	HelloCode             = 0x00
 	P2PProtocolVersion    = 5
 	minP2PProtocolVersion = 5
-	minETHProtocolVersion = uint(66)
-	// TODO: implement eth/68
-	maxETHProtocolVersion = uint(67)
+	minETHProtocolVersion = uint(68)
+	maxETHProtocolVersion = uint(68)
 	ETHCapName            = "eth"
 )
 

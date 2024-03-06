@@ -14,7 +14,7 @@ const (
 	GetBlockBodiesCode = 0x15
 )
 
-type GetBlockBodies eth.GetBlockBodiesPacket66
+type GetBlockBodies eth.GetBlockBodiesPacket
 
 func (msg *GetBlockBodies) Code() int { return GetBlockBodiesCode }
 
@@ -38,8 +38,8 @@ func (c *Client) handleGetBlockBodies(ctx context.Context, code uint64, data []b
 	}
 
 	err = c.sendBlockBodies(ctx, &BlockBodies{
-		RequestId:         blockBodies.RequestId,
-		BlockBodiesPacket: []*eth.BlockBody{},
+		RequestId:           blockBodies.RequestId,
+		BlockBodiesResponse: []*eth.BlockBody{},
 	})
 	if err != nil {
 		return err
@@ -52,7 +52,7 @@ func (c *Client) sendGetBlockBodies(ctx context.Context, bh *GetBlockBodies) err
 	c.log.WithFields(logrus.Fields{
 		"code":       GetBlockBodiesCode,
 		"request_id": bh.RequestId,
-		"bodies":     bh.GetBlockBodiesPacket,
+		"bodies":     bh.GetBlockBodiesRequest,
 	}).Debug("sending GetBlockBodies")
 
 	encodedData, err := rlp.EncodeToBytes(bh)

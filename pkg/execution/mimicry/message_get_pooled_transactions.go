@@ -17,7 +17,7 @@ const (
 	GetPooledTransactionsCode = 0x19
 )
 
-type GetPooledTransactions eth.GetPooledTransactionsPacket66
+type GetPooledTransactions eth.GetPooledTransactionsPacket
 
 func (msg *GetPooledTransactions) Code() int { return GetPooledTransactionsCode }
 
@@ -36,7 +36,7 @@ func (c *Client) sendGetPooledTransactions(ctx context.Context, pt *GetPooledTra
 	c.log.WithFields(logrus.Fields{
 		"code":       GetPooledTransactionsCode,
 		"request_id": pt.RequestId,
-		"txs_count":  len(pt.GetPooledTransactionsPacket),
+		"txs_count":  len(pt.GetPooledTransactionsRequest),
 	}).Debug("sending GetPooledTransactions")
 
 	encodedData, err := rlp.EncodeToBytes(pt)
@@ -70,8 +70,8 @@ func (c *Client) GetPooledTransactions(ctx context.Context, hashes []common.Hash
 	}()
 
 	if err := c.sendGetPooledTransactions(ctx, &GetPooledTransactions{
-		RequestId:                   requestID,
-		GetPooledTransactionsPacket: hashes,
+		RequestId:                    requestID,
+		GetPooledTransactionsRequest: hashes,
 	}); err != nil {
 		return nil, err
 	}
