@@ -23,15 +23,6 @@ func (msg *GetPooledTransactions) Code() int { return GetPooledTransactionsCode 
 
 func (msg *GetPooledTransactions) ReqID() uint64 { return msg.RequestId }
 
-func (c *Client) handleGetPooledTransactions(ctx context.Context, data []byte) (*GetPooledTransactions, error) {
-	s := new(GetPooledTransactions)
-	if err := rlp.DecodeBytes(data, &s); err != nil {
-		return nil, fmt.Errorf("error decoding get block headers: %w", err)
-	}
-
-	return s, nil
-}
-
 func (c *Client) sendGetPooledTransactions(ctx context.Context, pt *GetPooledTransactions) error {
 	c.log.WithFields(logrus.Fields{
 		"code":       GetPooledTransactionsCode,

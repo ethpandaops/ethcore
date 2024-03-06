@@ -7,7 +7,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/eth/protocols/eth"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -27,24 +26,6 @@ func (c *Client) receiveNewPooledTransactionHashes(ctx context.Context, data []b
 	}
 
 	return s, nil
-}
-
-func (c *Client) sendNewPooledTransactionHashes(ctx context.Context, pth *NewPooledTransactionHashes) error {
-	c.log.WithFields(logrus.Fields{
-		"code":         NewPooledTransactionHashesCode,
-		"hashes_count": len(pth.Hashes),
-	}).Debug("sending NewPooledTransactionHashes")
-
-	encodedData, err := rlp.EncodeToBytes(pth)
-	if err != nil {
-		return fmt.Errorf("error encoding new pooled transaction hashes: %w", err)
-	}
-
-	if _, err := c.rlpxConn.Write(NewPooledTransactionHashesCode, encodedData); err != nil {
-		return fmt.Errorf("error sending new pooled transaction hashes: %w", err)
-	}
-
-	return nil
 }
 
 func (c *Client) handleNewPooledTransactionHashes(ctx context.Context, code uint64, data []byte) error {

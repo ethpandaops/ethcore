@@ -7,7 +7,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/eth/protocols/eth"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -39,25 +38,6 @@ func (c *Client) handlePooledTransactions(ctx context.Context, code uint64, data
 
 	if c.pooledTransactionsMap[txs.ReqID()] != nil {
 		c.pooledTransactionsMap[txs.ReqID()] <- txs
-	}
-
-	return nil
-}
-
-func (c *Client) sendPooledTransactions(ctx context.Context, pt *PooledTransactions) error {
-	c.log.WithFields(logrus.Fields{
-		"code":       PooledTransactionsCode,
-		"request_id": pt.RequestId,
-		"txs_count":  len(pt.PooledTransactionsResponse),
-	}).Debug("sending PooledTransactions")
-
-	encodedData, err := rlp.EncodeToBytes(pt)
-	if err != nil {
-		return fmt.Errorf("error encoding get block headers: %w", err)
-	}
-
-	if _, err := c.rlpxConn.Write(PooledTransactionsCode, encodedData); err != nil {
-		return fmt.Errorf("error sending get block headers: %w", err)
 	}
 
 	return nil

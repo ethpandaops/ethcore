@@ -20,15 +20,6 @@ func (msg *Receipts) Code() int { return ReceiptsCode }
 
 func (msg *Receipts) ReqID() uint64 { return msg.RequestId }
 
-func (c *Client) handleReceipts(ctx context.Context, data []byte) (*Receipts, error) {
-	s := new(Receipts)
-	if err := rlp.DecodeBytes(data, &s); err != nil {
-		return nil, fmt.Errorf("error decoding block receipts: %w", err)
-	}
-
-	return s, nil
-}
-
 func (c *Client) sendReceipts(ctx context.Context, r *Receipts) error {
 	c.log.WithFields(logrus.Fields{
 		"code":           ReceiptsCode,

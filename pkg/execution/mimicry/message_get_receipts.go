@@ -8,7 +8,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/eth/protocols/eth"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -44,26 +43,8 @@ func (c *Client) handleGetReceipts(ctx context.Context, code uint64, data []byte
 	})
 	if err != nil {
 		c.handleSessionError(ctx, err)
+
 		return err
-	}
-
-	return nil
-}
-
-func (c *Client) sendGetReceipts(ctx context.Context, bh *GetReceipts) error {
-	c.log.WithFields(logrus.Fields{
-		"code":       GetReceiptsCode,
-		"request_id": bh.RequestId,
-		"receipts":   bh.GetReceiptsRequest,
-	}).Debug("sending GetReceipts")
-
-	encodedData, err := rlp.EncodeToBytes(bh)
-	if err != nil {
-		return fmt.Errorf("error encoding get block receipts: %w", err)
-	}
-
-	if _, err := c.rlpxConn.Write(GetReceiptsCode, encodedData); err != nil {
-		return fmt.Errorf("error sending get block receipts: %w", err)
 	}
 
 	return nil

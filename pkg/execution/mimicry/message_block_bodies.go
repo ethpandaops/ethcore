@@ -20,15 +20,6 @@ func (msg *BlockBodies) Code() int { return BlockBodiesCode }
 
 func (msg *BlockBodies) ReqID() uint64 { return msg.RequestId }
 
-func (c *Client) handleBlockBodies(ctx context.Context, data []byte) (*BlockBodies, error) {
-	s := new(BlockBodies)
-	if err := rlp.DecodeBytes(data, &s); err != nil {
-		return nil, fmt.Errorf("error decoding block bodies: %w", err)
-	}
-
-	return s, nil
-}
-
 func (c *Client) sendBlockBodies(ctx context.Context, bh *BlockBodies) error {
 	c.log.WithFields(logrus.Fields{
 		"code":         BlockBodiesCode,

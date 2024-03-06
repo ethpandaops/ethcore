@@ -156,6 +156,7 @@ func (c *Client) disconnect(ctx context.Context, reason *Disconnect) {
 func (c *Client) startSession(ctx context.Context) {
 	if err := c.sendHello(ctx); err != nil {
 		c.handleSessionError(ctx, err)
+
 		return
 	}
 
@@ -164,12 +165,14 @@ func (c *Client) startSession(ctx context.Context) {
 		err := c.conn.SetReadDeadline(time.Now().Add(30 * time.Second))
 		if err != nil {
 			c.handleSessionError(ctx, fmt.Errorf("error setting rlpx read deadline: %w", err))
+
 			return
 		}
 
 		code, data, _, err := c.rlpxConn.Read()
 		if err != nil {
 			c.handleSessionError(ctx, fmt.Errorf("error reading rlpx connection: %w", err))
+
 			return
 		}
 
@@ -177,54 +180,65 @@ func (c *Client) startSession(ctx context.Context) {
 		case HelloCode:
 			if err := c.handleHello(ctx, code, data); err != nil {
 				c.handleSessionError(ctx, err)
+
 				return
 			}
 		case DisconnectCode:
 			c.handleDisconnect(ctx, code, data)
+
 			return
 		case PingCode:
 			if err := c.handlePing(ctx, code, data); err != nil {
 				c.handleSessionError(ctx, err)
+
 				return
 			}
 		case StatusCode:
 			if err := c.handleStatus(ctx, code, data); err != nil {
 				c.handleSessionError(ctx, err)
+
 				return
 			}
 		case TransactionsCode:
 			if err := c.handleTransactions(ctx, code, data); err != nil {
 				c.handleSessionError(ctx, err)
+
 				return
 			}
 		case GetBlockHeadersCode:
 			if err := c.handleGetBlockHeaders(ctx, code, data); err != nil {
 				c.handleSessionError(ctx, err)
+
 				return
 			}
 		case BlockHeadersCode:
 			if err := c.handleBlockHeaders(ctx, code, data); err != nil {
 				c.handleSessionError(ctx, err)
+
 				return
 			}
 		case GetBlockBodiesCode:
 			if err := c.handleGetBlockBodies(ctx, code, data); err != nil {
 				c.handleSessionError(ctx, err)
+
 				return
 			}
 		case NewPooledTransactionHashesCode:
 			if err := c.handleNewPooledTransactionHashes(ctx, code, data); err != nil {
 				c.handleSessionError(ctx, err)
+
 				return
 			}
 		case PooledTransactionsCode:
 			if err := c.handlePooledTransactions(ctx, code, data); err != nil {
 				c.handleSessionError(ctx, err)
+
 				return
 			}
 		case GetReceiptsCode:
 			if err := c.handleGetReceipts(ctx, code, data); err != nil {
 				c.handleSessionError(ctx, err)
+
 				return
 			}
 		default:
