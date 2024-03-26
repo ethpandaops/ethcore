@@ -1,6 +1,6 @@
 module github.com/ethpandaops/ethcore
 
-go 1.22.0
+go 1.22.1
 
 require (
 	github.com/chuckpreslar/emission v0.0.0-20170206194824-a7ddd980baf9
