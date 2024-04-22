@@ -36,8 +36,12 @@ func (c *Client) handlePooledTransactions(ctx context.Context, code uint64, data
 		return err
 	}
 
-	if c.pooledTransactionsMap[txs.ReqID()] != nil {
-		c.pooledTransactionsMap[txs.ReqID()] <- txs
+	c.pooledTransactionsMux.Lock()
+	defer c.pooledTransactionsMux.Unlock()
+
+	channel, exists := c.pooledTransactionsMap[txs.ReqID()]
+	if exists && channel != nil {
+		channel <- txs
 	}
 
 	return nil
