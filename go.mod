@@ -4,7 +4,7 @@ go 1.22.0
 
 require (
 	github.com/chuckpreslar/emission v0.0.0-20170206194824-a7ddd980baf9
-	github.com/ethereum/go-ethereum v1.13.14
+	github.com/ethereum/go-ethereum v1.13.15
 	github.com/sirupsen/logrus v1.9.3
 )
 
