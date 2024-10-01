@@ -1,4 +1,4 @@
-package mimicry
+package p2p
 
 // Thanks to Mario: https://github.com/marioevz/blobber/blob/main/p2p/encoder.go
 

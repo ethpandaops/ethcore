@@ -48,7 +48,7 @@ type ListenerV5 struct {
 
 func NewDiscV5(ctx context.Context, restart time.Duration, log logrus.FieldLogger) *DiscV5 {
 	return &DiscV5{
-		log:     log.WithField("module", "ethcore/discovery/p2p/discV5"),
+		log:     log.WithField("module", "ethcore/discovery/discV5"),
 		restart: restart,
 		broker:  emission.NewEmitter(),
 		started: false,
@@ -258,12 +258,22 @@ func (d *DiscV5) filterPeer(node *enode.Node) bool {
 		return false
 	}
 
+	// Ignore ourself
+	if node.ID() == d.listener.localNode.ID() {
+		return false
+	}
+
 	// do not dial nodes with their tcp ports not set
 	if err := node.Record().Load(enr.WithEntry("tcp", new(enr.TCP))); err != nil {
 		if !enr.IsNotFound(err) {
 			d.log.WithError(err).Debug("Could not retrieve tcp port")
 		}
 
+		return false
+	}
+
+	// Do not bother if the node is private
+	if node.IP().IsPrivate() {
 		return false
 	}
 
