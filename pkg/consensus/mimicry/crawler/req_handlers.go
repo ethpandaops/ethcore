@@ -2,16 +2,16 @@ package crawler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
-	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/sirupsen/logrus"
 )
 
-func (c *Crawler) handleStatus(ctx context.Context, stream network.Stream) (common.SSZObj, error) {
+func (c *Crawler) handleStatus(ctx context.Context, stream network.Stream) error {
 	logCtx := c.log.WithFields(logrus.Fields{
 		"peer":      stream.Conn().RemotePeer().String(),
 		"protocol":  stream.Protocol(),
@@ -28,10 +28,15 @@ func (c *Crawler) handleStatus(ctx context.Context, stream network.Stream) (comm
 	}()
 
 	var theirStatus common.Status
-	if err := sszNetworkEncoder.DecodeWithMaxLength(stream, p2p.WrapSSZObject(&theirStatus)); err != nil {
+	err := c.reqResp.ReadRequest(ctx, stream, &theirStatus)
+	if err != nil {
 		logCtx.WithError(err).Debug("Failed to decode status message")
 
-		return nil, err
+		if errr := c.reqResp.WriteResponse(ctx, stream, nil, errors.New("failed to decode request body")); errr != nil {
+			logCtx.WithError(errr).Debug("Failed to send status response in response to decode error")
+		}
+
+		return err
 	}
 
 	agentVersion := "unknown"
@@ -40,7 +45,12 @@ func (c *Crawler) handleStatus(ctx context.Context, stream network.Stream) (comm
 	if err != nil {
 		logCtx.WithError(err).Debug("Failed to get agent version")
 	} else {
-		agentVersion = rawAgentVersion.(string)
+		a, ok := rawAgentVersion.(string)
+		if !ok {
+			logCtx.Debug("Agent version is not a string")
+		} else {
+			agentVersion = a
+		}
 	}
 
 	logCtx.WithFields(logrus.Fields{
@@ -58,10 +68,18 @@ func (c *Crawler) handleStatus(ctx context.Context, stream network.Stream) (comm
 		c.emitPeerStatusUpdated(stream.Conn().RemotePeer(), &status)
 	}
 
-	return &status, nil
+	if err := c.reqResp.WriteResponse(ctx, stream, &status, nil); err != nil {
+		logCtx.WithError(err).Debug("Failed to send status response")
+
+		return err
+	}
+
+	return nil
 }
 
-func (c *Crawler) handleGoodbye(ctx context.Context, stream network.Stream) (common.SSZObj, error) {
+func (c *Crawler) handleGoodbye(ctx context.Context, stream network.Stream) error {
+	var err error
+
 	logCtx := c.log.WithFields(logrus.Fields{
 		"peer":      stream.Conn().RemotePeer().String(),
 		"protocol":  stream.Protocol(),
@@ -72,16 +90,27 @@ func (c *Crawler) handleGoodbye(ctx context.Context, stream network.Stream) (com
 	defer func() {
 		logCtx.WithField("duration", time.Since(start)).Debug("Handled goodbye message")
 
-		if err := stream.Close(); err != nil {
-			logCtx.WithError(err).Debug("Failed to close stream")
+		if err != nil {
+			logCtx.WithError(err).Debug("Failed to handle goodbye message")
+
+			if errr := c.reqResp.WriteResponse(ctx, stream, nil, err); errr != nil {
+				logCtx.WithError(errr).Debug("Failed to send goodbye response in response to handle error")
+			}
+		}
+
+		if errr := stream.Close(); errr != nil {
+			logCtx.WithError(errr).Debug("Failed to close stream")
 		}
 	}()
 
+	// Read the goodbye message
 	var theirGoodbye common.Goodbye
-	if err := sszNetworkEncoder.DecodeWithMaxLength(stream, p2p.WrapSSZObject(&theirGoodbye)); err != nil {
-		logCtx.WithError(err).Debug("Failed to decode goodbye message")
 
-		return nil, err
+	err = c.reqResp.ReadRequest(ctx, stream, &theirGoodbye)
+	if err != nil {
+		logCtx.WithError(err).Debug("Failed to read goodbye message")
+
+		return err
 	}
 
 	logCtx.WithFields(logrus.Fields{
@@ -90,10 +119,20 @@ func (c *Crawler) handleGoodbye(ctx context.Context, stream network.Stream) (com
 
 	var resp common.Goodbye
 
-	return &resp, nil
+	// Send the goodbye response
+	err = c.reqResp.WriteResponse(ctx, stream, &resp, nil)
+	if err != nil {
+		logCtx.WithError(err).Debug("Failed to send goodbye response")
+
+		return err
+	}
+
+	return nil
 }
 
-func (c *Crawler) handlePing(ctx context.Context, stream network.Stream) (common.SSZObj, error) {
+func (c *Crawler) handlePing(ctx context.Context, stream network.Stream) error {
+	var err error
+
 	logCtx := c.log.WithFields(logrus.Fields{
 		"peer":      stream.Conn().RemotePeer().String(),
 		"protocol":  stream.Protocol(),
@@ -104,16 +143,19 @@ func (c *Crawler) handlePing(ctx context.Context, stream network.Stream) (common
 	defer func() {
 		logCtx.WithField("duration", time.Since(start)).Debug("Handled ping message")
 
-		if err := stream.Close(); err != nil {
+		err = stream.Close()
+		if err != nil {
 			logCtx.WithError(err).Debug("Failed to close stream")
 		}
 	}()
 
 	var theirPing common.Ping
-	if err := sszNetworkEncoder.DecodeWithMaxLength(stream, p2p.WrapSSZObject(&theirPing)); err != nil {
+
+	err = c.reqResp.ReadRequest(ctx, stream, &theirPing)
+	if err != nil {
 		logCtx.WithError(err).Debug("Failed to decode ping message")
 
-		return nil, err
+		return err
 	}
 
 	logCtx.WithFields(logrus.Fields{
@@ -122,10 +164,19 @@ func (c *Crawler) handlePing(ctx context.Context, stream network.Stream) (common
 
 	ping := common.Ping(c.metadata.SeqNumber)
 
-	return &ping, nil
+	err = c.reqResp.WriteResponse(ctx, stream, &ping, nil)
+	if err != nil {
+		logCtx.WithError(err).Debug("Failed to send ping response")
+
+		return err
+	}
+
+	return nil
 }
 
-func (c *Crawler) handleMetadata(ctx context.Context, stream network.Stream) (common.SSZObj, error) {
+func (c *Crawler) handleMetadata(ctx context.Context, stream network.Stream) error {
+	var err error
+
 	logCtx := c.log.WithFields(logrus.Fields{
 		"peer":      stream.Conn().RemotePeer().String(),
 		"protocol":  stream.Protocol(),
@@ -136,23 +187,32 @@ func (c *Crawler) handleMetadata(ctx context.Context, stream network.Stream) (co
 	defer func() {
 		logCtx.WithField("duration", time.Since(start)).Debug("Handled metadata message")
 
-		if err := stream.Close(); err != nil {
+		err = stream.Close()
+		if err != nil {
 			logCtx.WithError(err).Debug("Failed to close stream")
 		}
 	}()
 
 	var theirMetadata common.MetaData
-	if err := sszNetworkEncoder.DecodeWithMaxLength(stream, p2p.WrapSSZObject(&theirMetadata)); err != nil {
+
+	err = c.reqResp.ReadRequest(ctx, stream, &theirMetadata)
+	if err != nil {
 		logCtx.WithError(err).Debug("Failed to decode metadata message")
 
-		return nil, err
+		return err
 	}
 
 	logCtx.WithFields(logrus.Fields{
 		"metadata": theirMetadata,
-	}).Debug("Received metadata message")
+	}).Info("Received metadata message")
 
 	resp := c.metadata
 
-	return resp, nil
+	if err := c.reqResp.WriteResponse(ctx, stream, resp, nil); err != nil {
+		logCtx.WithError(err).Debug("Failed to send metadata response")
+
+		return err
+	}
+
+	return nil
 }

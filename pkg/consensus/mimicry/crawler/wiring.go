@@ -56,6 +56,8 @@ func (c *Crawler) wireUpComponents(ctx context.Context) error {
 }
 
 func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
+	goodbyeReason := eth.GoodbyeReasonClientShutdown
+
 	logCtx := c.log.WithFields(logrus.Fields{
 		"peer":          conn.RemotePeer(),
 		"agent_version": c.GetPeerAgentVersion(conn.RemotePeer()),
@@ -63,7 +65,7 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 
 	defer func() {
 		// Disconnect them regardless of what happens
-		if err := c.DisconnectFromPeer(context.Background(), conn.RemotePeer(), eth.GoodbyeReasonClientShutdown); err != nil {
+		if err := c.DisconnectFromPeer(context.Background(), conn.RemotePeer(), goodbyeReason); err != nil {
 			logCtx.WithError(err).Debug("Failed to disconnect from peer")
 		}
 	}()
@@ -79,9 +81,8 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 	ourStatus := c.GetStatus()
 
 	if status != nil && status.ForkDigest != ourStatus.ForkDigest {
-		if errr := c.DisconnectFromPeer(context.Background(), conn.RemotePeer(), eth.GoodbyeReasonIrrelevantNetwork); errr != nil {
-			logCtx.WithError(errr).Debug("Failed to disconnect from peer for incorrect fork digest")
-		}
+		// They're on a different fork
+		goodbyeReason = eth.GoodbyeReasonIrrelevantNetwork
 
 		c.emitFailedCrawl(conn.RemotePeer(), ErrCrawlStatusForkDigest)
 

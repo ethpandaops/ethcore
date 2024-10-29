@@ -340,19 +340,23 @@ func (c *Crawler) DisconnectFromPeer(ctx context.Context, peerID peer.ID, reason
 
 	logCtx.Debug("Disconnecting from peer")
 
-	// Send a goodbye message
+	// Send a goodbye message with a short timeout
+	timeoutCtx, cancel := context.WithTimeout(ctx, time.Second*5)
+	defer cancel()
+
+	// Send a goodbye message but don't wait for response
 	resp := common.Goodbye(0)
 	goodbye := common.Goodbye(reason)
 
-	if err := c.reqResp.SendRequest(ctx, &p2p.Request{
+	// We don't care about the goodbye message response
+	_ = c.reqResp.SendRequest(timeoutCtx, &p2p.Request{
 		ProtocolID: eth.GoodbyeProtocolID,
 		PeerID:     peerID,
 		Payload:    &goodbye,
-		Timeout:    time.Second * 30,
-	}, &resp); err != nil {
-		logCtx.WithError(err).Error("Failed to send goodbye message")
-	}
+		Timeout:    time.Second * 5,
+	}, &resp)
 
+	// Always disconnect regardless of goodbye message status
 	return c.node.DisconnectFromPeer(ctx, peerID)
 }
 

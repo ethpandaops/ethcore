@@ -7,6 +7,7 @@ import (
 	"io"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
@@ -55,6 +56,38 @@ var (
 	ErrFailedToDecodeResponse   = newRequestError("failed to decode response")
 	ErrFailedToCloseWriteStream = newRequestError("failed to close write stream")
 )
+
+func (r *ReqResp) ReadRequest(ctx context.Context, stream network.Stream, payload common.SSZObj) error {
+	if err := stream.SetReadDeadline(time.Now().Add(r.config.ReadTimeout)); err != nil {
+		return fmt.Errorf("failed to set read deadline on stream: %w", err)
+	}
+
+	if err := r.encoder.DecodeWithMaxLength(stream, WrapSSZObject(payload)); err != nil {
+		return fmt.Errorf("failed to decode request payload: %w", err)
+	}
+
+	if err := stream.CloseRead(); err != nil {
+		return fmt.Errorf("failed to close read stream: %w", err)
+	}
+
+	return nil
+}
+
+func (r *ReqResp) WriteRequest(ctx context.Context, stream network.Stream, payload common.SSZObj) error {
+	if err := stream.SetWriteDeadline(time.Now().Add(r.config.WriteTimeout)); err != nil {
+		return fmt.Errorf("failed to set write deadline on stream: %w", err)
+	}
+
+	if _, err := r.encoder.EncodeWithMaxLength(stream, WrapSSZObject(payload)); err != nil {
+		return fmt.Errorf("failed to encode request payload: %w", err)
+	}
+
+	if err := stream.CloseWrite(); err != nil {
+		return fmt.Errorf("failed to close write stream: %w", err)
+	}
+
+	return nil
+}
 
 func (r *ReqResp) SendRequest(ctx context.Context, req *Request, rsp common.SSZObj) error {
 	// Open the stream

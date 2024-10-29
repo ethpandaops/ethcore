@@ -8,7 +8,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/protocol"
-	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/prysmaticlabs/prysm/v5/beacon-chain/p2p/encoder"
 	"github.com/sirupsen/logrus"
 )
@@ -41,7 +40,7 @@ func (r *ReqResp) SupportedProtocols() []protocol.ID {
 	return r.protocols
 }
 
-func (r *ReqResp) RegisterHandler(ctx context.Context, proto protocol.ID, handler func(ctx context.Context, stream network.Stream) (common.SSZObj, error)) error {
+func (r *ReqResp) RegisterHandler(ctx context.Context, proto protocol.ID, handler func(ctx context.Context, stream network.Stream) error) error {
 	r.log.WithField("protocol", proto).Info("Registering protocol handler")
 
 	for _, p := range r.protocols {
@@ -52,13 +51,12 @@ func (r *ReqResp) RegisterHandler(ctx context.Context, proto protocol.ID, handle
 
 	r.protocols = append(r.protocols, proto)
 
-	r.host.SetStreamHandler(proto, r.wrapper(ctx, proto, handler))
+	r.host.SetStreamHandler(proto, r.wrapper(ctx, handler))
 
 	return nil
 }
 
-func (r *ReqResp) wrapper(ctx context.Context, protocol protocol.ID, handler func(ctx context.Context, stream network.Stream) (common.SSZObj, error)) network.StreamHandler {
-	// TODO: Instrument with metrics
+func (r *ReqResp) wrapper(ctx context.Context, handler func(ctx context.Context, stream network.Stream) error) network.StreamHandler {
 	return func(stream network.Stream) {
 		logCtx := r.log.WithFields(logrus.Fields{
 			"peer":      stream.Conn().RemotePeer().String(),
@@ -77,10 +75,9 @@ func (r *ReqResp) wrapper(ctx context.Context, protocol protocol.ID, handler fun
 			logCtx.WithField("duration", time.Since(start)).Debug("Handled message")
 		}()
 
-		data, err := handler(ctx, stream)
-
-		if errr := r.sendResponse(ctx, stream, data, err); errr != nil {
-			logCtx.WithError(err).Debug("Failed to send response")
+		err := handler(ctx, stream)
+		if err != nil {
+			logCtx.WithError(err).Debug("Req/Resp handler returned error")
 		}
 	}
 }
