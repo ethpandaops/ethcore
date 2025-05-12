@@ -1,27 +1,66 @@
 package crawler
 
-type CrawlError string
-
-const (
-	ErrCrawlTooSoon                 = CrawlError("too soon")
-	ErrCrawlFailedToConnect         = CrawlError("failed to connect")
-	ErrCrawlENRForkDigest           = CrawlError("wrong enr fork digest")
-	ErrCrawlStatusForkDigest        = CrawlError("wrong fork digest in status message")
-	ErrCrawlFailedToRequestStatus   = CrawlError("failed to request status")
-	ErrCrawlFailedToRequestMetadata = CrawlError("failed to request metadata")
-	ErrCrawlFailedToCrawl           = CrawlError("failed to crawl")
+import (
+	"errors"
+	"fmt"
 )
 
-func (e CrawlError) Error() string {
-	return string(e)
+type CrawlError struct {
+	Msg  string
+	Type string
 }
 
-type StatusError string
-
-func (e StatusError) Error() string {
-	return string(e)
-}
-
-const (
-	ErrStatusForkDigest = StatusError("wrong fork digest in status message")
+var (
+	ErrCrawlTooSoon                 = newCrawlError("too soon")
+	ErrCrawlFailedToConnect         = newCrawlError("failed to connect")
+	ErrCrawlENRForkDigest           = newCrawlError("wrong enr fork digest")
+	ErrCrawlStatusForkDigest        = newCrawlError("wrong fork digest in status message")
+	ErrCrawlFailedToRequestStatus   = newCrawlError("failed to request status")
+	ErrCrawlFailedToRequestMetadata = newCrawlError("failed to request metadata")
+	ErrCrawlFailedToCrawl           = newCrawlError("failed to crawl")
 )
+
+func newCrawlError(msg string) *CrawlError {
+	return &CrawlError{Msg: msg, Type: msg}
+}
+
+func (e *CrawlError) Error() string {
+	return e.Msg
+}
+
+func (e *CrawlError) Add(msg string) *CrawlError {
+	e.Msg = fmt.Sprintf("%s: %s", e.Msg, msg)
+
+	return e
+}
+
+func (e *CrawlError) Unwrap() error {
+	return errors.New(e.Msg)
+}
+
+type StatusError struct {
+	Msg  string
+	Type string
+}
+
+var (
+	ErrStatusForkDigest = newStatusError("wrong fork digest in status message")
+)
+
+func newStatusError(msg string) *StatusError {
+	return &StatusError{Msg: msg, Type: msg}
+}
+
+func (e *StatusError) Error() string {
+	return e.Msg
+}
+
+func (e *StatusError) Add(msg string) *StatusError {
+	e.Msg = fmt.Sprintf("%s: %s", e.Msg, msg)
+
+	return e
+}
+
+func (e *StatusError) Unwrap() error {
+	return errors.New(e.Msg)
+}

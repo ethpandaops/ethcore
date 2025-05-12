@@ -13,3 +13,4 @@ type NodeFinder interface {
 }
 
 var _ NodeFinder = &DiscV5{}
+var _ NodeFinder = &Manual{}

@@ -17,6 +17,7 @@ type Config struct {
 	Beacon          *ethereum.Config `yaml:"ethereum"`
 	DialConcurrency int              `yaml:"dialConcurrency" default:"10"`
 	DialTimeout     time.Duration    `yaml:"dialTimeout" default:"5s"`
+	CooloffDuration time.Duration    `yaml:"cooloffDuration" default:"600s"`
 }
 
 // Validate validates the CrawlerConfig

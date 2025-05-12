@@ -22,26 +22,55 @@ func (c *Crawler) wireUpComponents(ctx context.Context) error {
 	c.node.AfterPeerDisconnect(c.handlePeerDisconnected)
 
 	// Wire up the beacon node
-	c.beacon.OnReady(ctx, c.handleBeaconNodeReady)
+	c.beacon.Node().OnHead(ctx, func(ctx context.Context, event *v1.HeadEvent) error {
+		return c.fetchAndSetStatus(ctx)
+	})
 
 	// Wire up the discovery
 	c.discovery.OnNodeRecord(ctx, c.handleNewDiscoveryNode)
 
 	// Wire up the req/resp
-	if err := c.reqResp.RegisterHandler(ctx, eth.StatusProtocolID, c.handleStatus); err != nil {
+	if err := c.reqResp.RegisterHandler(ctx, eth.StatusV1ProtocolID, c.handleStatus); err != nil {
 		return fmt.Errorf("failed to register status handler: %w", err)
 	}
 
-	if err := c.reqResp.RegisterHandler(ctx, eth.GoodbyeProtocolID, c.handleGoodbye); err != nil {
+	if err := c.reqResp.RegisterHandler(ctx, eth.GoodbyeV1ProtocolID, c.handleGoodbye); err != nil {
 		return fmt.Errorf("failed to register goodbye handler: %w", err)
 	}
 
-	if err := c.reqResp.RegisterHandler(ctx, eth.PingProtocolID, c.handlePing); err != nil {
+	if err := c.reqResp.RegisterHandler(ctx, eth.PingV1ProtocolID, c.handlePing); err != nil {
 		return fmt.Errorf("failed to register ping handler: %w", err)
 	}
 
-	if err := c.reqResp.RegisterHandler(ctx, eth.MetaDataProtocolID, c.handleMetadata); err != nil {
+	if err := c.reqResp.RegisterHandler(ctx, eth.MetaDataV2ProtocolID, c.handleMetadata); err != nil {
 		return fmt.Errorf("failed to register metadata handler: %w", err)
+	}
+
+	// Register dummy RPC handlers for the ones we don't implement yet
+	// Beacon blocks
+	if err := c.reqResp.RegisterHandler(ctx, eth.BeaconBlocksByRangeV1ProtocolID, c.handleDummyRPC); err != nil {
+		return fmt.Errorf("failed to register dummy RPC handler: %w", err)
+	}
+
+	if err := c.reqResp.RegisterHandler(ctx, eth.BeaconBlocksByRootV1ProtocolID, c.handleDummyRPC); err != nil {
+		return fmt.Errorf("failed to register dummy RPC handler: %w", err)
+	}
+
+	if err := c.reqResp.RegisterHandler(ctx, eth.BeaconBlocksByRangeV2ProtocolID, c.handleDummyRPC); err != nil {
+		return fmt.Errorf("failed to register dummy RPC handler: %w", err)
+	}
+
+	if err := c.reqResp.RegisterHandler(ctx, eth.BeaconBlocksByRootV2ProtocolID, c.handleDummyRPC); err != nil {
+		return fmt.Errorf("failed to register dummy RPC handler: %w", err)
+	}
+
+	// Beacon blobs
+	if err := c.reqResp.RegisterHandler(ctx, eth.BlobSidecarsByRangeV1ProtocolID, c.handleDummyRPC); err != nil {
+		return fmt.Errorf("failed to register dummy RPC handler: %w", err)
+	}
+
+	if err := c.reqResp.RegisterHandler(ctx, eth.BlobSidecarsByRootV1ProtocolID, c.handleDummyRPC); err != nil {
+		return fmt.Errorf("failed to register dummy RPC handler: %w", err)
 	}
 
 	c.OnFailedCrawl(func(peerID peer.ID, reason CrawlError) {
@@ -73,7 +102,7 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 	status, err := c.RequestStatusFromPeer(context.Background(), conn.RemotePeer())
 	if err != nil {
 		logCtx.WithError(err).Debug("Failed to request status from peer")
-		c.emitFailedCrawl(conn.RemotePeer(), ErrCrawlFailedToRequestStatus)
+		c.emitFailedCrawl(conn.RemotePeer(), *ErrCrawlFailedToRequestStatus)
 
 		return
 	}
@@ -84,7 +113,7 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 		// They're on a different fork
 		goodbyeReason = eth.GoodbyeReasonIrrelevantNetwork
 
-		c.emitFailedCrawl(conn.RemotePeer(), ErrCrawlStatusForkDigest)
+		c.emitFailedCrawl(conn.RemotePeer(), *ErrCrawlStatusForkDigest.Add(fmt.Sprintf("ours %s != theirs %s", ourStatus.ForkDigest, status.ForkDigest)))
 
 		return
 	}
@@ -102,7 +131,7 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 	if err != nil {
 		logCtx.WithError(err).Warn("Failed to request metadata from peer")
 
-		c.emitFailedCrawl(conn.RemotePeer(), ErrCrawlFailedToRequestMetadata)
+		c.emitFailedCrawl(conn.RemotePeer(), *ErrCrawlFailedToRequestMetadata)
 
 		return
 	}
@@ -183,14 +212,19 @@ func (c *Crawler) handleNewDiscoveryNode(ctx context.Context, node *enode.Node) 
 	if err != nil {
 		c.log.WithError(err).Error("Failed to derive peer details from node")
 
+		// We don't care about this node
 		return nil
 	}
 
 	// Check if they're on our network
-	if !c.nodeIsOnOurNetwork(n.Enode) {
+	if err := c.nodeIsOnOurNetwork(n.Enode); err != nil {
 		c.log.WithFields(logrus.Fields{
-			"node": n.Enode.String(),
+			"node":  n.Enode.String(),
+			"error": err.Error(),
 		}).Trace("Node is not on our network")
+
+		//nolint:nilerr // We don't care about this node
+		return nil
 	}
 
 	// If the channel is full, we drop the peer.

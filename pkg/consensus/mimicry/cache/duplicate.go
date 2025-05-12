@@ -11,10 +11,10 @@ type DuplicateCache struct {
 	Nodes *ttlcache.Cache[string, time.Time]
 }
 
-func NewDuplicateCache() *DuplicateCache {
+func NewDuplicateCache(nodeCacheDuration time.Duration) *DuplicateCache {
 	return &DuplicateCache{
 		Nodes: ttlcache.New(
-			ttlcache.WithTTL[string, time.Time](60 * time.Minute),
+			ttlcache.WithTTL[string, time.Time](nodeCacheDuration),
 		),
 	}
 }

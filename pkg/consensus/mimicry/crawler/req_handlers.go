@@ -216,3 +216,25 @@ func (c *Crawler) handleMetadata(ctx context.Context, stream network.Stream) err
 
 	return nil
 }
+
+// handleDummyRPC is a dummy handler for RPCs that are not yet implemented. It
+// will always return an error.
+func (c *Crawler) handleDummyRPC(ctx context.Context, stream network.Stream) error {
+	logCtx := c.log.WithFields(logrus.Fields{
+		"peer":      stream.Conn().RemotePeer().String(),
+		"protocol":  stream.Protocol(),
+		"direction": "incoming",
+	})
+
+	logCtx.Debug("Received dummy RPC")
+
+	// Send an error response
+	if err := c.reqResp.WriteResponse(ctx, stream, nil, errors.New("unknown error")); err != nil {
+		logCtx.WithError(err).Debug("Failed to send dummy RPC response")
+
+		return err
+	}
+
+	// Close the stream
+	return stream.Close()
+}

@@ -172,9 +172,12 @@ func (b *BeaconNode) ForkDigest() (phase0.ForkDigest, error) {
 		return phase0.ForkDigest{}, errors.Wrap(err, "failed to get spec")
 	}
 
-	slot := b.beacon.Wallclock().Slots().Current()
+	_, epoch, err := b.beacon.Wallclock().Now()
+	if err != nil {
+		return phase0.ForkDigest{}, errors.Wrap(err, "failed to get wallclock")
+	}
 
-	current, err := spec.ForkEpochs.CurrentFork(phase0.Slot(slot.Number()), spec.SlotsPerEpoch)
+	current, err := spec.ForkEpochs.CurrentFork(phase0.Epoch(epoch.Number()))
 	if err != nil {
 		return phase0.ForkDigest{}, errors.Wrap(err, "failed to get current fork")
 	}

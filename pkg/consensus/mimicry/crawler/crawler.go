@@ -3,12 +3,14 @@ package crawler
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"sync"
 	"time"
 
 	"github.com/attestantio/go-eth2-client/api"
+	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/cenkalti/backoff"
 	"github.com/chuckpreslar/emission"
 	"github.com/ethereum/go-ethereum/p2p/enode"
@@ -64,6 +66,8 @@ type Crawler struct {
 	metrics *Metrics
 
 	peersToDial chan *discovery.ConnectablePeer
+
+	OnReady chan struct{}
 }
 
 // New creates a new Crawler
@@ -76,15 +80,16 @@ func New(log logrus.FieldLogger, config *Config, userAgent, namespace string, f 
 		broker:    emission.NewEmitter(),
 		status:    &common.Status{},
 		metadata: &common.MetaData{
-			SeqNumber: 0,
+			SeqNumber: 1,
 			Attnets:   common.AttnetBits{},
 			Syncnets:  common.SyncnetBits{},
 		},
 		metrics:            NewMetrics(),
 		statusFromPeerChan: make(chan eth.PeerStatus, 10000),
-		duplicateCache:     cache.NewDuplicateCache(),
+		duplicateCache:     cache.NewDuplicateCache(config.CooloffDuration),
 		discovery:          f,
 		peersToDial:        make(chan *discovery.ConnectablePeer, 10000),
+		OnReady:            make(chan struct{}),
 	}
 }
 
@@ -92,6 +97,7 @@ func New(log logrus.FieldLogger, config *Config, userAgent, namespace string, f 
 func (c *Crawler) Start(ctx context.Context) error {
 	c.log.WithFields(logrus.Fields{
 		"user_agent": c.userAgent,
+		"cooloff":    c.config.CooloffDuration,
 	}).Info("Starting Ethereum Mimicry crawler")
 
 	// Start the duplicate cache
@@ -193,6 +199,17 @@ func (c *Crawler) Start(ctx context.Context) error {
 
 		c.log.Info("Successfully started Mimicry crawler")
 
+		for {
+			// Wait until we have a valid status
+			if c.GetStatus().HeadSlot != 0 {
+				break
+			}
+
+			time.Sleep(time.Second)
+		}
+
+		close(c.OnReady)
+
 		return nil
 	})
 
@@ -267,28 +284,32 @@ func (c *Crawler) StatusFromPeerChan() <-chan eth.PeerStatus {
 	return c.statusFromPeerChan
 }
 
-func (c *Crawler) nodeIsOnOurNetwork(node *enode.Node) bool {
+func (c *Crawler) nodeIsOnOurNetwork(node *enode.Node) error {
 	sszEncodedForkEntry := make([]byte, 16)
 
 	entry := enr.WithEntry("eth2", &sszEncodedForkEntry)
 
 	if err := node.Record().Load(entry); err != nil {
-		return false
+		return fmt.Errorf("failed to load enr fork entry: %w", err)
 	}
 
 	forkEntry := &pb.ENRForkID{}
 	if err := forkEntry.UnmarshalSSZ(sszEncodedForkEntry); err != nil {
-		return false
+		return fmt.Errorf("failed to unmarshal enr fork entry: %w", err)
 	}
 
 	status := c.GetStatus()
 
-	return bytes.Equal(forkEntry.CurrentForkDigest, status.ForkDigest[:])
+	if !bytes.Equal(forkEntry.CurrentForkDigest, status.ForkDigest[:]) {
+		return ErrCrawlENRForkDigest.Add(fmt.Sprintf("theirs 0x%s != ours %s", hex.EncodeToString(forkEntry.CurrentForkDigest), status.ForkDigest.String()))
+	}
+
+	return nil
 }
 
 func (c *Crawler) ConnectToPeer(ctx context.Context, p peer.AddrInfo, n *enode.Node) error {
-	if !c.nodeIsOnOurNetwork(n) {
-		c.emitFailedCrawl(p.ID, ErrCrawlENRForkDigest)
+	if err := c.nodeIsOnOurNetwork(n); err != nil {
+		c.emitFailedCrawl(p.ID, *newCrawlError(err.Error()))
 
 		return nil
 	}
@@ -298,7 +319,7 @@ func (c *Crawler) ConnectToPeer(ctx context.Context, p peer.AddrInfo, n *enode.N
 			"peer": p.ID,
 		}).Debug("We've already connected to this peer previously")
 
-		c.emitFailedCrawl(p.ID, ErrCrawlTooSoon)
+		c.emitFailedCrawl(p.ID, *ErrCrawlTooSoon)
 
 		return nil
 	}
@@ -350,7 +371,7 @@ func (c *Crawler) DisconnectFromPeer(ctx context.Context, peerID peer.ID, reason
 
 	// We don't care about the goodbye message response
 	_ = c.reqResp.SendRequest(timeoutCtx, &p2p.Request{
-		ProtocolID: eth.GoodbyeProtocolID,
+		ProtocolID: eth.GoodbyeV1ProtocolID,
 		PeerID:     peerID,
 		Payload:    &goodbye,
 		Timeout:    time.Second * 5,
@@ -364,7 +385,7 @@ func (c *Crawler) RequestStatusFromPeer(ctx context.Context, peerID peer.ID) (*c
 	status := c.GetStatus()
 
 	req := &p2p.Request{
-		ProtocolID: eth.StatusProtocolID,
+		ProtocolID: eth.StatusV1ProtocolID,
 		PeerID:     peerID,
 		Payload:    &status,
 		Timeout:    time.Second * 30,
@@ -395,7 +416,7 @@ func (c *Crawler) RequestMetadataFromPeer(ctx context.Context, peerID peer.ID) (
 	metadata := c.metadata
 
 	req := &p2p.Request{
-		ProtocolID: eth.MetaDataProtocolID,
+		ProtocolID: eth.MetaDataV2ProtocolID,
 		PeerID:     peerID,
 		Payload:    metadata,
 		Timeout:    time.Second * 30,
@@ -428,6 +449,21 @@ func (c *Crawler) fetchAndSetStatus(ctx context.Context) error {
 	checkpoint, err := c.beacon.Node().FetchFinality(ctx, "head")
 	if err != nil {
 		return fmt.Errorf("failed to fetch finality: %w", err)
+	}
+
+	sp, err := c.beacon.Node().Spec()
+	if err != nil {
+		return fmt.Errorf("failed to fetch spec: %w", err)
+	}
+
+	_, epoch, err := c.beacon.Node().Wallclock().Now()
+	if err != nil {
+		return fmt.Errorf("failed to fetch wallclock: %w", err)
+	}
+
+	currentFork, err := sp.ForkEpochs.CurrentFork(phase0.Epoch(epoch.Number()))
+	if err != nil {
+		return fmt.Errorf("failed to fetch current fork: %w", err)
 	}
 
 	status.FinalizedRoot = tree.Root(checkpoint.Finalized.Root)
@@ -463,6 +499,7 @@ func (c *Crawler) fetchAndSetStatus(ctx context.Context) error {
 			"head_slot":       status.HeadSlot,
 			"head_root":       status.HeadRoot,
 			"fork_digest":     status.ForkDigest,
+			"current_fork":    currentFork.Name,
 		}).Info("New eth2 status set")
 	}
 
