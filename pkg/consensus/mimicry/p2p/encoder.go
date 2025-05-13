@@ -46,7 +46,7 @@ func (w *wrappedSpecObjectEncoder) MarshalSSZ() ([]byte, error) {
 }
 
 func (w *wrappedSpecObjectEncoder) SizeSSZ() int {
-	return int(w.SpecObj.ByteLength(w.Spec))
+	return int(w.SpecObj.ByteLength(w.Spec)) //nolint:gosec,staticcheck // not concerned about overflow here.
 }
 
 func (w *wrappedSpecObjectEncoder) UnmarshalSSZ(b []byte) error {
@@ -82,7 +82,7 @@ func (w *wrappedSSZObjectEncoder) MarshalSSZ() ([]byte, error) {
 }
 
 func (w *wrappedSSZObjectEncoder) SizeSSZ() int {
-	return int(w.SSZObj.ByteLength())
+	return int(w.SSZObj.ByteLength()) //nolint:gosec,staticcheck // not concerned about overflow here.
 }
 
 func (w *wrappedSSZObjectEncoder) UnmarshalSSZ(b []byte) error {

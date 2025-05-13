@@ -5,12 +5,10 @@ import (
 	"encoding/hex"
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/ethpandaops/beacon/pkg/beacon"
 	"github.com/ethpandaops/ethcore/pkg/ethereum/beacon/services"
-	"github.com/go-co-op/gocron"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -48,8 +46,6 @@ func NewBeaconNode(ctx context.Context, name string, config *Config, log logrus.
 }
 
 func (b *BeaconNode) Start(ctx context.Context) error {
-	s := gocron.NewScheduler(time.Local)
-
 	errs := make(chan error, 1)
 
 	go func() {
@@ -84,8 +80,6 @@ func (b *BeaconNode) Start(ctx context.Context) error {
 		}
 	}()
 
-	s.StartAsync()
-
 	if err := b.beacon.Start(ctx); err != nil {
 		return err
 	}
@@ -119,7 +113,12 @@ func (b *BeaconNode) Metadata() *services.MetadataService {
 		return nil
 	}
 
-	return service.(*services.MetadataService)
+	metadata, ok := service.(*services.MetadataService)
+	if !ok {
+		return nil
+	}
+
+	return metadata
 }
 
 func (b *BeaconNode) OnReady(_ context.Context, callback func(ctx context.Context) error) {

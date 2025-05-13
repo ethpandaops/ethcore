@@ -1,22 +1,30 @@
 package beacon
 
-import (
-	"strings"
-)
+import "strings"
 
+// Client represents an Ethereum consensus client implementation.
 type Client string
 
 const (
-	ClientUnknown    Client = "unknown"
+	// ClientUnknown represents an unknown or unidentified consensus client.
+	ClientUnknown Client = "unknown"
+	// ClientLighthouse represents the Lighthouse consensus client.
 	ClientLighthouse Client = "lighthouse"
-	ClientNimbus     Client = "nimbus"
-	ClientTeku       Client = "teku"
-	ClientPrysm      Client = "prysm"
-	ClientLodestar   Client = "lodestar"
-	ClientGrandine   Client = "grandine"
-	ClientCaplin     Client = "caplin"
+	// ClientNimbus represents the Nimbus consensus client.
+	ClientNimbus Client = "nimbus"
+	// ClientTeku represents the Teku consensus client.
+	ClientTeku Client = "teku"
+	// ClientPrysm represents the Prysm consensus client.
+	ClientPrysm Client = "prysm"
+	// ClientLodestar represents the Lodestar consensus client.
+	ClientLodestar Client = "lodestar"
+	// ClientGrandine represents the Grandine consensus client.
+	ClientGrandine Client = "grandine"
+	// ClientCaplin represents the Caplin consensus client.
+	ClientCaplin Client = "caplin"
 )
 
+// AllClients contains all known consensus client implementations.
 var AllClients = []Client{
 	ClientUnknown,
 	ClientLighthouse,
@@ -28,35 +36,27 @@ var AllClients = []Client{
 	ClientCaplin,
 }
 
+// clientIdentifiers maps client-specific strings to their respective Client type.
+var clientIdentifiers = map[string]Client{
+	"lighthouse": ClientLighthouse,
+	"nimbus":     ClientNimbus,
+	"teku":       ClientTeku,
+	"prysm":      ClientPrysm,
+	"lodestar":   ClientLodestar,
+	"grandine":   ClientGrandine,
+	"caplin":     ClientCaplin,
+}
+
+// ClientFromString identifies a consensus client from a string identifier.
+// It performs a case-insensitive search for known client names within the input string.
+// Returns ClientUnknown if no known client is identified.
 func ClientFromString(client string) Client {
 	asLower := strings.ToLower(client)
 
-	if strings.Contains(asLower, "lighthouse") {
-		return ClientLighthouse
-	}
-
-	if strings.Contains(asLower, "nimbus") {
-		return ClientNimbus
-	}
-
-	if strings.Contains(asLower, "teku") {
-		return ClientTeku
-	}
-
-	if strings.Contains(asLower, "prysm") {
-		return ClientPrysm
-	}
-
-	if strings.Contains(asLower, "lodestar") {
-		return ClientLodestar
-	}
-
-	if strings.Contains(asLower, "grandine") {
-		return ClientGrandine
-	}
-
-	if strings.Contains(asLower, "caplin") {
-		return ClientCaplin
+	for identifier, clientType := range clientIdentifiers {
+		if strings.Contains(asLower, identifier) {
+			return clientType
+		}
 	}
 
 	return ClientUnknown

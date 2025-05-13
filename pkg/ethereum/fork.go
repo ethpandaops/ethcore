@@ -1,9 +1,9 @@
 package ethereum
 
 import (
+	"github.com/OffchainLabs/prysm/v6/beacon-chain/core/signing"
 	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/pkg/errors"
-	"github.com/prysmaticlabs/prysm/v5/beacon-chain/core/signing"
 )
 
 func ComputeForkDigest(genesisValidatorsRoot phase0.Root, forkVersion [4]byte) (phase0.ForkDigest, error) {

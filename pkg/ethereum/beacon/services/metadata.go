@@ -2,17 +2,22 @@ package services
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
 	v1 "github.com/attestantio/go-eth2-client/api/v1"
-	backoff "github.com/cenkalti/backoff/v4"
+	backoff "github.com/cenkalti/backoff/v5"
 	"github.com/ethpandaops/beacon/pkg/beacon"
+	"github.com/ethpandaops/beacon/pkg/beacon/api/types"
 	"github.com/ethpandaops/beacon/pkg/beacon/state"
+	clients "github.com/ethpandaops/ethcore/pkg/ethereum/beacon"
+	"github.com/ethpandaops/ethcore/pkg/ethereum/networks"
+	"github.com/ethpandaops/ethcore/pkg/ethereum/serialize"
 	"github.com/ethpandaops/ethwallclock"
-	"github.com/ethpandaops/xatu/pkg/ethereum"
-	"github.com/go-co-op/gocron"
+	"github.com/go-co-op/gocron/v2"
 	"github.com/sirupsen/logrus"
 )
 
@@ -20,43 +25,56 @@ type MetadataService struct {
 	beacon beacon.Node
 	log    logrus.FieldLogger
 
-	Network string
+	Network             *networks.Network
+	overrideNetworkName string
 
 	Genesis *v1.Genesis
 	Spec    *state.Spec
 
 	wallclock *ethwallclock.EthereumBeaconChain
 
+	nodeIdentity *types.Identity
+	nodeID       string
+	nodeIDHash   string
+
 	onReadyCallbacks []func(context.Context) error
 
 	mu sync.Mutex
 }
 
-func NewMetadataService(log logrus.FieldLogger, sbeacon beacon.Node, network string) MetadataService {
+func NewMetadataService(log logrus.FieldLogger, sbeacon beacon.Node, overrideNetworkName string) MetadataService {
 	return MetadataService{
-		beacon:           sbeacon,
-		log:              log.WithField("module", "ethcore/ethereum/beacon/metadata"),
-		onReadyCallbacks: []func(context.Context) error{},
-		mu:               sync.Mutex{},
-		Network:          network,
+		beacon:              sbeacon,
+		log:                 log.WithField("module", "ethcore/ethereum/beacon/metadata"),
+		onReadyCallbacks:    []func(context.Context) error{},
+		mu:                  sync.Mutex{},
+		Network:             &networks.Network{Name: networks.NetworkNameNone},
+		overrideNetworkName: overrideNetworkName,
 	}
 }
 
 func (m *MetadataService) Start(ctx context.Context) error {
 	go func() {
-		operation := func() error {
+		operation := func() (string, error) {
 			if err := m.RefreshAll(ctx); err != nil {
-				return err
+				return "", err
 			}
 
 			if err := m.Ready(ctx); err != nil {
-				return err
+				return "", err
 			}
 
-			return nil
+			return "", nil
 		}
 
-		if err := backoff.Retry(operation, backoff.NewExponentialBackOff()); err != nil {
+		retryOpts := []backoff.RetryOption{
+			backoff.WithBackOff(backoff.NewExponentialBackOff()),
+			backoff.WithNotify(func(err error, duration time.Duration) {
+				m.log.WithError(err).Warnf("Failed to refresh metadata, retrying in %s", duration)
+			}),
+		}
+
+		if _, err := backoff.Retry(ctx, operation, retryOpts...); err != nil {
 			m.log.WithError(err).Warn("Failed to refresh metadata")
 		}
 
@@ -67,15 +85,25 @@ func (m *MetadataService) Start(ctx context.Context) error {
 		}
 	}()
 
-	s := gocron.NewScheduler(time.Local)
-
-	if _, err := s.Every("5m").Do(func() {
-		_ = m.RefreshAll(ctx)
-	}); err != nil {
+	s, err := gocron.NewScheduler(gocron.WithLocation(time.Local))
+	if err != nil {
 		return err
 	}
 
-	s.StartAsync()
+	if _, err := s.NewJob(
+		gocron.DurationJob(5*time.Minute),
+		gocron.NewTask(
+			func(ctx context.Context) {
+				_ = m.RefreshAll(ctx)
+			},
+			ctx,
+		),
+		gocron.WithStartAt(gocron.WithStartImmediately()),
+	); err != nil {
+		return err
+	}
+
+	s.Start()
 
 	return nil
 }
@@ -105,8 +133,16 @@ func (m *MetadataService) Ready(ctx context.Context) error {
 		return errors.New("node version is not available")
 	}
 
+	if m.Network.Name == networks.NetworkNameNone {
+		return errors.New("network name is not available")
+	}
+
 	if m.wallclock == nil {
 		return errors.New("wallclock is not available")
+	}
+
+	if m.nodeIdentity == nil {
+		return errors.New("node identity is not available")
 	}
 
 	return nil
@@ -119,6 +155,10 @@ func (m *MetadataService) RefreshAll(ctx context.Context) error {
 
 	if err := m.fetchGenesis(ctx); err != nil {
 		m.log.WithError(err).Warn("Failed to fetch genesis for refresh")
+	}
+
+	if _, err := m.DeriveNodeIdentity(ctx); err != nil {
+		m.log.WithError(err).Warn("Failed to derive node identity")
 	}
 
 	if m.Genesis != nil && m.Spec != nil && m.wallclock == nil {
@@ -141,6 +181,70 @@ func (m *MetadataService) Wallclock() *ethwallclock.EthereumBeaconChain {
 	return m.wallclock
 }
 
+func (m *MetadataService) DeriveNodeIdentity(ctx context.Context) (*types.Identity, error) {
+	if m.beacon == nil {
+		return nil, errors.New("beacon is not available")
+	}
+
+	if !m.beacon.Healthy() {
+		return nil, errors.New("beacon is not healthy")
+	}
+
+	identity, err := m.beacon.FetchNodeIdentity(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	m.nodeIdentity = identity
+
+	enr, err := identity.GetEnode()
+	if err != nil {
+		return nil, err
+	}
+
+	m.nodeID = enr.ID().String()
+
+	// Hash the node ID so we obfuscate the actual node ID, and trim it to 10 characters.
+	m.nodeIDHash = fmt.Sprintf("%x", sha256.Sum256([]byte(m.nodeID)))[:10]
+
+	return identity, nil
+}
+
+func (m *MetadataService) DeriveNetwork(_ context.Context) error {
+	if m.Genesis == nil {
+		return errors.New("genesis is not available")
+	}
+
+	network := networks.DeriveFromGenesisRoot(serialize.RootAsString(m.Genesis.GenesisValidatorsRoot))
+
+	if m.overrideNetworkName != "" {
+		network.Name = networks.NetworkName(m.overrideNetworkName)
+
+		network.ID = m.Spec.DepositChainID
+	}
+
+	if network.Name != m.Network.Name {
+		m.log.WithFields(logrus.Fields{
+			"name": network.Name,
+			"id":   network.ID,
+		}).Info("Detected ethereum network")
+	}
+
+	m.Network = network
+
+	return nil
+}
+
+func (m *MetadataService) NodeVersion(_ context.Context) string {
+	version, _ := m.beacon.NodeVersion()
+
+	return version
+}
+
+func (m *MetadataService) Client(ctx context.Context) string {
+	return string(clients.ClientFromString(m.NodeVersion(ctx)))
+}
+
 func (m *MetadataService) fetchSpec(_ context.Context) error {
 	spec, err := m.beacon.Spec()
 	if err != nil {
@@ -161,14 +265,4 @@ func (m *MetadataService) fetchGenesis(_ context.Context) error {
 	m.Genesis = genesis
 
 	return nil
-}
-
-func (m *MetadataService) NodeVersion(_ context.Context) string {
-	version, _ := m.beacon.NodeVersion()
-
-	return version
-}
-
-func (m *MetadataService) Client(ctx context.Context) string {
-	return string(ethereum.ClientFromString(m.NodeVersion(ctx)))
 }

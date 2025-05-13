@@ -3,15 +3,14 @@ package host
 import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
-	// Import the metrics package if not already imported
 )
 
-// Event names used for broker communication
+// Event names used for broker communication.
 var (
-	// Peer disconnect events
+	// Peer disconnect events.
 	BeforePeerDisconnectEvent = "peer:before:disconnect"
 	AfterPeerDisconnectEvent  = "peer:after:disconnect"
-	// Peer connect events
+	// Peer connect events.
 	BeforePeerConnectEvent = "peer:before:connect"
 	AfterPeerConnectEvent  = "peer:after:connect"
 )
@@ -21,25 +20,26 @@ type AfterPeerConnectCallback func(net network.Network, conn network.Conn)
 type BeforePeerDisconnectCallback func(peerID peer.ID)
 type AfterPeerDisconnectCallback func(net network.Network, conn network.Conn)
 
-// Subscribers
+// BeforePeerConnect subscribes to the before peer connect event.
 func (n *Node) BeforePeerConnect(callback BeforePeerConnectCallback) {
 	n.broker.On(BeforePeerConnectEvent, callback)
 }
 
+// AfterPeerConnect subscribes to the after peer connect event.
 func (n *Node) AfterPeerConnect(callback AfterPeerConnectCallback) {
 	n.broker.On(AfterPeerConnectEvent, callback)
 }
 
-// New subscriber methods for lifecycle events
+// BeforePeerDisconnect subscribes to the before peer disconnect event.
 func (n *Node) BeforePeerDisconnect(callback BeforePeerDisconnectCallback) {
 	n.broker.On(BeforePeerDisconnectEvent, callback)
 }
 
+// AfterPeerDisconnect subscribes to the after peer disconnect event.
 func (n *Node) AfterPeerDisconnect(callback AfterPeerDisconnectCallback) {
 	n.broker.On(AfterPeerDisconnectEvent, callback)
 }
 
-// Emitters
 func (n *Node) emitBeforePeerConnect(peerID peer.ID) {
 	n.broker.Emit(BeforePeerConnectEvent, peerID)
 }
