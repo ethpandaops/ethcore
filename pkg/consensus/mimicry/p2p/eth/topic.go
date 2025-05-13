@@ -1,7 +1,7 @@
 package eth
 
 import (
-	"github.com/prysmaticlabs/prysm/v5/beacon-chain/p2p/encoder"
+	"github.com/OffchainLabs/prysm/v6/beacon-chain/p2p/encoder"
 )
 
 const (

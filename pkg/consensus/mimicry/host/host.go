@@ -30,7 +30,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// Config is the configuration for the Mimicry host
+// Config is the configuration for the Mimicry host.
 type Config struct {
 	IPAddr  net.IP `yaml:"ipAddr"`
 	UDPPort int    `yaml:"udpPort"`
@@ -38,7 +38,7 @@ type Config struct {
 	PrivKey string `yaml:"privKey"`
 }
 
-// Validate validates the Mimicry host config
+// Validate validates the Mimicry host config.
 func (c *Config) Validate() error {
 	if c.IPAddr == nil {
 		return errors.New("ipAddr is required")
@@ -48,7 +48,7 @@ func (c *Config) Validate() error {
 }
 
 // Node is a Mimicry host
-// It is responsible for managing the libp2p host and the ENR
+// It is responsible for managing the libp2p host and the ENR.
 type Node struct {
 	log logrus.FieldLogger
 
@@ -210,6 +210,7 @@ func (n *Node) derivePrivateKey() (*crypto.Secp256k1PrivateKey, error) {
 	return n.DerivedPrivKey, nil
 }
 
+//nolint:unused // Will revisit if not-needed.
 func (n *Node) createLocalNode(
 	privKey *crypto.Secp256k1PrivateKey,
 	ipAddr net.IP,
@@ -234,8 +235,8 @@ func (n *Node) createLocalNode(
 	localNode := enode.NewLocalNode(db, priv)
 
 	ipEntry := enr.IP(ipAddr)
-	udpEntry := enr.UDP(udpPort)
-	tcpEntry := enr.TCP(tcpPort)
+	udpEntry := enr.UDP(udpPort) //nolint:gosec // not concerned about overflow here.
+	tcpEntry := enr.TCP(tcpPort) //nolint:gosec // not concerned about overflow here.
 
 	localNode.Set(ipEntry)
 	localNode.Set(udpEntry)

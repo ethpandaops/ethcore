@@ -28,6 +28,7 @@ func (c *Crawler) handleStatus(ctx context.Context, stream network.Stream) error
 	}()
 
 	var theirStatus common.Status
+
 	err := c.reqResp.ReadRequest(ctx, stream, &theirStatus)
 	if err != nil {
 		logCtx.WithError(err).Debug("Failed to decode status message")

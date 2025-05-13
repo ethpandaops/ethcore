@@ -1,12 +1,10 @@
 package discovery
 
 import (
-	"crypto/elliptic"
 	"errors"
 	"fmt"
 	"net"
 
-	"github.com/ethereum/go-ethereum/crypto/secp256k1"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -19,12 +17,17 @@ type ConnectablePeer struct {
 }
 
 func DeriveDetailsFromNode(node *enode.Node) (*ConnectablePeer, error) {
-	pubKey := node.Pubkey()
-	if pubKey == nil {
+	ecdsaPubKey := node.Pubkey()
+	if ecdsaPubKey == nil {
 		return nil, errors.New("public key is nil")
 	}
 
-	secpKey, err := crypto.UnmarshalSecp256k1PublicKey(elliptic.Marshal(secp256k1.S256(), pubKey.X, pubKey.Y))
+	pubKey, err := ecdsaPubKey.ECDH()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get ECDH public key: %w", err)
+	}
+
+	secpKey, err := crypto.UnmarshalSecp256k1PublicKey(pubKey.Bytes())
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal secp256k1 public key: %w", err)
 	}

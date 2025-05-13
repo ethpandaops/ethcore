@@ -10,7 +10,7 @@ import (
 	perrors "github.com/pkg/errors"
 )
 
-// Config is the configuration for the Crawler
+// Config is the configuration for the Crawler.
 type Config struct {
 	Node            *host.Config `yaml:"node"`
 	UserAgent       string
@@ -20,7 +20,7 @@ type Config struct {
 	CooloffDuration time.Duration    `yaml:"cooloffDuration" default:"600s"`
 }
 
-// Validate validates the CrawlerConfig
+// Validate validates the CrawlerConfig.
 func (c *Config) Validate() error {
 	if c.Node == nil {
 		return errors.New("node is required")

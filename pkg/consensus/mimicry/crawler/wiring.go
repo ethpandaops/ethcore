@@ -146,6 +146,7 @@ func (c *Crawler) handlePeerDisconnected(net network.Network, conn network.Conn)
 	}).Debug("Disconnected from peer")
 }
 
+//nolint:unused // Will revisit if not-needed.
 func (c *Crawler) handleBeaconNodeReady(ctx context.Context) error {
 	c.log.Info("Upstream beacon node is ready!")
 

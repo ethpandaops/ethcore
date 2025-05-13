@@ -9,9 +9,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/OffchainLabs/prysm/v6/beacon-chain/p2p/encoder"
+	pb "github.com/OffchainLabs/prysm/v6/proto/prysm/v1alpha1"
 	"github.com/attestantio/go-eth2-client/api"
 	"github.com/attestantio/go-eth2-client/spec/phase0"
-	"github.com/cenkalti/backoff"
+	backoff "github.com/cenkalti/backoff/v5"
 	"github.com/chuckpreslar/emission"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/enr"
@@ -22,24 +24,24 @@ import (
 	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/eth"
 	"github.com/ethpandaops/ethcore/pkg/discovery"
 	"github.com/ethpandaops/ethcore/pkg/ethereum"
-	"github.com/go-co-op/gocron"
+	"github.com/go-co-op/gocron/v2"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/protolambda/ztyp/tree"
-	"github.com/prysmaticlabs/prysm/v5/beacon-chain/p2p/encoder"
-	pb "github.com/prysmaticlabs/prysm/v5/proto/prysm/v1alpha1"
 	"github.com/sirupsen/logrus"
 )
 
 var sszNetworkEncoder = encoder.SszNetworkEncoder{}
+
+const unknown = "unknown"
 
 // Crawler is a Mimicry client that connects to Ethereum beacon nodes and
 // requests status updates from them. It depends on an upstream beacon node
 // to provide it with the current Ethereum network state, and never
 // stays connected to any one peer for very long.
 // Crawler comes with all tools included to crawl the network,
-// including discovery, and outputs events to the ch
+// including discovery, and outputs events to the ch.
 type Crawler struct {
 	log       logrus.FieldLogger
 	config    *Config
@@ -48,7 +50,6 @@ type Crawler struct {
 	broker *emission.Emitter
 	node   *host.Node
 
-	ctx      context.Context
 	metadata *common.MetaData
 	status   *common.Status
 
@@ -70,7 +71,7 @@ type Crawler struct {
 	OnReady chan struct{}
 }
 
-// New creates a new Crawler
+// New creates a new Crawler.
 func New(log logrus.FieldLogger, config *Config, userAgent, namespace string, f discovery.NodeFinder) *Crawler {
 	return &Crawler{
 		log:       log,
@@ -93,7 +94,7 @@ func New(log logrus.FieldLogger, config *Config, userAgent, namespace string, f 
 	}
 }
 
-// Start starts the Crawler
+// Start starts the Crawler.
 func (c *Crawler) Start(ctx context.Context) error {
 	c.log.WithFields(logrus.Fields{
 		"user_agent": c.userAgent,
@@ -140,16 +141,27 @@ func (c *Crawler) Start(ctx context.Context) error {
 	c.beacon.OnReady(ctx, func(ctx context.Context) error {
 		c.log.Info("Beacon node is ready")
 
+		operation := func() (string, error) {
+			if err := c.fetchAndSetStatus(ctx); err != nil {
+				return "", err
+			}
+
+			return "", nil
+		}
+
 		bo := backoff.NewExponentialBackOff()
 		bo.MaxInterval = 15 * time.Second
-		bo.MaxElapsedTime = 3 * time.Minute
 
-		if err := backoff.RetryNotify(func() error {
-			return c.fetchAndSetStatus(ctx)
-		}, bo, func(err error, timer time.Duration) {
-			c.log.WithError(err).WithField("next_attempt", timer).Warn("Failed to fetch initial status")
-		}); err != nil {
-			c.log.WithError(err).Fatal("Failed to fetch initial status")
+		retryOpts := []backoff.RetryOption{
+			backoff.WithBackOff(backoff.NewExponentialBackOff()),
+			backoff.WithMaxElapsedTime(3 * time.Minute),
+			backoff.WithNotify(func(err error, duration time.Duration) {
+				c.log.WithError(err).Warnf("Failed to fetch initial status, retrying in %s", duration)
+			}),
+		}
+
+		if _, err := backoff.Retry(ctx, operation, retryOpts...); err != nil {
+			c.log.WithError(err).Warn("Failed to fetch initial status")
 		}
 
 		c.log.Info("Successfully fetched initial status")
@@ -199,12 +211,8 @@ func (c *Crawler) Start(ctx context.Context) error {
 
 		c.log.Info("Successfully started Mimicry crawler")
 
-		for {
-			// Wait until we have a valid status
-			if c.GetStatus().HeadSlot != 0 {
-				break
-			}
-
+		// Wait until we have a valid status
+		for c.GetStatus().HeadSlot == 0 {
 			time.Sleep(time.Second)
 		}
 
@@ -239,17 +247,27 @@ func (c *Crawler) Stop(ctx context.Context) error {
 }
 
 func (c *Crawler) startCrons(ctx context.Context) error {
-	cr := gocron.NewScheduler(time.Local)
-
-	if _, err := cr.Every("60s").Do(func() {
-		if err := c.fetchAndSetStatus(ctx); err != nil {
-			c.log.WithError(err).Error("Failed to fetch and set status")
-		}
-	}); err != nil {
+	s, err := gocron.NewScheduler(gocron.WithLocation(time.Local))
+	if err != nil {
 		return err
 	}
 
-	cr.StartAsync()
+	if _, err := s.NewJob(
+		gocron.DurationJob(1*time.Minute),
+		gocron.NewTask(
+			func(ctx context.Context) {
+				if err := c.fetchAndSetStatus(ctx); err != nil {
+					c.log.WithError(err).Error("Failed to fetch and set status")
+				}
+			},
+			ctx,
+		),
+		gocron.WithStartAt(gocron.WithStartImmediately()),
+	); err != nil {
+		return err
+	}
+
+	s.Start()
 
 	return nil
 }
@@ -436,10 +454,15 @@ func (c *Crawler) RequestMetadataFromPeer(ctx context.Context, peerID peer.ID) (
 func (c *Crawler) GetPeerAgentVersion(peerID peer.ID) string {
 	rawAgentVersion, err := c.node.Peerstore().Get(peerID, "AgentVersion")
 	if err != nil {
-		return "unknown"
+		return unknown
 	}
 
-	return rawAgentVersion.(string)
+	agentVersion, ok := rawAgentVersion.(string)
+	if !ok {
+		return unknown
+	}
+
+	return agentVersion
 }
 
 func (c *Crawler) fetchAndSetStatus(ctx context.Context) error {

@@ -66,6 +66,6 @@ func (m *Metrics) RecordSuccessfulCrawl(agent string) {
 	m.SuccessfulCrawls.WithLabelValues(agent).Inc()
 }
 
-func (m *Metrics) RecordFailedRequest(protocol, error string) {
-	m.FailedRequests.WithLabelValues(protocol, error).Inc()
+func (m *Metrics) RecordFailedRequest(protocol, errorType string) {
+	m.FailedRequests.WithLabelValues(protocol, errorType).Inc()
 }
