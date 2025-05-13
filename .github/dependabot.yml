@@ -7,7 +7,7 @@ updates:
      groups:
         actions:
            patterns:
-              - '*'
+              - "*"
    - package-ecosystem: gomod
      directory: /
      schedule:
@@ -15,4 +15,4 @@ updates:
      groups:
         go-dependencies:
            patterns:
-              - '*'
+              - "*"
