@@ -13,7 +13,7 @@ import (
 	"github.com/ethpandaops/beacon/pkg/beacon"
 	"github.com/ethpandaops/beacon/pkg/beacon/api/types"
 	"github.com/ethpandaops/beacon/pkg/beacon/state"
-	clients "github.com/ethpandaops/ethcore/pkg/ethereum/beacon"
+	"github.com/ethpandaops/ethcore/pkg/ethereum/clients"
 	"github.com/ethpandaops/ethcore/pkg/ethereum/networks"
 	"github.com/ethpandaops/ethcore/pkg/ethereum/serialize"
 	"github.com/ethpandaops/ethwallclock"

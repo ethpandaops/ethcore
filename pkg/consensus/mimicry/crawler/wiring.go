@@ -8,7 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/eth"
 	"github.com/ethpandaops/ethcore/pkg/discovery"
-	"github.com/ethpandaops/ethcore/pkg/ethereum/beacon"
+	"github.com/ethpandaops/ethcore/pkg/ethereum/clients"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
@@ -78,7 +78,7 @@ func (c *Crawler) wireUpComponents(ctx context.Context) error {
 	})
 
 	c.OnSuccessfulCrawl(func(peerID peer.ID, status *common.Status, metadata *common.MetaData) {
-		c.metrics.RecordSuccessfulCrawl(string(beacon.ClientFromString(c.GetPeerAgentVersion(peerID))))
+		c.metrics.RecordSuccessfulCrawl(string(clients.ClientFromString(c.GetPeerAgentVersion(peerID))))
 	})
 
 	return nil

@@ -15,7 +15,7 @@ require (
 	github.com/ethpandaops/ethwallclock v0.4.0
 	github.com/go-co-op/gocron/v2 v2.16.1
 	github.com/jellydator/ttlcache/v3 v3.3.0
-	github.com/kurtosis-tech/kurtosis/api/golang v1.8.0
+	github.com/kurtosis-tech/kurtosis/api/golang v1.9.1
 	github.com/libp2p/go-libp2p v0.41.1
 	github.com/libp2p/go-libp2p-mplex v0.10.0
 	github.com/multiformats/go-multiaddr v0.15.0
@@ -96,6 +96,7 @@ require (
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.10 // indirect
 	github.com/koron/go-ssdp v0.0.6 // indirect
+	github.com/kurtosis-tech/kurtosis v1.4.1 // indirect
 	github.com/kurtosis-tech/kurtosis-portal/api/golang v0.0.0-20230818182330-1a86869414d2 // indirect
 	github.com/kurtosis-tech/kurtosis/contexts-config-store v0.0.0-20230818184218-f4e3e773463b // indirect
 	github.com/kurtosis-tech/kurtosis/grpc-file-transfer/golang v0.0.0-20230803130419-099ee7a4e3dc // indirect
