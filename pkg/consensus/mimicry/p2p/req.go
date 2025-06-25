@@ -39,9 +39,10 @@ func newRequestError(msg string) *RequestError {
 }
 
 func (e *RequestError) Add(msg string) *RequestError {
-	e.Msg = fmt.Sprintf("%s: %s", e.Msg, msg)
-
-	return e
+	return &RequestError{
+		Msg:  fmt.Sprintf("%s: %s", e.Msg, msg),
+		Type: e.Type,
+	}
 }
 
 func (e *RequestError) Unwrap() error {

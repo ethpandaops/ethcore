@@ -161,7 +161,7 @@ func (b *BeaconNode) Synced(ctx context.Context) error {
 }
 
 func (b *BeaconNode) ForkDigest() (phase0.ForkDigest, error) {
-	genesis := b.Metadata().Genesis
+	genesis := b.Metadata().GetGenesis()
 	if genesis == nil {
 		return phase0.ForkDigest{}, errors.New("missing genesis")
 	}

@@ -1,12 +1,12 @@
-package beacon
+package clients
 
 import "strings"
 
-// Client represents an Ethereum consensus client implementation.
+// Client represents an Ethereum client implementation.
 type Client string
 
 const (
-	// ClientUnknown represents an unknown or unidentified consensus client.
+	// ClientUnknown represents an unknown or unidentified client.
 	ClientUnknown Client = "unknown"
 	// ClientLighthouse represents the Lighthouse consensus client.
 	ClientLighthouse Client = "lighthouse"
@@ -22,9 +22,42 @@ const (
 	ClientGrandine Client = "grandine"
 	// ClientCaplin represents the Caplin consensus client.
 	ClientCaplin Client = "caplin"
+	// ClientGeth represents the Geth execution client.
+	ClientGeth Client = "geth"
+	// ClientBesu represents the Besu execution client.
+	ClientBesu Client = "besu"
+	// ClientNethermind represents the Nethermind execution client.
+	ClientNethermind Client = "nethermind"
+	// ClientErigon represents the Erigon execution client.
+	ClientErigon Client = "erigon"
+	// ClientReth represents the Reth execution client.
+	ClientReth Client = "reth"
+	// ClientEthereumJS represents the EthereumJS execution client.
+	ClientEthereumJS Client = "ethereumjs"
 )
 
-// AllClients contains all known consensus client implementations.
+// AllConsensusClients contains all known consensus client implementations.
+var AllConsensusClients = []Client{
+	ClientLighthouse,
+	ClientNimbus,
+	ClientTeku,
+	ClientPrysm,
+	ClientLodestar,
+	ClientGrandine,
+	ClientCaplin,
+}
+
+// AllExecutionClients contains all known execution client implementations.
+var AllExecutionClients = []Client{
+	ClientGeth,
+	ClientBesu,
+	ClientNethermind,
+	ClientErigon,
+	ClientReth,
+	ClientEthereumJS,
+}
+
+// AllClients contains all known consensus+execution client implementations.
 var AllClients = []Client{
 	ClientUnknown,
 	ClientLighthouse,
@@ -34,6 +67,12 @@ var AllClients = []Client{
 	ClientLodestar,
 	ClientGrandine,
 	ClientCaplin,
+	ClientGeth,
+	ClientBesu,
+	ClientNethermind,
+	ClientErigon,
+	ClientReth,
+	ClientEthereumJS,
 }
 
 // clientIdentifiers maps client-specific strings to their respective Client type.
@@ -45,6 +84,12 @@ var clientIdentifiers = map[string]Client{
 	"lodestar":   ClientLodestar,
 	"grandine":   ClientGrandine,
 	"caplin":     ClientCaplin,
+	"geth":       ClientGeth,
+	"besu":       ClientBesu,
+	"nethermind": ClientNethermind,
+	"erigon":     ClientErigon,
+	"reth":       ClientReth,
+	"ethereumjs": ClientEthereumJS,
 }
 
 // ClientFromString identifies a consensus client from a string identifier.

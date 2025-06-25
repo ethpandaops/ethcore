@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/OffchainLabs/prysm/v6/crypto/ecdsa"
 	"github.com/ethereum/go-ethereum/p2p/enode"
-	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 )
@@ -17,19 +17,28 @@ type ConnectablePeer struct {
 }
 
 func DeriveDetailsFromNode(node *enode.Node) (*ConnectablePeer, error) {
+	if node == nil {
+		return nil, errors.New("node is nil")
+	}
+
 	ecdsaPubKey := node.Pubkey()
 	if ecdsaPubKey == nil {
 		return nil, errors.New("public key is nil")
 	}
 
-	pubKey, err := ecdsaPubKey.ECDH()
+	// Convert the ECDSA public key to libp2p format using Prysm's implementation.
+	//
+	// We use Prysm's conversion method here because:
+	// 1. Ethereum nodes use secp256k1 elliptic curve for their cryptographic operations
+	// 2. While both geth (go-ethereum) and libp2p support secp256k1, they have different
+	//    internal representations of the keys
+	// 3. Direct conversion attempts (like using crypto/ecdh) fail because Go's standard
+	//    crypto libraries don't support the secp256k1 curve
+	// 4. Prysm's implementation includes the necessary "hack" to ensure libp2p's secp256k1
+	//    keys are recognized as geth's secp256k1 in discovery v5 protocol
+	secpKey, err := ecdsa.ConvertToInterfacePubkey(ecdsaPubKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get ECDH public key: %w", err)
-	}
-
-	secpKey, err := crypto.UnmarshalSecp256k1PublicKey(pubKey.Bytes())
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal secp256k1 public key: %w", err)
+		return nil, fmt.Errorf("failed to convert ECDSA public key: %w", err)
 	}
 
 	peerID, err := peer.IDFromPublicKey(secpKey)
