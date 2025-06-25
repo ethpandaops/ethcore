@@ -16,8 +16,8 @@ github.com/Masterminds/semver/v3 v3.1.1 h1:hLg3sBzpNErnxhQtUy/mmLR2I9foDujNK030I
 github.com/Masterminds/semver/v3 v3.1.1/go.mod h1:VPu/7SZ7ePZ3QOrcuXROw5FAcLl4a0cBrbBpGY/8hQs=
 github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERoyfY=
 github.com/Microsoft/go-winio v0.6.2/go.mod h1:yd8OoFMLzJbo9gZq8j5qaps8bJ9aShtEA8Ipt1oGCvU=
-github.com/OffchainLabs/prysm/v6 v6.0.2 h1:GrHNvZlOoaPYeA4uL2xoUqplAelImteWxhJDap1yVBs=
-github.com/OffchainLabs/prysm/v6 v6.0.2/go.mod h1:lMkHT3gWiCOqo4rbuhLTU4FoQ/THni9v6z4w9P6FRyU=
+github.com/OffchainLabs/prysm/v6 v6.0.4 h1:aqWCb2U3LfeahzjORvxXYsL1ebKWT1AUu3Ya3y7LApE=
+github.com/OffchainLabs/prysm/v6 v6.0.4/go.mod h1:lMkHT3gWiCOqo4rbuhLTU4FoQ/THni9v6z4w9P6FRyU=
 github.com/VictoriaMetrics/fastcache v1.12.2 h1:N0y9ASrJ0F6h0QaC3o6uJb3NIZ9VKLjCM7NQbSmF7WI=
 github.com/VictoriaMetrics/fastcache v1.12.2/go.mod h1:AmC+Nzz1+3G2eCPapF6UcsnkThDcMsQicp4xDukwJYI=
 github.com/adrg/xdg v0.4.0 h1:RzRqFcjH4nE5C6oTAxhBtoE2IRyjBSa62SCbyPidvls=
@@ -38,6 +38,8 @@ github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6r
 github.com/bits-and-blooms/bitset v1.22.0 h1:Tquv9S8+SGaS3EhyA+up3FXzmkhxPGjQQCkcs2uw7w4=
 github.com/bits-and-blooms/bitset v1.22.0/go.mod h1:7hO7Gc7Pp1vODcmWvKMRA9BNmbv6a/7QIWpPxHddWR8=
 github.com/bradfitz/go-smtpd v0.0.0-20170404230938-deb6d6237625/go.mod h1:HYsPBTaaSFSlLx/70C2HPIMNZpVV8+vt/A+FMnYP11g=
+github.com/btcsuite/btcd/btcec/v2 v2.3.5 h1:dpAlnAwmT1yIBm3exhT1/8iUSD98RDJM5vqJVQDQLiU=
+github.com/btcsuite/btcd/btcec/v2 v2.3.5/go.mod h1:m22FrOAiuxl/tht9wIqAoGHcbnCCaPWyauO8y2LGGtQ=
 github.com/buger/jsonparser v0.0.0-20181115193947-bf1c66bbce23/go.mod h1:bbYlZJ7hK1yFx9hf58LP0zeX7UjIGs20ufpu3evjr+s=
 github.com/cenkalti/backoff/v4 v4.3.0 h1:MyRJ/UdXutAwSAT+s3wNd7MfTIcy71VQueUuFK343L8=
 github.com/cenkalti/backoff/v4 v4.3.0/go.mod h1:Y3VNntkOUPxTVeUxJ/G5vcM//AlwfmyYozVcomhLiZE=
@@ -119,10 +121,10 @@ github.com/ethereum/go-ethereum v1.15.11 h1:JK73WKeu0WC0O1eyX+mdQAVHUV+UR1a9VB/d
 github.com/ethereum/go-ethereum v1.15.11/go.mod h1:mf8YiHIb0GR4x4TipcvBUPxJLw1mFdmxzoDi11sDRoI=
 github.com/ethereum/go-verkle v0.2.2 h1:I2W0WjnrFUIzzVPwm8ykY+7pL2d4VhlsePn4j7cnFk8=
 github.com/ethereum/go-verkle v0.2.2/go.mod h1:M3b90YRnzqKyyzBEWJGqj8Qff4IDeXnzFw0P9bFw3uk=
-github.com/ethpandaops/beacon v0.55.0 h1:7TNgSm3awVfMP4mvoto320rN82bjnptM3NqyCcObkmo=
-github.com/ethpandaops/beacon v0.55.0/go.mod h1:T5HSrqxG8B28AT1zGFs+N/YDfDWMKBdYZX4Cxvjh2Zc=
-github.com/ethpandaops/ethereum-package-go v0.1.0 h1:sYe1Mr2XFiCYMq9JxMfAHjLNA0zJtlCCvZhh3ob5E5c=
-github.com/ethpandaops/ethereum-package-go v0.1.0/go.mod h1:BbIynsoyU7dHnggzHz70SLF1cUzQjE2hCXVCer/2lD8=
+github.com/ethpandaops/beacon v0.56.0 h1:NP6sYFUmmlORgti4pNj62vrap0R5xfy5RufyuNWs554=
+github.com/ethpandaops/beacon v0.56.0/go.mod h1:T5HSrqxG8B28AT1zGFs+N/YDfDWMKBdYZX4Cxvjh2Zc=
+github.com/ethpandaops/ethereum-package-go v0.2.0 h1:a3hnczkBoN8eIeLK7YHva+Uz/GKzlOEOIaY8PgV9g/U=
+github.com/ethpandaops/ethereum-package-go v0.2.0/go.mod h1:cT6pzGeMN8QdrudoF7Crk7TdopX7FMhyzZfWACsW+GQ=
 github.com/ethpandaops/ethwallclock v0.4.0 h1:+sgnhf4pk6hLPukP076VxkiLloE4L0Yk1yat+ZyHh1g=
 github.com/ethpandaops/ethwallclock v0.4.0/go.mod h1:y0Cu+mhGLlem19vnAV2x0hpFS5KZ7oOi2SWYayv9l24=
 github.com/ferranbt/fastssz v0.1.4 h1:OCDB+dYDEQDvAgtAGnTSidK1Pe2tW3nFV40XyMkTeDY=

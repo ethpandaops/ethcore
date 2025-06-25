@@ -9,7 +9,7 @@ import (
 	"time"
 
 	v1 "github.com/attestantio/go-eth2-client/api/v1"
-	backoff "github.com/cenkalti/backoff/v5"
+	"github.com/cenkalti/backoff/v5"
 	"github.com/ethpandaops/beacon/pkg/beacon"
 	"github.com/ethpandaops/beacon/pkg/beacon/api/types"
 	"github.com/ethpandaops/beacon/pkg/beacon/state"
@@ -78,7 +78,12 @@ func (m *MetadataService) Start(ctx context.Context) error {
 			m.log.WithError(err).Warn("Failed to refresh metadata")
 		}
 
-		for _, cb := range m.onReadyCallbacks {
+		m.mu.Lock()
+		callbacks := make([]func(context.Context) error, len(m.onReadyCallbacks))
+		copy(callbacks, m.onReadyCallbacks)
+		m.mu.Unlock()
+
+		for _, cb := range callbacks {
 			if err := cb(ctx); err != nil {
 				m.log.WithError(err).Warn("Failed to execute onReady callback")
 			}
@@ -117,10 +122,15 @@ func (m *MetadataService) Stop(ctx context.Context) error {
 }
 
 func (m *MetadataService) OnReady(ctx context.Context, cb func(context.Context) error) {
+	m.mu.Lock()
 	m.onReadyCallbacks = append(m.onReadyCallbacks, cb)
+	m.mu.Unlock()
 }
 
-func (m *MetadataService) Ready(ctx context.Context) error {
+func (m *MetadataService) Ready(_ context.Context) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	if m.Genesis == nil {
 		return errors.New("genesis is not available")
 	}
@@ -131,10 +141,6 @@ func (m *MetadataService) Ready(ctx context.Context) error {
 
 	if m.NodeVersion(context.Background()) == "" {
 		return errors.New("node version is not available")
-	}
-
-	if m.Network.Name == networks.NetworkNameNone {
-		return errors.New("network name is not available")
 	}
 
 	if m.wallclock == nil {
@@ -161,15 +167,13 @@ func (m *MetadataService) RefreshAll(ctx context.Context) error {
 		m.log.WithError(err).Warn("Failed to derive node identity")
 	}
 
+	m.mu.Lock()
 	if m.Genesis != nil && m.Spec != nil && m.wallclock == nil {
 		if newWallclock := ethwallclock.NewEthereumBeaconChain(m.Genesis.GenesisTime, m.Spec.SecondsPerSlot.AsDuration(), uint64(m.Spec.SlotsPerEpoch)); newWallclock != nil {
-			m.mu.Lock()
-
 			m.wallclock = newWallclock
-
-			m.mu.Unlock()
 		}
 	}
+	m.mu.Unlock()
 
 	return nil
 }
@@ -179,6 +183,34 @@ func (m *MetadataService) Wallclock() *ethwallclock.EthereumBeaconChain {
 	defer m.mu.Unlock()
 
 	return m.wallclock
+}
+
+func (m *MetadataService) GetGenesis() *v1.Genesis {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	return m.Genesis
+}
+
+func (m *MetadataService) GetSpec() *state.Spec {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	return m.Spec
+}
+
+func (m *MetadataService) GetNetwork() *networks.Network {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.Network == nil {
+		return nil
+	}
+
+	// Return a copy to prevent external modification
+	network := *m.Network
+
+	return &network
 }
 
 func (m *MetadataService) DeriveNodeIdentity(ctx context.Context) (*types.Identity, error) {
@@ -195,10 +227,13 @@ func (m *MetadataService) DeriveNodeIdentity(ctx context.Context) (*types.Identi
 		return nil, err
 	}
 
+	m.mu.Lock()
 	m.nodeIdentity = identity
 
 	enr, err := identity.GetEnode()
 	if err != nil {
+		m.mu.Unlock()
+
 		return nil, err
 	}
 
@@ -206,11 +241,15 @@ func (m *MetadataService) DeriveNodeIdentity(ctx context.Context) (*types.Identi
 
 	// Hash the node ID so we obfuscate the actual node ID, and trim it to 10 characters.
 	m.nodeIDHash = fmt.Sprintf("%x", sha256.Sum256([]byte(m.nodeID)))[:10]
+	m.mu.Unlock()
 
 	return identity, nil
 }
 
 func (m *MetadataService) DeriveNetwork(_ context.Context) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	if m.Genesis == nil {
 		return errors.New("genesis is not available")
 	}
@@ -251,7 +290,9 @@ func (m *MetadataService) fetchSpec(_ context.Context) error {
 		return err
 	}
 
+	m.mu.Lock()
 	m.Spec = spec
+	m.mu.Unlock()
 
 	return nil
 }
@@ -262,7 +303,9 @@ func (m *MetadataService) fetchGenesis(_ context.Context) error {
 		return err
 	}
 
+	m.mu.Lock()
 	m.Genesis = genesis
+	m.mu.Unlock()
 
 	return nil
 }

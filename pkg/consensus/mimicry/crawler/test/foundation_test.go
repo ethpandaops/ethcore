@@ -10,6 +10,7 @@ import (
 	"github.com/ethpandaops/beacon/pkg/beacon"
 	"github.com/ethpandaops/ethereum-package-go"
 	"github.com/ethpandaops/ethereum-package-go/pkg/client"
+	epgconfig "github.com/ethpandaops/ethereum-package-go/pkg/config"
 	"github.com/ethpandaops/ethereum-package-go/pkg/network"
 	"github.com/sirupsen/logrus"
 )
@@ -83,16 +84,33 @@ func SetupKurtosisEnvironment(t *testing.T, config *NetworkConfig, logger *logru
 		opts = append(opts, ethereum.WithOrphanOnExit())
 	}
 
-	// Try to reuse existing network if available
+	// Always try to reuse existing network if available to avoid conflicts
+	// This helps when previous test runs didn't clean up properly
 	if config.NetworkName != "" {
 		opts = append(opts, ethereum.WithReuse(config.NetworkName))
+		logger.Infof("Attempting to reuse existing network: %s", config.NetworkName)
 	}
 
 	// Add timeout option
 	opts = append(opts, ethereum.WithTimeout(config.NetworkTimeout))
 
-	// Use minimal preset for testing
-	opts = append(opts, ethereum.Minimal())
+	// Configure NAT exit IP to localhost so ENRs contain accessible IPs
+	opts = append(opts, ethereum.WithNATExitIP("127.0.0.1"))
+
+	// For now, use prysm/lighthouse.
+	// TODO(@matty): Work is needed to ensure crawling works with other clients, struggling with Teku/Nimbus/Lodestar.
+	opts = append(opts, ethereum.WithParticipants([]epgconfig.ParticipantConfig{
+		{
+			ELType: client.Geth,
+			CLType: client.Lighthouse,
+			Count:  1,
+		},
+		{
+			ELType: client.Geth,
+			CLType: client.Prysm,
+			Count:  1,
+		},
+	}))
 
 	// Create the network
 	network, err := ethereum.Run(ctx, opts...)
