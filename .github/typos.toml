@@ -5,3 +5,7 @@ extend-ignore-identifiers-re = [
     # Ignore enode URLs
     "enode://.*"
 ]
+
+[default.extend-words]
+# Ignore "Iy" which appears in base64 encoded ENR strings
+Iy = "Iy"
