@@ -284,8 +284,12 @@ func (m *MetadataService) Client(ctx context.Context) string {
 	return string(clients.ClientFromString(m.NodeVersion(ctx)))
 }
 
-func (m *MetadataService) fetchSpec(_ context.Context) error {
-	spec, err := m.beacon.Spec()
+func (m *MetadataService) fetchSpec(ctx context.Context) error {
+	if !m.beacon.Healthy() {
+		return errors.New("beacon node is not healthy")
+	}
+
+	spec, err := m.beacon.FetchSpec(ctx)
 	if err != nil {
 		return err
 	}
@@ -297,8 +301,12 @@ func (m *MetadataService) fetchSpec(_ context.Context) error {
 	return nil
 }
 
-func (m *MetadataService) fetchGenesis(_ context.Context) error {
-	genesis, err := m.beacon.Genesis()
+func (m *MetadataService) fetchGenesis(ctx context.Context) error {
+	if !m.beacon.Healthy() {
+		return errors.New("beacon node is not healthy")
+	}
+
+	genesis, err := m.beacon.FetchGenesis(ctx)
 	if err != nil {
 		return err
 	}
