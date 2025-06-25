@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand/v2"
+	"os"
 	"testing"
 	"time"
 
@@ -94,8 +95,15 @@ func SetupKurtosisEnvironment(t *testing.T, config *NetworkConfig, logger *logru
 	// Add timeout option
 	opts = append(opts, ethereum.WithTimeout(config.NetworkTimeout))
 
-	// Configure NAT exit IP to localhost so ENRs contain accessible IPs
-	opts = append(opts, ethereum.WithNATExitIP("127.0.0.1"))
+	// Configure NAT exit IP based on environment
+	// In CI environments, don't set NAT exit IP to let Kurtosis handle it
+	if os.Getenv("CI") == "" {
+		// For local development, use localhost
+		logger.Info("Running in local mode, setting NAT exit IP to 127.0.0.1")
+		opts = append(opts, ethereum.WithNATExitIP("127.0.0.1"))
+	} else {
+		logger.Info("Running in CI mode, letting Kurtosis handle NAT configuration")
+	}
 
 	// For now, use prysm/lighthouse.
 	// TODO(@matty): Work is needed to ensure crawling works with other clients, struggling with Teku/Nimbus/Lodestar.
