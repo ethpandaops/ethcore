@@ -4,7 +4,8 @@ import (
 	"context"
 	"fmt"
 	"math/rand/v2"
-	"os"
+	"net"
+	"runtime"
 	"testing"
 	"time"
 
@@ -96,14 +97,11 @@ func SetupKurtosisEnvironment(t *testing.T, config *NetworkConfig, logger *logru
 	opts = append(opts, ethereum.WithTimeout(config.NetworkTimeout))
 
 	// Configure NAT exit IP based on environment
-	// In CI environments, don't set NAT exit IP to let Kurtosis handle it
-	if os.Getenv("CI") == "" {
-		// For local development, use localhost
-		logger.Info("Running in local mode, setting NAT exit IP to 127.0.0.1")
-		opts = append(opts, ethereum.WithNATExitIP("127.0.0.1"))
-	} else {
-		logger.Info("Running in CI mode, letting Kurtosis handle NAT configuration")
-	}
+	// On macOS/Windows with Docker Desktop, localhost works due to port forwarding
+	// On Linux, we need to use the docker bridge gateway IP
+	natIP := getHostIPForContainers()
+	logger.Infof("Setting NAT exit IP to %s", natIP)
+	opts = append(opts, ethereum.WithNATExitIP(natIP))
 
 	// For now, use prysm/lighthouse.
 	// TODO(@matty): Work is needed to ensure crawling works with other clients, struggling with Teku/Nimbus/Lodestar.
@@ -281,4 +279,33 @@ func (tf *TestFoundation) initializeBeaconNodes(t *testing.T) error {
 	tf.Logger.Info("All beacon nodes are healthy")
 
 	return nil
+}
+
+// getHostIPForContainers returns the appropriate IP address for containers to reach the host.
+// On macOS/Windows with Docker Desktop, this is 127.0.0.1 due to automatic port forwarding.
+// On Linux, we need to use the docker bridge gateway IP (typically 172.17.0.1).
+func getHostIPForContainers() string {
+	// On macOS/Windows, Docker Desktop forwards localhost
+	if runtime.GOOS == "darwin" || runtime.GOOS == "windows" {
+		return "127.0.0.1"
+	}
+
+	// On Linux, try to get the docker0 bridge IP
+	// First, try to get the default gateway from inside perspective
+	// This is typically 172.17.0.1 for Docker's default bridge
+	iface, err := net.InterfaceByName("docker0")
+	if err == nil {
+		addrs, err := iface.Addrs()
+		if err == nil && len(addrs) > 0 {
+			for _, addr := range addrs {
+				if ipnet, ok := addr.(*net.IPNet); ok && ipnet.IP.To4() != nil {
+					return ipnet.IP.String()
+				}
+			}
+		}
+	}
+
+	// Fallback: use Docker's default bridge gateway
+	// This is almost always 172.17.0.1 unless Docker is configured differently
+	return "172.17.0.1"
 }
