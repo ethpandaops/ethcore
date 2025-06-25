@@ -12,7 +12,7 @@ require (
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0
 	github.com/ethereum/go-ethereum v1.15.11
 	github.com/ethpandaops/beacon v0.56.0
-	github.com/ethpandaops/ethereum-package-go v0.3.0
+	github.com/ethpandaops/ethereum-package-go v0.4.0
 	github.com/ethpandaops/ethwallclock v0.4.0
 	github.com/go-co-op/gocron/v2 v2.16.1
 	github.com/jellydator/ttlcache/v3 v3.3.0

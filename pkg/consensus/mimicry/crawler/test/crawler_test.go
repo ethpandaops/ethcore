@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"regexp"
+	"sync"
 	"testing"
 	"time"
 
@@ -141,6 +142,9 @@ func AllDiscoverableNodes(t *testing.T, tf *TestFoundation, options *TestOptions
 	// Get all our peer IDs
 	identities, successful := setupNodeTracking(t, tf, logger)
 
+	// Create mutex for synchronizing access to the successful map
+	mu := &sync.Mutex{}
+
 	// Create our discovery instance which we'll use to manually add peers
 	manual := &discovery.Manual{}
 
@@ -148,7 +152,7 @@ func AllDiscoverableNodes(t *testing.T, tf *TestFoundation, options *TestOptions
 	cr := setupCrawler(t, tf, logger, manual, options.Config)
 
 	// Create a sink of the crawler's events
-	setupCrawlerEventHandlers(t, cr, logger, identities, successful)
+	setupCrawlerEventHandlers(t, cr, logger, identities, successful, mu)
 
 	// Wait until the crawler is ready
 	select {
@@ -159,7 +163,7 @@ func AllDiscoverableNodes(t *testing.T, tf *TestFoundation, options *TestOptions
 	}
 
 	// Feed ENRs to the crawler and wait for results
-	feedENRsToCrawler(t, tf, logger, manual, successful, options.Config.CrawlerTimeout)
+	feedENRsToCrawler(t, tf, logger, manual, successful, mu, options.Config.CrawlerTimeout)
 }
 
 // setupNodeTracking sets up tracking of node identities and crawl status.
@@ -218,7 +222,7 @@ func setupCrawler(t *testing.T, tf *TestFoundation, logger *logrus.Logger, manua
 }
 
 // setupCrawlerEventHandlers sets up event handlers for the crawler.
-func setupCrawlerEventHandlers(t *testing.T, cr *crawler.Crawler, logger *logrus.Logger, identities map[string]*types.Identity, successful map[string]bool) {
+func setupCrawlerEventHandlers(t *testing.T, cr *crawler.Crawler, logger *logrus.Logger, identities map[string]*types.Identity, successful map[string]bool, mu *sync.Mutex) {
 	t.Helper()
 
 	cr.OnSuccessfulCrawl(func(peerID peer.ID, status *common.Status, metadata *common.MetaData) {
@@ -231,7 +235,10 @@ func setupCrawlerEventHandlers(t *testing.T, cr *crawler.Crawler, logger *logrus
 			if identity.PeerID == peerID.String() {
 				logger.Infof("Got a successful crawl for %s", name)
 
+				mu.Lock()
 				successful[name] = true
+				mu.Unlock()
+
 				found = true
 
 				break
@@ -249,7 +256,7 @@ func setupCrawlerEventHandlers(t *testing.T, cr *crawler.Crawler, logger *logrus
 }
 
 // feedENRsToCrawler feeds ENRs to the crawler and waits for results.
-func feedENRsToCrawler(t *testing.T, tf *TestFoundation, logger *logrus.Logger, manual *discovery.Manual, successful map[string]bool, timeout time.Duration) {
+func feedENRsToCrawler(t *testing.T, tf *TestFoundation, logger *logrus.Logger, manual *discovery.Manual, successful map[string]bool, mu *sync.Mutex, timeout time.Duration) {
 	t.Helper()
 
 	// Create a context with timeout for crawler operations
@@ -289,6 +296,7 @@ func feedENRsToCrawler(t *testing.T, tf *TestFoundation, logger *logrus.Logger, 
 		case <-ctx.Done():
 			t.Fatalf("Timed out waiting for all nodes to be discovered: %v", ctx.Err())
 		case <-ticker.C:
+			mu.Lock()
 			okPeers := 0
 			for _, complete := range successful {
 				if complete {
@@ -299,6 +307,7 @@ func feedENRsToCrawler(t *testing.T, tf *TestFoundation, logger *logrus.Logger, 
 			logger.Infof("Discovered %d/%d peers", okPeers, len(successful))
 
 			if okPeers == len(successful) {
+				mu.Unlock()
 				// Test complete!
 				return
 			} else {
@@ -308,6 +317,7 @@ func feedENRsToCrawler(t *testing.T, tf *TestFoundation, logger *logrus.Logger, 
 						missingPeers = append(missingPeers, name)
 					}
 				}
+				mu.Unlock()
 				logger.Infof("Missing peers: %v", missingPeers)
 			}
 		}
