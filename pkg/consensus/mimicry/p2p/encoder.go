@@ -10,7 +10,7 @@ import (
 	fastssz "github.com/prysmaticlabs/fastssz"
 )
 
-// Marshaler combines fastssz marshaling and unmarshaling capabilities.
+// Marshaler combines fastssz marshaling and unmarshalling capabilities.
 type Marshaler interface {
 	fastssz.Marshaler
 	fastssz.Unmarshaler
