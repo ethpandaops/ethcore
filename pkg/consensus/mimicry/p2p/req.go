@@ -114,9 +114,24 @@ func (r *ReqResp) SendRequest(ctx context.Context, req *Request, rsp common.SSZO
 		}
 	}()
 
-	// Send the request
-	if _, err := r.encoder.EncodeWithMaxLength(stream, WrapSSZObject(req.Payload)); err != nil {
-		return ErrFailedToEncodeRequest.Add(err.Error())
+	// Send the request payload only if one exists
+	// IMPORTANT: Some requests (like metadata) have no payload per the Ethereum consensus spec.
+	// Sending a payload when none is expected will cause the request to be rejected by some clients.
+	writeStreamClosed := false
+
+	if req.Payload != nil {
+		if _, err := r.encoder.EncodeWithMaxLength(stream, WrapSSZObject(req.Payload)); err != nil {
+			return ErrFailedToEncodeRequest.Add(err.Error())
+		}
+	} else {
+		// For requests with no payload, we need to close the write side
+		// immediately to signal to the remote that we're done sending.
+		// This prevents the remote from waiting for data that will never come.
+		if err := stream.CloseWrite(); err != nil {
+			return ErrFailedToCloseWriteStream.Add(err.Error())
+		}
+
+		writeStreamClosed = true
 	}
 
 	// Wait for the response
@@ -136,9 +151,11 @@ func (r *ReqResp) SendRequest(ctx context.Context, req *Request, rsp common.SSZO
 		return ErrFailedToDecodeResponse.Add(fmt.Sprintf("failed to decode response: %v", err))
 	}
 
-	// Close the stream
-	if err := stream.CloseWrite(); err != nil {
-		return ErrFailedToCloseWriteStream.Add(err.Error())
+	// Close the write stream if not already closed.
+	if !writeStreamClosed {
+		if err := stream.CloseWrite(); err != nil {
+			return ErrFailedToCloseWriteStream.Add(err.Error())
+		}
 	}
 
 	return nil
