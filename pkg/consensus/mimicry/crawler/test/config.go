@@ -12,5 +12,5 @@ const (
 	// Crawler configuration.
 	CrawlerDialConcurrency = 10
 	CrawlerCooloffDuration = 1 * time.Second
-	CrawlerTimeout         = 60 * time.Second
+	CrawlerTimeout         = 90 * time.Second
 )
