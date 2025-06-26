@@ -24,29 +24,22 @@ type DiscV5 struct {
 	log       logrus.FieldLogger
 	restart   time.Duration
 	bootNodes []*enode.Node
-
-	listener *ListenerV5
-
-	privKey *ecdsa.PrivateKey
-
-	broker *emission.Emitter
-
-	mu sync.Mutex
-
+	listener  *ListenerV5
+	privKey   *ecdsa.PrivateKey
+	broker    *emission.Emitter
+	mu        sync.Mutex
 	scheduler gocron.Scheduler
-
-	started bool
+	started   bool
 }
 
 type ListenerV5 struct {
 	conn      *net.UDPConn
 	localNode *enode.LocalNode
 	discovery *discover.UDPv5
-
-	mu sync.Mutex
+	mu        sync.Mutex
 }
 
-func NewDiscV5(ctx context.Context, restart time.Duration, log logrus.FieldLogger) *DiscV5 {
+func NewDiscV5(_ context.Context, restart time.Duration, log logrus.FieldLogger) *DiscV5 {
 	return &DiscV5{
 		log:     log.WithField("module", "ethcore/discovery/discV5"),
 		restart: restart,
@@ -73,9 +66,12 @@ func (d *DiscV5) Start(ctx context.Context) error {
 }
 
 func (d *DiscV5) startListener(ctx context.Context) error {
+	d.mu.Lock()
 	if d.listener != nil {
 		d.listener.Close()
+		d.listener = nil
 	}
+	d.mu.Unlock()
 
 	privKey, err := gcrypto.GenerateKey()
 	if err != nil {
@@ -89,28 +85,31 @@ func (d *DiscV5) startListener(ctx context.Context) error {
 		return err
 	}
 
+	d.mu.Lock()
 	d.listener = listener
+	d.mu.Unlock()
 
 	go d.listenForNewNodes(ctx)
 
 	return nil
 }
 
-func (d *DiscV5) Stop(ctx context.Context) error {
-	if d.listener != nil {
-		d.listener.Close()
+func (d *DiscV5) Stop(_ context.Context) error {
+	d.mu.Lock()
+	listener := d.listener
+	scheduler := d.scheduler
+	d.started = false
+	d.mu.Unlock()
+
+	if listener != nil {
+		listener.Close()
 	}
 
-	if d.scheduler != nil {
-		if err := d.scheduler.Shutdown(); err != nil {
+	if scheduler != nil {
+		if err := scheduler.Shutdown(); err != nil {
 			return err
 		}
 	}
-
-	d.mu.Lock()
-	defer d.mu.Unlock()
-
-	d.started = false
 
 	return nil
 }
@@ -138,13 +137,49 @@ func (d *DiscV5) startCrons(ctx context.Context) error {
 
 	c.Start()
 
+	d.mu.Lock()
 	d.scheduler = c
+	d.mu.Unlock()
 
 	return nil
 }
 
+func (d *DiscV5) UpdateBootNodes(bootNodes []string) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	bn := []*enode.Node{}
+
+	for _, addr := range bootNodes {
+		bootNode, parseErr := enode.Parse(enode.ValidSchemes, addr)
+		if parseErr != nil {
+			return parseErr
+		}
+
+		bn = append(bn, bootNode)
+	}
+
+	d.bootNodes = bn
+
+	return nil
+}
+
+func (d *DiscV5) OnNodeRecord(ctx context.Context, handler func(ctx context.Context, reason *enode.Node) error) {
+	d.broker.On(topicNodeRecord, func(reason *enode.Node) {
+		d.handleSubscriberError(handler(ctx, reason), topicNodeRecord)
+	})
+}
+
 func (d *DiscV5) listenForNewNodes(ctx context.Context) {
-	iterator := d.listener.discovery.RandomNodes()
+	d.mu.Lock()
+	listener := d.listener
+	d.mu.Unlock()
+
+	if listener == nil || listener.discovery == nil {
+		return
+	}
+
+	iterator := listener.discovery.RandomNodes()
 	iterator = enode.Filter(iterator, d.filterPeer)
 
 	defer iterator.Close()
@@ -174,7 +209,7 @@ func (d *DiscV5) createListener(
 	bindIP = ipAddr
 	udpAddr := &net.UDPAddr{
 		IP:   bindIP,
-		Port: int(0),
+		Port: 0,
 	}
 
 	conn, err := net.ListenUDP("udp", udpAddr)
@@ -188,8 +223,8 @@ func (d *DiscV5) createListener(
 		ctx,
 		privKey,
 		ipAddr,
-		int(0),
-		int(0),
+		0,
+		0,
 	)
 	if err != nil {
 		return nil, err
@@ -219,7 +254,7 @@ func (d *DiscV5) createListener(
 }
 
 func (d *DiscV5) createLocalNode(
-	ctx context.Context,
+	_ context.Context,
 	privKey *ecdsa.PrivateKey,
 	ipAddr net.IP,
 	udpPort, tcpPort int,
@@ -271,7 +306,11 @@ func (d *DiscV5) filterPeer(node *enode.Node) bool {
 	}
 
 	// Ignore ourself
-	if node.ID() == d.listener.localNode.ID() {
+	d.mu.Lock()
+	listener := d.listener
+	d.mu.Unlock()
+
+	if listener != nil && listener.localNode != nil && node.ID() == listener.localNode.ID() {
 		return false
 	}
 
@@ -292,7 +331,7 @@ func (d *DiscV5) filterPeer(node *enode.Node) bool {
 	return true
 }
 
-func (d *DiscV5) publishNodeRecord(ctx context.Context, record *enode.Node) {
+func (d *DiscV5) publishNodeRecord(_ context.Context, record *enode.Node) {
 	d.broker.Emit(topicNodeRecord, record)
 }
 
@@ -300,32 +339,6 @@ func (d *DiscV5) handleSubscriberError(err error, topic string) {
 	if err != nil {
 		d.log.WithError(err).WithField("topic", topic).Error("Subscriber error")
 	}
-}
-
-func (d *DiscV5) UpdateBootNodes(bootNodes []string) error {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-
-	bn := []*enode.Node{}
-
-	for _, addr := range bootNodes {
-		bootNode, parseErr := enode.Parse(enode.ValidSchemes, addr)
-		if parseErr != nil {
-			return parseErr
-		}
-
-		bn = append(bn, bootNode)
-	}
-
-	d.bootNodes = bn
-
-	return nil
-}
-
-func (d *DiscV5) OnNodeRecord(ctx context.Context, handler func(ctx context.Context, reason *enode.Node) error) {
-	d.broker.On(topicNodeRecord, func(reason *enode.Node) {
-		d.handleSubscriberError(handler(ctx, reason), topicNodeRecord)
-	})
 }
 
 func (l *ListenerV5) Close() error {
