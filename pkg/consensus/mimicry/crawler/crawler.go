@@ -205,8 +205,6 @@ func (c *Crawler) Start(ctx context.Context) error {
 
 		// Wait until we have a valid status
 		for c.GetStatus().HeadSlot == 0 {
-			c.log.Infof("Slot: %d", c.GetStatus().HeadSlot)
-
 			time.Sleep(time.Second)
 		}
 
