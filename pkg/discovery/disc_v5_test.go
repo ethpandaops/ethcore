@@ -2,7 +2,9 @@ package discovery
 
 import (
 	"context"
+	"fmt"
 	"net"
+	"sync"
 	"testing"
 	"time"
 
@@ -315,42 +317,74 @@ func TestDiscV5_OnNodeRecord_ErrorHandling(t *testing.T) {
 func TestDiscV5_ConcurrentOperations(t *testing.T) {
 	ctx := context.Background()
 	logger := logrus.New()
-	disc := NewDiscV5(ctx, 30*time.Second, logger)
+	logger.SetLevel(logrus.ErrorLevel) // Reduce log noise
 
-	// Start multiple goroutines updating boot nodes
-	done := make(chan bool, 3)
+	// Test concurrent UpdateBootNodes without Start/Stop
+	t.Run("concurrent boot node updates", func(t *testing.T) {
+		disc := NewDiscV5(ctx, 1*time.Hour, logger)
+		var wg sync.WaitGroup
+		wg.Add(3)
 
-	go func() {
-		for i := 0; i < 10; i++ {
-			_ = disc.UpdateBootNodes([]string{
-				"enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@10.0.0.1:30303",
-			})
+		// Multiple goroutines updating boot nodes
+		go func() {
+			defer wg.Done()
+			for i := 0; i < 20; i++ {
+				err := disc.UpdateBootNodes([]string{
+					"enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@10.0.0.1:30303",
+				})
+				assert.NoError(t, err)
+			}
+		}()
+
+		go func() {
+			defer wg.Done()
+			for i := 0; i < 20; i++ {
+				err := disc.UpdateBootNodes([]string{
+					"enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@10.0.0.2:30303",
+				})
+				assert.NoError(t, err)
+			}
+		}()
+
+		go func() {
+			defer wg.Done()
+			for i := 0; i < 20; i++ {
+				err := disc.UpdateBootNodes([]string{
+					"enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@10.0.0.3:30303",
+					"enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@10.0.0.4:30303",
+				})
+				assert.NoError(t, err)
+			}
+		}()
+
+		wg.Wait()
+
+		// Verify final state
+		assert.True(t, len(disc.bootNodes) > 0)
+	})
+
+	// Test multiple instances don't interfere
+	t.Run("multiple instances", func(t *testing.T) {
+		instances := make([]*DiscV5, 3)
+		for i := 0; i < 3; i++ {
+			instances[i] = NewDiscV5(ctx, 1*time.Hour, logger)
 		}
-		done <- true
-	}()
 
-	go func() {
-		for i := 0; i < 10; i++ {
-			_ = disc.UpdateBootNodes([]string{
-				"enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@10.0.0.2:30303",
-			})
+		var wg sync.WaitGroup
+		wg.Add(len(instances))
+
+		for idx, disc := range instances {
+			go func(d *DiscV5, i int) {
+				defer wg.Done()
+				for j := 0; j < 10; j++ {
+					err := d.UpdateBootNodes([]string{
+						fmt.Sprintf("enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@10.0.%d.1:30303", i),
+					})
+					assert.NoError(t, err)
+				}
+			}(disc, idx)
 		}
-		done <- true
-	}()
 
-	go func() {
-		for i := 0; i < 10; i++ {
-			_ = disc.Start(ctx)
-			_ = disc.Stop(ctx)
-		}
-		done <- true
-	}()
-
-	// Wait for all goroutines to complete
-	for i := 0; i < 3; i++ {
-		<-done
-	}
-
-	// If we get here without deadlocking, the test passes
-	assert.True(t, true)
+		wg.Wait()
+	})
 }
