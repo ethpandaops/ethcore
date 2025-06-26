@@ -29,6 +29,6 @@ func (m *Manual) AddNode(ctx context.Context, node *enode.Node) error {
 	if m.handler == nil {
 		return errors.New("no handler set")
 	}
-	
+
 	return m.handler(ctx, node)
 }
