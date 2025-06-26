@@ -135,11 +135,11 @@ func (d *DiscV5) startCrons(ctx context.Context) error {
 		return err
 	}
 
-	c.Start()
-
 	d.mu.Lock()
 	d.scheduler = c
 	d.mu.Unlock()
+
+	c.Start()
 
 	return nil
 }
