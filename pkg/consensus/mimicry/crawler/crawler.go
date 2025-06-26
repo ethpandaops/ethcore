@@ -203,11 +203,18 @@ func (c *Crawler) Start(ctx context.Context) error {
 
 		c.log.Info("Successfully started Mimicry crawler")
 
-		// Wait until we have a valid status
+		// Wait until we have a valid status (with timeout)
+		waitStart := time.Now()
 		for c.GetStatus().HeadSlot == 0 {
+			if time.Since(waitStart) > 30*time.Second {
+				c.log.Warn("Timeout waiting for valid status, marking crawler as ready anyway")
+				break
+			}
+			c.log.Debug("Waiting for valid status, current HeadSlot is 0")
 			time.Sleep(time.Second)
 		}
 
+		c.log.WithField("head_slot", c.GetStatus().HeadSlot).Info("Crawler is ready")
 		close(c.OnReady)
 
 		return nil
@@ -500,7 +507,7 @@ func (c *Crawler) fetchAndSetStatus(ctx context.Context) error {
 		return fmt.Errorf("failed to fetch block headers: %w", err)
 	}
 
-	status.HeadRoot = tree.Root(headers.Header.Message.StateRoot)
+	status.HeadRoot = tree.Root(headers.Root)
 	status.HeadSlot = common.Slot(headers.Header.Message.Slot)
 
 	forkDigest, err := c.beacon.ForkDigest()
