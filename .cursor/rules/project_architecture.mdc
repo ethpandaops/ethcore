@@ -1,0 +1,72 @@
+---
+description: ETHCore Project Architecture Guidelines
+globs: ["**/*.go", "**/go.mod", "**/go.sum"]
+alwaysApply: false
+---
+
+# ETHCore Project Architecture
+
+ETHCore is a Go package providing utilities for interacting with Ethereum networks, developed by ethpandaops.
+
+## Project Structure
+
+The project follows a standard Go package layout with all source code under the `pkg/` directory:
+
+```
+ethcore/
+├── pkg/
+│   ├── consensus/          # Consensus layer implementations
+│   │   └── mimicry/       # Beacon chain client mimicry
+│   │       ├── crawler/   # Network crawling functionality
+│   │       ├── host/      # P2P host management
+│   │       ├── p2p/       # Peer-to-peer protocols
+│   │       └── cache/     # Duplicate caching
+│   ├── discovery/          # Node discovery protocols
+│   │   ├── disc_v5/       # Discovery v5 implementation
+│   │   └── manual/        # Manual peer discovery
+│   ├── ethereum/           # Core Ethereum utilities
+│   │   ├── beacon/        # Beacon chain utilities
+│   │   ├── clients/       # Client implementations
+│   │   ├── config/        # Configuration management
+│   │   ├── fork/          # Fork handling
+│   │   ├── networks/      # Network configurations
+│   │   └── serialize/     # Serialization utilities
+│   └── execution/          # Execution layer implementations
+│       └── mimicry/       # Execution client mimicry
+│           └── rlpx/      # RLPx protocol implementation
+```
+
+## Key Technologies
+
+- **Language**: Go 1.24.0
+- **Consensus Client**: Prysm v6.0.4
+- **Execution Client**: go-ethereum v1.15.11
+- **Networking**: libp2p for P2P communication
+- **Protocols**: Ethereum discovery v5, RLPx
+
+## Architecture Principles
+
+1. **Package Organization**: Each major Ethereum component (consensus, execution, discovery) has its own package
+2. **Interface-Based Design**: Use interfaces for pluggable implementations (e.g., Discovery, Observer)
+3. **Mimicry Pattern**: Both consensus and execution layers implement "mimicry" clients that can interact with real nodes
+4. **Context-Aware**: All long-running operations should accept context.Context for cancellation
+5. **Error Handling**: Use wrapped errors with context for better debugging
+
+## Build System
+
+- Standard Go modules (go.mod/go.sum)
+- GitHub Actions for CI/CD
+- golangci-lint for code quality
+- No Makefile - use standard go commands
+
+## Dependencies
+
+Major dependencies should be managed through go.mod:
+- Ethereum implementations (Prysm, go-ethereum)
+- Networking libraries (libp2p)
+- ethpandaops ecosystem packages
+
+When adding new dependencies:
+1. Ensure they align with existing Ethereum client implementations
+2. Prefer well-maintained libraries from the Ethereum ecosystem
+3. Keep dependencies minimal and focused
