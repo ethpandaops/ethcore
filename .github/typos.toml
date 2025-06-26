@@ -1,0 +1,11 @@
+[default]
+extend-ignore-identifiers-re = [
+    # Ignore ENR (Ethereum Node Record) strings which are base64 encoded
+    "enr:-.*",
+    # Ignore enode URLs
+    "enode://.*"
+]
+
+[default.extend-words]
+# Ignore "Iy" which appears in base64 encoded ENR strings
+Iy = "Iy"

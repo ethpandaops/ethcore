@@ -176,6 +176,7 @@ func (c *Client) startSession(ctx context.Context) {
 			return
 		}
 
+		//nolint:gosec // not an overflow issue here.
 		switch int(code) {
 		case HelloCode:
 			if err := c.handleHello(ctx, code, data); err != nil {
