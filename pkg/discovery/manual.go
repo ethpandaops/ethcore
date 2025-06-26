@@ -2,6 +2,7 @@ package discovery
 
 import (
 	"context"
+	"errors"
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
 )
@@ -25,5 +26,8 @@ func (m *Manual) OnNodeRecord(ctx context.Context, handler func(ctx context.Cont
 }
 
 func (m *Manual) AddNode(ctx context.Context, node *enode.Node) error {
+	if m.handler == nil {
+		return errors.New("no handler set")
+	}
 	return m.handler(ctx, node)
 }
