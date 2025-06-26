@@ -18,6 +18,7 @@ var (
 	ErrCrawlFailedToRequestStatus   = newCrawlError("failed to request status")
 	ErrCrawlFailedToRequestMetadata = newCrawlError("failed to request metadata")
 	ErrCrawlFailedToCrawl           = newCrawlError("failed to crawl")
+	ErrCrawlIdentifyTimeout         = newCrawlError("identify protocol timeout")
 )
 
 func newCrawlError(msg string) *CrawlError {

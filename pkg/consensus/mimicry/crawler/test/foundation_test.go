@@ -103,8 +103,11 @@ func SetupKurtosisEnvironment(t *testing.T, config *NetworkConfig, logger *logru
 	logger.Infof("Setting NAT exit IP to %s", natIP)
 	opts = append(opts, ethereum.WithNATExitIP(natIP))
 
-	// For now, use prysm/lighthouse.
-	// TODO(@matty): Work is needed to ensure crawling works with other clients, struggling with Teku/Nimbus/Lodestar.
+	// Enable debug logs for tests.
+	opts = append(opts, ethereum.WithGlobalLogLevel("debug"))
+
+	// For now, use prysm/lighthouse/teku.
+	// TODO(@matty): Work is needed to ensure crawling works with other clients, struggling with Nimbus/Lodestar.
 	opts = append(opts, ethereum.WithParticipants([]epgconfig.ParticipantConfig{
 		{
 			ELType: client.Geth,
@@ -114,6 +117,11 @@ func SetupKurtosisEnvironment(t *testing.T, config *NetworkConfig, logger *logru
 		{
 			ELType: client.Geth,
 			CLType: client.Prysm,
+			Count:  1,
+		},
+		{
+			ELType: client.Geth,
+			CLType: client.Teku,
 			Count:  1,
 		},
 	}))

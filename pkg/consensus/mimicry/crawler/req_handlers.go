@@ -194,18 +194,10 @@ func (c *Crawler) handleMetadata(ctx context.Context, stream network.Stream) err
 		}
 	}()
 
-	var theirMetadata common.MetaData
-
-	err = c.reqResp.ReadRequest(ctx, stream, &theirMetadata)
-	if err != nil {
-		logCtx.WithError(err).Debug("Failed to decode metadata message")
-
-		return err
-	}
-
-	logCtx.WithFields(logrus.Fields{
-		"metadata": theirMetadata,
-	}).Info("Received metadata message")
+	// Metadata requests have no content per the Ethereum consensus spec
+	// The request opens and negotiates the stream without sending any request content
+	// We immediately respond with our local metadata
+	logCtx.Debug("Received metadata request")
 
 	resp := c.metadata
 

@@ -3,6 +3,7 @@ package crawler
 import (
 	"context"
 	"fmt"
+	"time"
 
 	v1 "github.com/attestantio/go-eth2-client/api/v1"
 	"github.com/ethereum/go-ethereum/p2p/enode"
@@ -87,21 +88,107 @@ func (c *Crawler) wireUpComponents(ctx context.Context) error {
 func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 	goodbyeReason := eth.GoodbyeReasonClientShutdown
 
+	c.log.WithFields(logrus.Fields{
+		"peer":      conn.RemotePeer().String(),
+		"protocols": conn.RemoteMultiaddr().Protocols(),
+	}).Info("Peer connected")
+
+	// Wait for libp2p identify protocol to complete.
+	// The identify protocol exchanges peer information like agent version, protocols, etc.
+	// Without this wait, we may see "unknown" agent versions which makes it hard to crawl/map.
+	// We use a generous timeout to accommodate clients that take longer to initialize.
+	identifyTimeout := 25 * time.Second
+	identifyCtx, identifyCancel := context.WithTimeout(context.Background(), identifyTimeout)
+
+	defer identifyCancel()
+
+	// Poll for agent version to become available, which indicates identify has completed.
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+
+	identifyCompleted := false
+
+	for {
+		select {
+		case <-identifyCtx.Done():
+			c.log.WithFields(logrus.Fields{
+				"peer":    conn.RemotePeer(),
+				"timeout": identifyTimeout,
+			}).Warn("Timeout waiting for identify protocol")
+
+			break
+		case <-ticker.C:
+			if agentVersion := c.GetPeerAgentVersion(conn.RemotePeer()); agentVersion != unknown {
+				c.log.WithFields(logrus.Fields{
+					"peer":          conn.RemotePeer(),
+					"agent_version": agentVersion,
+				}).Info("Identify protocol completed")
+
+				identifyCompleted = true
+
+				break
+			}
+		}
+
+		// Check if we should exit the loop.
+		if identifyCtx.Err() != nil || identifyCompleted {
+			break
+		}
+	}
+
+	agentVersion := c.GetPeerAgentVersion(conn.RemotePeer())
 	logCtx := c.log.WithFields(logrus.Fields{
 		"peer":          conn.RemotePeer(),
-		"agent_version": c.GetPeerAgentVersion(conn.RemotePeer()),
+		"agent_version": agentVersion,
 	})
+
+	// If we couldn't get the agent version through identify protocol,
+	// we mark this as a failed crawl since we can't properly identify the client.
+	if !identifyCompleted && agentVersion == unknown {
+		logCtx.Error("Failed to complete identify protocol - cannot determine client type")
+
+		c.emitFailedCrawl(conn.RemotePeer(), *ErrCrawlIdentifyTimeout)
+
+		return
+	}
 
 	defer func() {
 		// Disconnect them regardless of what happens
 		if err := c.DisconnectFromPeer(context.Background(), conn.RemotePeer(), goodbyeReason); err != nil {
-			logCtx.WithError(err).Debug("Failed to disconnect from peer")
+			logCtx.WithError(err).Error("Failed to disconnect from peer")
 		}
 	}()
 
-	status, err := c.RequestStatusFromPeer(context.Background(), conn.RemotePeer())
+	// Request status with retry logic.
+	// Different beacon node implementations have varying initialization times after connection.
+	// This retry mechanism ensures we don't prematurely fail connections to slower-initializing clients.
+	// We use generous delays to accommodate all client types.
+	var (
+		retryDelay = 5 * time.Second
+		status     *common.Status
+		err        error
+	)
+
+	for retries := 0; retries < 3; retries++ {
+		status, err = c.RequestStatusFromPeer(context.Background(), conn.RemotePeer())
+		if err == nil {
+			break
+		}
+
+		if retries < 2 {
+			logCtx.WithFields(logrus.Fields{
+				"attempt":     retries + 1,
+				"error":       err.Error(),
+				"retry_delay": retryDelay,
+			}).Info("Status request failed, retrying")
+
+			time.Sleep(retryDelay)
+		}
+	}
+
 	if err != nil {
-		logCtx.WithError(err).Debug("Failed to request status from peer")
+		logCtx.WithError(err).Error("Failed to request status from peer after retries")
+
 		c.emitFailedCrawl(conn.RemotePeer(), *ErrCrawlFailedToRequestStatus)
 
 		return
@@ -124,14 +211,41 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 		"finalized_epoch": status.FinalizedEpoch,
 		"head_root":       status.HeadRoot.String(),
 		"head_slot":       status.HeadSlot,
+		"connected":       c.node.Connectedness(conn.RemotePeer()),
 	}).Debug("Received status from peer")
 
-	// Request metadata from the peer
-	metadata, err := c.RequestMetadataFromPeer(context.Background(), conn.RemotePeer())
-	if err != nil {
-		logCtx.WithError(err).Warn("Failed to request metadata from peer")
+	// Request metadata from the peer with retry logic
+	// Metadata contains information about attestation subnet participation and sync committee duties.
+	metadataCtx, metadataCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer metadataCancel()
 
-		c.emitFailedCrawl(conn.RemotePeer(), *ErrCrawlFailedToRequestMetadata)
+	// Retry metadata requests with generous delays for all clients
+	metadataRetryDelay := 3 * time.Second
+
+	var metadata *common.MetaData
+	for retries := 0; retries < 3; retries++ {
+		metadata, err = c.RequestMetadataFromPeer(metadataCtx, conn.RemotePeer())
+		if err == nil {
+			break
+		}
+
+		if retries < 2 {
+			logCtx.WithFields(logrus.Fields{
+				"attempt":     retries + 1,
+				"error":       err.Error(),
+				"retry_delay": metadataRetryDelay,
+			}).Error("Metadata request failed, retrying")
+
+			time.Sleep(metadataRetryDelay)
+		}
+	}
+
+	if err != nil {
+		logCtx.WithError(err).Error("Failed to request metadata from peer after retries")
+
+		// We still consider this a successful crawl if we got status
+		// The status exchange is the critical validation for network participation.
+		c.emitSuccessfulCrawl(conn.RemotePeer(), status, nil)
 
 		return
 	}

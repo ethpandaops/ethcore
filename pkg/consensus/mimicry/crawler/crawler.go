@@ -13,7 +13,7 @@ import (
 	pb "github.com/OffchainLabs/prysm/v6/proto/prysm/v1alpha1"
 	"github.com/attestantio/go-eth2-client/api"
 	"github.com/attestantio/go-eth2-client/spec/phase0"
-	backoff "github.com/cenkalti/backoff/v5"
+	"github.com/cenkalti/backoff/v5"
 	"github.com/chuckpreslar/emission"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/enr"
@@ -431,12 +431,15 @@ func (c *Crawler) RequestStatusFromPeer(ctx context.Context, peerID peer.ID) (*c
 }
 
 func (c *Crawler) RequestMetadataFromPeer(ctx context.Context, peerID peer.ID) (*common.MetaData, error) {
-	metadata := c.metadata
+	c.log.WithField("peer", peerID.String()).Debug("Requesting metadata from peer")
 
+	// NOTE: Per the Ethereum consensus spec, metadata requests have NO payload.
+	// We must send nil as the payload to comply with the specification.
+	// See: https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/p2p-interface.md#getmetadata-v1
 	req := &p2p.Request{
 		ProtocolID: eth.MetaDataV2ProtocolID,
 		PeerID:     peerID,
-		Payload:    metadata,
+		Payload:    nil, // Metadata requests have no payload per spec
 		Timeout:    time.Second * 30,
 	}
 
@@ -445,6 +448,12 @@ func (c *Crawler) RequestMetadataFromPeer(ctx context.Context, peerID peer.ID) (
 	if err := c.reqResp.SendRequest(ctx, req, rsp); err != nil {
 		return nil, fmt.Errorf("failed to send request: %w", err)
 	}
+
+	c.log.WithFields(logrus.Fields{
+		"peer":       peerID.String(),
+		"seq_number": rsp.SeqNumber,
+		"attnets":    fmt.Sprintf("%x", rsp.Attnets),
+	}).Debug("Successfully received metadata")
 
 	c.emitMetadataReceived(peerID, rsp)
 
