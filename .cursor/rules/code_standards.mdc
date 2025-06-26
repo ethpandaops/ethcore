@@ -1,0 +1,83 @@
+---
+description: ETHCore Code Standards and Conventions
+globs: ["**/*.go"]
+alwaysApply: false
+---
+
+# ETHCore Code Standards
+
+## Go Language Conventions
+
+### General Guidelines
+- Follow standard Go conventions from Effective Go
+- Use `gofmt` for formatting (enforced by CI)
+- Follow golangci-lint rules defined in `.golangci.yml`
+- Write idiomatic Go code
+
+### Naming Conventions
+- **Packages**: lowercase, single word when possible (e.g., `discovery`, `consensus`)
+- **Interfaces**: Should end with `-er` suffix when appropriate (e.g., `Observer`, `Discoverer`)
+- **Exported functions/types**: Use CamelCase (e.g., `NewCrawler`, `BeaconBlock`)
+- **Unexported functions/types**: Use camelCase (e.g., `handlePeer`, `internalState`)
+- **Constants**: Use CamelCase or ALL_CAPS for protocol constants
+- **Errors**: Error variables should start with `Err` (e.g., `ErrInvalidPeer`)
+
+### File Organization
+- One primary type per file, named after the type
+- Tests in `*_test.go` files in the same package
+- Group imports in order: standard library, external packages, internal packages
+- Use blank lines to separate import groups
+
+### Error Handling
+- Always check errors immediately
+- Wrap errors with context using `fmt.Errorf` with `%w` verb
+- Create custom error types when needed for error handling logic
+- Log errors at appropriate levels (debug, info, warn, error)
+
+### Logging
+- Use structured logging with fields
+- Include relevant context (peer IDs, addresses, etc.)
+- Use appropriate log levels:
+  - Debug: Detailed debugging information
+  - Info: General informational messages
+  - Warn: Warning conditions
+  - Error: Error conditions
+
+### Testing
+- Write table-driven tests when appropriate
+- Use descriptive test names that explain what is being tested
+- Mock external dependencies using interfaces
+- Aim for high test coverage of critical paths
+- Use `testify` assertions for clearer test failures
+
+### Concurrency
+- Always pass `context.Context` as the first parameter
+- Use channels for communication between goroutines
+- Protect shared state with mutexes
+- Prefer immutable data structures when possible
+- Use `sync.WaitGroup` or `errgroup` for coordinating goroutines
+
+### Documentation
+- Document all exported types, functions, and methods
+- Start documentation with the name being documented
+- Use complete sentences
+- Include examples for complex APIs
+- Document any protocol specifics or Ethereum assumptions
+
+### Protocol Implementation
+- Follow Ethereum protocol specifications exactly
+- Document any deviations or simplifications
+- Use appropriate types from go-ethereum or Prysm when available
+- Handle all protocol message types, even if just logging unsupported ones
+
+### Performance
+- Avoid premature optimization
+- Use buffered channels where appropriate
+- Reuse buffers with `sync.Pool` for high-frequency allocations
+- Profile before optimizing
+
+### Security
+- Never log sensitive information (private keys, passwords)
+- Validate all external inputs
+- Use crypto/rand for security-sensitive randomness
+- Follow Ethereum security best practices

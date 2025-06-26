@@ -1,0 +1,134 @@
+---
+description: ETHCore Development Workflow Guidelines
+globs: ["**/*.go", ".github/**/*.yml", ".github/**/*.yaml", "go.mod", "go.sum"]
+alwaysApply: false
+---
+
+# ETHCore Development Workflow
+
+## Git Workflow
+
+### Branching Strategy
+- **Main branch**: `master` - stable, production-ready code
+- **Feature branches**: Create from master, prefix with type:
+  - `feat/` - New features
+  - `fix/` - Bug fixes
+  - `refactor/` - Code refactoring
+  - `test/` - Test improvements
+  - `docs/` - Documentation updates
+  - `chore/` - Maintenance tasks
+
+### Commit Messages
+- Use conventional commit format: `type(scope): description`
+- Types: feat, fix, docs, style, refactor, test, chore
+- Keep the first line under 72 characters
+- Use present tense ("add feature" not "added feature")
+- Reference issues when applicable
+
+### Pull Requests
+- Create PR from feature branch to master
+- Ensure all CI checks pass before merging
+- Include clear description of changes
+- Reference related issues
+- Squash commits when merging
+
+## Testing Requirements
+
+### Before Committing
+1. Run tests locally: `go test ./...`
+2. Run linter: `golangci-lint run`
+3. Ensure no typos (CI will check)
+4. Verify code formatting: `gofmt -s -w .`
+
+### Test Coverage
+- Write tests for all new functionality
+- Maintain or improve existing coverage
+- Focus on testing critical paths and edge cases
+- Use table-driven tests for comprehensive coverage
+
+### Integration Tests
+- Test interactions with Ethereum nodes when possible
+- Use test fixtures for predictable results
+- Mock external dependencies appropriately
+
+## CI/CD Pipeline
+
+### GitHub Actions Workflows
+1. **check-typos.yml**: Checks for typos in code and documentation
+2. **golangci-lint.yaml**: Runs comprehensive Go linting
+3. **gotest.yaml**: Runs all tests with race detection
+
+### CI Requirements
+- All checks must pass for PR approval
+- Tests run on multiple Go versions
+- Race condition detection enabled
+- Linting with strict configuration
+
+## Code Review Guidelines
+
+### For Contributors
+- Self-review before requesting review
+- Respond to feedback constructively
+- Update PR based on review comments
+- Keep PRs focused and reasonably sized
+
+### For Reviewers
+- Check for adherence to code standards
+- Verify test coverage
+- Ensure documentation is updated
+- Consider performance implications
+- Review for security issues
+
+## Release Process
+
+### Versioning
+- Follow semantic versioning (semver)
+- Tag releases on master branch
+- Document breaking changes
+
+### Release Checklist
+1. Update version in relevant files
+2. Update CHANGELOG if present
+3. Run full test suite
+4. Create release tag
+5. Generate release notes
+
+## Development Environment
+
+### Required Tools
+- Go 1.24.0 or later
+- golangci-lint (latest version)
+- git
+
+### Recommended Setup
+1. Use Go modules for dependency management
+2. Enable Go module proxy for faster downloads
+3. Configure IDE/editor with Go support
+4. Install pre-commit hooks if available
+
+## Dependency Management
+
+### Adding Dependencies
+1. Use `go get` to add new dependencies
+2. Run `go mod tidy` to clean up
+3. Commit both go.mod and go.sum
+4. Justify new dependencies in PR
+
+### Updating Dependencies
+1. Use `go get -u` for updates
+2. Test thoroughly after updates
+3. Update one major dependency at a time
+4. Document any breaking changes
+
+## Performance Considerations
+
+### Profiling
+- Profile before optimizing
+- Use Go's built-in profiling tools
+- Focus on hot paths identified by profiling
+- Benchmark critical functions
+
+### Monitoring
+- Add metrics for important operations
+- Use appropriate logging levels
+- Consider resource usage in design
