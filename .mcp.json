@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "ethcore-language-server": {
+      "command": "mcp-language-server",
+      "args": [
+        "--workspace",
+        ".",
+        "--lsp",
+        "gopls"
+      ]
+    }
+  }
+}

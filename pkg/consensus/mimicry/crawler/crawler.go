@@ -46,29 +46,21 @@ type Crawler struct {
 	log       logrus.FieldLogger
 	config    *Config
 	userAgent string
-
-	broker *emission.Emitter
-	node   *host.Node
-
-	metadata *common.MetaData
-	status   *common.Status
+	broker    *emission.Emitter
+	node      *host.Node
+	metadata  *common.MetaData
+	status    *common.Status
 
 	// Subcomponents
-	beacon    *ethereum.BeaconNode
-	reqResp   *p2p.ReqResp
-	discovery discovery.NodeFinder
-
-	statusMu sync.Mutex
-
+	beacon             *ethereum.BeaconNode
+	reqResp            *p2p.ReqResp
+	discovery          discovery.NodeFinder
+	statusMu           sync.Mutex
 	statusFromPeerChan chan eth.PeerStatus
-
-	duplicateCache *cache.DuplicateCache
-
-	metrics *Metrics
-
-	peersToDial chan *discovery.ConnectablePeer
-
-	OnReady chan struct{}
+	duplicateCache     *cache.DuplicateCache
+	metrics            *Metrics
+	peersToDial        chan *discovery.ConnectablePeer
+	OnReady            chan struct{}
 }
 
 // New creates a new Crawler.
