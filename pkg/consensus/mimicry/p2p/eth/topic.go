@@ -26,20 +26,3 @@ const (
 	BlobSidecarsByRangeV1ProtocolID = "/eth2/beacon_chain/req/blob_sidecars_by_range/" + ProtocolVersionV1 + "/" + ProtocolSuffix
 	BlobSidecarsByRootV1ProtocolID  = "/eth2/beacon_chain/req/blob_sidecars_by_root/" + ProtocolVersionV1 + "/" + ProtocolSuffix
 )
-
-// func BuildSubnettedProtocol(protocolID string, bits common.AttnetBits) string {
-// 	for _, bit := range bits {
-// 		if bit {
-// 			protocolID = fmt.Sprintf("%s/%s/%s", protocolID, encoder.ProtocolSuffixSSZSnappy, bits.String())
-// 		}
-// 	}
-// 	return protocolID
-// }
-
-// func GetAttestationSubnetProtocols(bits common.AttnetBits) []string {
-
-// 	return []string{
-// 		StatusProtocolID,
-// 		AttnetsProtocolID,
-// 	}
-// }
