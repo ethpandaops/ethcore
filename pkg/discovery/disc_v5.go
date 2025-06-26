@@ -50,13 +50,16 @@ func NewDiscV5(_ context.Context, restart time.Duration, log logrus.FieldLogger)
 
 func (d *DiscV5) Start(ctx context.Context) error {
 	d.mu.Lock()
-	defer d.mu.Unlock()
 
 	if d.started {
+		d.mu.Unlock()
+
 		return nil
 	}
 
 	d.started = true
+
+	d.mu.Unlock()
 
 	if err := d.startCrons(ctx); err != nil {
 		return err
