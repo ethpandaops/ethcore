@@ -3,6 +3,7 @@ package pubsub
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -808,14 +809,56 @@ func TestProcessorMetricsRaceConditions(t *testing.T) {
 	log.SetLevel(logrus.ErrorLevel)
 
 	// Test concurrent metric recording on the same metrics instance
-	// NOTE: This test exposes race conditions in the current ProcessorMetrics implementation
-	// The ProcessorMetrics struct lacks proper synchronization for concurrent access
-	// This is a known issue that should be fixed in the ProcessorMetrics implementation
 	t.Run("single_metrics_concurrent_ops", func(t *testing.T) {
-		t.Skip("Skipping due to race conditions in ProcessorMetrics - this test exposes real concurrency bugs that need fixing")
+		// Race conditions have been fixed by adding proper synchronization
+		metrics := NewProcessorMetrics(log)
+		const numGoroutines = 20
+		const numOperations = 100
+		var wg sync.WaitGroup
+
+		wg.Add(numGoroutines)
+		for i := 0; i < numGoroutines; i++ {
+			go func(id int) {
+				defer wg.Done()
+				topic := fmt.Sprintf("topic-%d", id%3) // Use 3 topics
+				
+				for j := 0; j < numOperations; j++ {
+					metrics.RecordMessage()
+					
+					if j%2 == 0 {
+						metrics.RecordValidationResult(ValidationAccept)
+						metrics.RecordProcessed()
+						metrics.RecordProcessingTime(time.Millisecond * time.Duration(j))
+					} else {
+						metrics.RecordValidationResult(ValidationReject)
+						metrics.RecordValidationError()
+					}
+					
+					// Access topic metrics concurrently
+					topicMetrics := metrics.GetTopicMetrics(topic)
+					topicMetrics.RecordMessage()
+					
+					// Randomly record other errors
+					if j%5 == 0 {
+						metrics.RecordDecodingError()
+					}
+					if j%7 == 0 {
+						metrics.RecordProcessingError()
+					}
+				}
+			}(i)
+		}
+
+		wg.Wait()
+
+		// Verify metrics are consistent
+		stats := metrics.GetStats()
+		assert.Equal(t, uint64(numGoroutines*numOperations), stats.MessagesReceived)
+		assert.Equal(t, 3, stats.TopicCount) // Should have 3 topics
 		
-		// TODO: Fix race conditions in ProcessorMetrics by adding proper mutex protection
-		// for the topicMetrics map and atomic operations for counters
+		// Verify counts add up correctly
+		totalValidations := stats.MessagesAccepted + stats.MessagesRejected
+		assert.Equal(t, uint64(numGoroutines*numOperations), totalValidations)
 	})
 
 	// Test that separate metric instances don't interfere

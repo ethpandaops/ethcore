@@ -685,26 +685,20 @@ func (g *Gossipsub) SubscribeToProcessorTopic(ctx context.Context, topic string)
 
 	// Check if we have a registered processor for this topic
 	g.regMutex.RLock()
-	processorInterface, exists := g.registeredProcessors[topic]
+	_, exists := g.registeredProcessors[topic]
 	g.regMutex.RUnlock()
 
 	if !exists {
 		return NewTopicError(fmt.Errorf("no processor registered for topic %s", topic), topic, "subscribe_processor_topic")
 	}
 
-	// Use the existing SubscribeWithProcessor logic
-	if _, ok := processorInterface.(interface {
-		Topic() string
-		Decode(context.Context, []byte) (interface{}, error)
-		Validate(context.Context, interface{}, string) (ValidationResult, error)
-		Process(context.Context, interface{}, string) error
-		GetTopicScoreParams() *TopicScoreParams
-	}); ok {
-		// This is a type erasure workaround - in practice we'd use proper generics
-		return fmt.Errorf("direct processor subscription not yet implemented - use SubscribeWithProcessor for now")
-	}
-
-	return NewTopicError(fmt.Errorf("processor does not implement required interface"), topic, "subscribe_processor_topic")
+	// Direct subscription through processor interface is not supported due to Go's type system limitations
+	// Processors must be subscribed using the typed SubscribeWithProcessor[T] method
+	return NewTopicError(
+		fmt.Errorf("direct processor subscription not supported - use SubscribeWithProcessor[T] with the typed processor"),
+		topic,
+		"subscribe_processor_topic",
+	)
 }
 
 // SubscribeToMultiProcessorTopics handles subscription for a registered multi-processor
@@ -716,25 +710,17 @@ func (g *Gossipsub) SubscribeToMultiProcessorTopics(ctx context.Context, name st
 
 	// Check if we have a registered multi-processor with this name
 	g.regMutex.RLock()
-	processorInterface, exists := g.registeredMultiProcessors[name]
+	_, exists := g.registeredMultiProcessors[name]
 	g.regMutex.RUnlock()
 
 	if !exists {
 		return NewError(fmt.Errorf("no multi-processor registered with name %s", name), "subscribe_multi_processor_topics")
 	}
 
-	// Use the existing SubscribeMultiWithProcessor logic
-	if _, ok := processorInterface.(interface {
-		AllPossibleTopics() []string
-		GetTopicScoreParams(string) *TopicScoreParams
-		TopicIndex(string) (int, error)
-		Decode(context.Context, string, []byte) (interface{}, error)
-		Validate(context.Context, string, interface{}, string) (ValidationResult, error)
-		Process(context.Context, string, interface{}, string) error
-	}); ok {
-		// This is a type erasure workaround - in practice we'd use proper generics
-		return fmt.Errorf("direct multi-processor subscription not yet implemented - use SubscribeMultiWithProcessor for now")
-	}
-
-	return NewError(fmt.Errorf("multi-processor does not implement required interface"), "subscribe_multi_processor_topics")
+	// Direct subscription through multi-processor interface is not supported due to Go's type system limitations
+	// Multi-processors must be subscribed using the typed SubscribeMultiWithProcessor[T] method
+	return NewError(
+		fmt.Errorf("direct multi-processor subscription not supported - use SubscribeMultiWithProcessor[T] with the typed processor"),
+		"subscribe_multi_processor_topics",
+	)
 }

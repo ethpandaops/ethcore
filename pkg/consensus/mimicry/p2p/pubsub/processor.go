@@ -2,6 +2,9 @@ package pubsub
 
 import (
 	"context"
+	"fmt"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -71,7 +74,7 @@ type MultiProcessor[T any] interface {
 
 // ProcessorMetrics tracks performance metrics for message processing
 type ProcessorMetrics struct {
-	// Processing metrics
+	// Processing metrics (use atomic operations)
 	messagesReceived    uint64
 	messagesProcessed   uint64
 	messagesAccepted    uint64
@@ -81,7 +84,8 @@ type ProcessorMetrics struct {
 	validationErrors    uint64
 	decodingErrors      uint64
 
-	// Timing metrics
+	// Timing metrics (protected by mutex)
+	mu                  sync.RWMutex
 	totalProcessingTime time.Duration
 	avgProcessingTime   time.Duration
 
@@ -101,51 +105,57 @@ func NewProcessorMetrics(log logrus.FieldLogger) *ProcessorMetrics {
 
 // RecordMessage increments the messages received counter
 func (m *ProcessorMetrics) RecordMessage() {
-	m.messagesReceived++
+	atomic.AddUint64(&m.messagesReceived, 1)
 }
 
 // RecordProcessed increments the messages processed counter
 func (m *ProcessorMetrics) RecordProcessed() {
-	m.messagesProcessed++
+	atomic.AddUint64(&m.messagesProcessed, 1)
 }
 
 // RecordValidationResult records the outcome of message validation
 func (m *ProcessorMetrics) RecordValidationResult(result ValidationResult) {
 	switch result {
 	case ValidationAccept:
-		m.messagesAccepted++
+		atomic.AddUint64(&m.messagesAccepted, 1)
 	case ValidationReject:
-		m.messagesRejected++
+		atomic.AddUint64(&m.messagesRejected, 1)
 	case ValidationIgnore:
-		m.messagesIgnored++
+		atomic.AddUint64(&m.messagesIgnored, 1)
 	}
 }
 
 // RecordProcessingError increments the processing error counter
 func (m *ProcessorMetrics) RecordProcessingError() {
-	m.processingErrors++
+	atomic.AddUint64(&m.processingErrors, 1)
 }
 
 // RecordValidationError increments the validation error counter
 func (m *ProcessorMetrics) RecordValidationError() {
-	m.validationErrors++
+	atomic.AddUint64(&m.validationErrors, 1)
 }
 
 // RecordDecodingError increments the decoding error counter
 func (m *ProcessorMetrics) RecordDecodingError() {
-	m.decodingErrors++
+	atomic.AddUint64(&m.decodingErrors, 1)
 }
 
 // RecordProcessingTime adds processing time to the total and updates average
 func (m *ProcessorMetrics) RecordProcessingTime(duration time.Duration) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.totalProcessingTime += duration
-	if m.messagesProcessed > 0 {
-		m.avgProcessingTime = m.totalProcessingTime / time.Duration(m.messagesProcessed)
+	processed := atomic.LoadUint64(&m.messagesProcessed)
+	if processed > 0 {
+		m.avgProcessingTime = m.totalProcessingTime / time.Duration(processed)
 	}
 }
 
 // GetTopicMetrics returns metrics for a specific topic (creates if not exists)
 func (m *ProcessorMetrics) GetTopicMetrics(topic string) *ProcessorMetrics {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	
 	if metrics, exists := m.topicMetrics[topic]; exists {
 		return metrics
 	}
@@ -160,15 +170,18 @@ func (m *ProcessorMetrics) GetTopicMetrics(topic string) *ProcessorMetrics {
 
 // GetStats returns current processing statistics
 func (m *ProcessorMetrics) GetStats() ProcessorStats {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	
 	return ProcessorStats{
-		MessagesReceived:     m.messagesReceived,
-		MessagesProcessed:    m.messagesProcessed,
-		MessagesAccepted:     m.messagesAccepted,
-		MessagesRejected:     m.messagesRejected,
-		MessagesIgnored:      m.messagesIgnored,
-		ProcessingErrors:     m.processingErrors,
-		ValidationErrors:     m.validationErrors,
-		DecodingErrors:       m.decodingErrors,
+		MessagesReceived:     atomic.LoadUint64(&m.messagesReceived),
+		MessagesProcessed:    atomic.LoadUint64(&m.messagesProcessed),
+		MessagesAccepted:     atomic.LoadUint64(&m.messagesAccepted),
+		MessagesRejected:     atomic.LoadUint64(&m.messagesRejected),
+		MessagesIgnored:      atomic.LoadUint64(&m.messagesIgnored),
+		ProcessingErrors:     atomic.LoadUint64(&m.processingErrors),
+		ValidationErrors:     atomic.LoadUint64(&m.validationErrors),
+		DecodingErrors:       atomic.LoadUint64(&m.decodingErrors),
 		TotalProcessingTime:  m.totalProcessingTime,
 		AvgProcessingTime:    m.avgProcessingTime,
 		TopicCount:           len(m.topicMetrics),
@@ -255,4 +268,161 @@ func (w *multiProcessorWrapper[T]) Subscribe(ctx context.Context) error {
 func (w *multiProcessorWrapper[T]) Unsubscribe(ctx context.Context) error {
 	// This is handled by the gossipsub Unsubscribe function
 	return nil
+}
+
+// SelfSubscribingProcessor wraps a processor to provide working Subscribe/Unsubscribe methods
+type SelfSubscribingProcessor[T any] struct {
+	Processor[T] // Embed the processor interface
+	gossipsub    *Gossipsub
+	subscription *ProcessorSubscription[T]
+	mu           sync.RWMutex
+	log          logrus.FieldLogger
+}
+
+// NewSelfSubscribingProcessor creates a processor wrapper with working Subscribe/Unsubscribe methods
+func NewSelfSubscribingProcessor[T any](processor Processor[T], gossipsub *Gossipsub, log logrus.FieldLogger) *SelfSubscribingProcessor[T] {
+	return &SelfSubscribingProcessor[T]{
+		Processor: processor,
+		gossipsub: gossipsub,
+		log:       log.WithField("topic", processor.Topic()),
+	}
+}
+
+// Subscribe handles subscription using the typed SubscribeWithProcessor method
+func (sp *SelfSubscribingProcessor[T]) Subscribe(ctx context.Context) error {
+	sp.mu.Lock()
+	defer sp.mu.Unlock()
+
+	if sp.subscription != nil && sp.subscription.IsStarted() {
+		return fmt.Errorf("already subscribed to topic %s", sp.Topic())
+	}
+
+	err := SubscribeWithProcessor(sp.gossipsub, ctx, sp.Processor)
+	if err != nil {
+		return fmt.Errorf("failed to subscribe: %w", err)
+	}
+
+	// Note: SubscribeWithProcessor doesn't return the subscription
+	// We would need to retrieve it from the gossipsub if needed
+	sp.log.Info("Subscribed to topic")
+	return nil
+}
+
+// Unsubscribe handles unsubscription
+func (sp *SelfSubscribingProcessor[T]) Unsubscribe(ctx context.Context) error {
+	sp.mu.Lock()
+	defer sp.mu.Unlock()
+
+	if sp.subscription == nil {
+		return fmt.Errorf("not subscribed to topic %s", sp.Topic())
+	}
+
+	if err := sp.gossipsub.Unsubscribe(sp.Topic()); err != nil {
+		return fmt.Errorf("failed to unsubscribe: %w", err)
+	}
+
+	sp.subscription = nil
+	sp.log.Info("Unsubscribed from topic")
+	return nil
+}
+
+// IsSubscribed returns whether the processor is currently subscribed
+func (sp *SelfSubscribingProcessor[T]) IsSubscribed() bool {
+	sp.mu.RLock()
+	defer sp.mu.RUnlock()
+	return sp.subscription != nil && sp.subscription.IsStarted()
+}
+
+// GetSubscription returns the current subscription
+func (sp *SelfSubscribingProcessor[T]) GetSubscription() *ProcessorSubscription[T] {
+	sp.mu.RLock()
+	defer sp.mu.RUnlock()
+	return sp.subscription
+}
+
+// SelfSubscribingMultiProcessor wraps a multi-processor to provide working Subscribe/Unsubscribe methods
+type SelfSubscribingMultiProcessor[T any] struct {
+	MultiProcessor[T] // Embed the multi-processor interface
+	gossipsub         *Gossipsub
+	name              string
+	activeSubnets     []uint64
+	mu                sync.RWMutex
+	log               logrus.FieldLogger
+}
+
+// NewSelfSubscribingMultiProcessor creates a multi-processor wrapper with working Subscribe/Unsubscribe methods
+func NewSelfSubscribingMultiProcessor[T any](processor MultiProcessor[T], name string, gossipsub *Gossipsub, log logrus.FieldLogger) *SelfSubscribingMultiProcessor[T] {
+	return &SelfSubscribingMultiProcessor[T]{
+		MultiProcessor: processor,
+		gossipsub:      gossipsub,
+		name:           name,
+		log:            log.WithField("multi_processor", name),
+	}
+}
+
+// Subscribe handles subscription to specified subnets
+func (smp *SelfSubscribingMultiProcessor[T]) Subscribe(ctx context.Context, subnets []uint64) error {
+	smp.mu.Lock()
+	defer smp.mu.Unlock()
+
+	// First, register if not already registered
+	if err := RegisterMultiProcessor(smp.gossipsub, smp.name, smp.MultiProcessor); err != nil {
+		// Ignore already registered error
+		if !IsAlreadyRegisteredError(err) {
+			return fmt.Errorf("failed to register multi-processor: %w", err)
+		}
+	}
+
+	// Subscribe to the new subnets
+	if err := SubscribeMultiWithProcessor(smp.gossipsub, ctx, smp.MultiProcessor); err != nil {
+		return fmt.Errorf("failed to subscribe to subnets: %w", err)
+	}
+
+	smp.activeSubnets = subnets
+	smp.log.WithField("subnets", subnets).Info("Subscribed to subnets")
+	return nil
+}
+
+// Unsubscribe handles unsubscription from specified subnets
+func (smp *SelfSubscribingMultiProcessor[T]) Unsubscribe(ctx context.Context, subnets []uint64) error {
+	smp.mu.Lock()
+	defer smp.mu.Unlock()
+
+	// Create a set of current subnets
+	activeMap := make(map[uint64]bool)
+	for _, subnet := range smp.activeSubnets {
+		activeMap[subnet] = true
+	}
+
+	// Unsubscribe from each specified subnet
+	for _, subnet := range subnets {
+		if activeMap[subnet] {
+			// Get the topic for this subnet
+			topics := smp.MultiProcessor.AllPossibleTopics()
+			if int(subnet) < len(topics) {
+				if err := smp.gossipsub.Unsubscribe(topics[subnet]); err != nil {
+					smp.log.WithError(err).WithField("subnet", subnet).Error("Failed to unsubscribe from subnet")
+					// Continue unsubscribing from other subnets
+				}
+			}
+			delete(activeMap, subnet)
+		}
+	}
+
+	// Update active subnets
+	newSubnets := make([]uint64, 0, len(activeMap))
+	for subnet := range activeMap {
+		newSubnets = append(newSubnets, subnet)
+	}
+	smp.activeSubnets = newSubnets
+
+	smp.log.WithField("remaining_subnets", newSubnets).Info("Unsubscribed from subnets")
+	return nil
+}
+
+// GetActiveSubnets returns the currently active subnets
+func (smp *SelfSubscribingMultiProcessor[T]) GetActiveSubnets() []uint64 {
+	smp.mu.RLock()
+	defer smp.mu.RUnlock()
+	return append([]uint64(nil), smp.activeSubnets...) // return copy
 }

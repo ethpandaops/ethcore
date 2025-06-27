@@ -79,8 +79,16 @@ func (p *syncCommitteeProcessor) Unsubscribe(ctx context.Context, subnets []uint
 		activeMap[subnet] = true
 	}
 
+	// Unsubscribe from each subnet topic
 	for _, subnet := range subnets {
-		delete(activeMap, subnet)
+		if activeMap[subnet] {
+			topic := SyncCommitteeSubnetTopic(p.forkDigest, subnet)
+			if err := p.gossipsub.Unsubscribe(topic); err != nil {
+				p.log.WithError(err).WithField("subnet", subnet).Error("Failed to unsubscribe from sync committee subnet")
+				// Continue unsubscribing from other subnets even if one fails
+			}
+			delete(activeMap, subnet)
+		}
 	}
 
 	// Update our active subnets
@@ -90,8 +98,7 @@ func (p *syncCommitteeProcessor) Unsubscribe(ctx context.Context, subnets []uint
 	}
 	p.subnets = newSubnets
 
-	// For now, return error indicating full implementation needed
-	return fmt.Errorf("selective unsubscribe not yet implemented - use full resubscribe")
+	return nil
 }
 
 func (p *syncCommitteeProcessor) GetActiveSubnets() []uint64 {

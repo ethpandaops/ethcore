@@ -3,6 +3,7 @@ package pubsub
 import (
 	"errors"
 	"fmt"
+	"strings"
 )
 
 // Error wraps an error with additional context for pubsub operations.
@@ -61,4 +62,14 @@ var (
 	ErrSubscriptionClosed     = errors.New("subscription closed")
 	ErrPeerNotFound           = errors.New("peer not found")
 	ErrContextCanceled        = errors.New("context canceled")
+	ErrAlreadyRegistered      = errors.New("already registered")
 )
+
+// IsAlreadyRegisteredError checks if the error indicates a processor is already registered
+func IsAlreadyRegisteredError(err error) bool {
+	if err == nil {
+		return false
+	}
+	// Check if it's our error type and contains "already registered"
+	return strings.Contains(err.Error(), "already registered")
+}

@@ -261,7 +261,7 @@ func TestGossipsub_ProcessorSubscriptionMethods(t *testing.T) {
 	// Test SubscribeToProcessorTopic - should return error as processor interface check fails
 	err = g.SubscribeToProcessorTopic(ctx, "test_topic")
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "processor does not implement required interface")
+	assert.Contains(t, err.Error(), "direct processor subscription not supported")
 	
 	// Test with unregistered topic
 	err = g.SubscribeToProcessorTopic(ctx, "unknown_topic")
