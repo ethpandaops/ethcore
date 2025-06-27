@@ -51,9 +51,9 @@ func TestPeerStatusNil(t *testing.T) {
 func TestPeerStatusMultiple(t *testing.T) {
 	// Test creating multiple peer statuses
 	peers := []struct {
-		id     string
-		epoch  common.Epoch
-		slot   common.Slot
+		id    string
+		epoch common.Epoch
+		slot  common.Slot
 	}{
 		{"12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf", 100, 3200},
 		{"12D3KooWDpJ7As7BWAwRMfu1VU2WCqNjvq387JEYKDBj4kx6nXTN", 101, 3232},

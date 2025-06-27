@@ -14,6 +14,7 @@ import (
 
 // createTestHost creates a test libp2p host
 func createTestHost(t *testing.T) host.Host {
+	t.Helper()
 	h, err := libp2p.New(
 		libp2p.ListenAddrStrings("/ip4/127.0.0.1/tcp/0"),
 	)
@@ -23,44 +24,45 @@ func createTestHost(t *testing.T) host.Host {
 
 // createTestGossipsub creates a test Gossipsub instance
 func createTestGossipsub(t *testing.T, h host.Host) *Gossipsub {
+	t.Helper()
 	log := logrus.New()
 	log.SetLevel(logrus.DebugLevel)
-	
+
 	config := DefaultConfig()
 	config.MaxMessageSize = 1024 * 1024 // 1MB
-	
+
 	g, err := NewGossipsub(log, h, config)
 	require.NoError(t, err)
 	require.NotNil(t, g)
-	
+
 	return g
 }
 
 func TestGossipsub_Lifecycle(t *testing.T) {
 	h := createTestHost(t)
 	defer h.Close()
-	
+
 	g := createTestGossipsub(t, h)
-	
+
 	// Test initial state
 	assert.False(t, g.IsStarted())
-	
+
 	// Test Start
 	ctx := context.Background()
 	err := g.Start(ctx)
 	require.NoError(t, err)
 	assert.True(t, g.IsStarted())
-	
+
 	// Test double start
 	err = g.Start(ctx)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "already started")
-	
+
 	// Test Stop
 	err = g.Stop()
 	require.NoError(t, err)
 	assert.False(t, g.IsStarted())
-	
+
 	// Test double stop
 	err = g.Stop()
 	assert.Error(t, err)
@@ -70,35 +72,35 @@ func TestGossipsub_Lifecycle(t *testing.T) {
 func TestGossipsub_ProcessorRegistration(t *testing.T) {
 	h := createTestHost(t)
 	defer h.Close()
-	
+
 	g := createTestGossipsub(t, h)
-	
+
 	// Register single-topic processor
 	processor := newMockProcessor("test_topic")
 	err := RegisterProcessor(g, processor)
 	require.NoError(t, err)
-	
+
 	// Try to register same processor again
 	err = RegisterProcessor(g, processor)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "already registered")
-	
+
 	// Register multi-topic processor
 	multiProcessor := newMockMultiProcessor([]string{"topic1", "topic2"})
 	err = RegisterMultiProcessor(g, "test_multi", multiProcessor)
 	require.NoError(t, err)
-	
+
 	// Try to register same multi-processor again
 	err = RegisterMultiProcessor(g, "test_multi", multiProcessor)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "already registered")
-	
+
 	// Start Gossipsub
 	ctx := context.Background()
 	err = g.Start(ctx)
 	require.NoError(t, err)
-	defer g.Stop()
-	
+	defer func() { _ = g.Stop() }()
+
 	// Cannot register processors after start
 	newProcessor := newMockProcessor("new_topic")
 	err = RegisterProcessor(g, newProcessor)
@@ -109,62 +111,62 @@ func TestGossipsub_ProcessorRegistration(t *testing.T) {
 func TestGossipsub_SubscriptionWithProcessor(t *testing.T) {
 	h := createTestHost(t)
 	defer h.Close()
-	
+
 	g := createTestGossipsub(t, h)
-	
+
 	// Create and register processor
 	processor := newMockProcessor("test_topic")
 	processor.setDecodeResult("decoded message")
 	processor.setValidateResult(ValidationAccept)
-	
+
 	err := RegisterProcessor(g, processor)
 	require.NoError(t, err)
-	
+
 	// Start Gossipsub
 	ctx := context.Background()
 	err = g.Start(ctx)
 	require.NoError(t, err)
-	defer g.Stop()
-	
+	defer func() { _ = g.Stop() }()
+
 	// Subscribe with processor
 	err = SubscribeWithProcessor(g, ctx, processor)
 	require.NoError(t, err)
-	
+
 	// Verify subscription
 	assert.True(t, g.IsSubscribed("test_topic"))
-	
+
 	subs := g.GetSubscriptions()
 	assert.Contains(t, subs, "test_topic")
-	
+
 	// Test unsubscribe
 	err = g.Unsubscribe("test_topic")
 	require.NoError(t, err)
-	
+
 	assert.False(t, g.IsSubscribed("test_topic"))
 }
 
 func TestGossipsub_PublishMessage(t *testing.T) {
 	h := createTestHost(t)
 	defer h.Close()
-	
+
 	g := createTestGossipsub(t, h)
-	
+
 	// Start Gossipsub
 	ctx := context.Background()
 	err := g.Start(ctx)
 	require.NoError(t, err)
-	defer g.Stop()
-	
+	defer func() { _ = g.Stop() }()
+
 	// Test publish without subscription (should still work)
 	testData := []byte("test message")
 	err = g.Publish(ctx, "test_topic", testData)
 	require.NoError(t, err)
-	
+
 	// Test publish with empty topic
 	err = g.Publish(ctx, "", testData)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid topic")
-	
+
 	// Test publish with oversized message
 	oversizedData := make([]byte, g.config.MaxMessageSize+1)
 	err = g.Publish(ctx, "test_topic", oversizedData)
@@ -175,9 +177,9 @@ func TestGossipsub_PublishMessage(t *testing.T) {
 func TestGossipsub_ProcessorScoring(t *testing.T) {
 	h := createTestHost(t)
 	defer h.Close()
-	
+
 	g := createTestGossipsub(t, h)
-	
+
 	// Create processor with custom scoring
 	processor := newMockProcessor("scored_topic")
 	processor.scoreParams = &TopicScoreParams{
@@ -189,10 +191,10 @@ func TestGossipsub_ProcessorScoring(t *testing.T) {
 		FirstMessageDeliveriesDecay:  0.5,
 		FirstMessageDeliveriesCap:    100,
 	}
-	
+
 	err := RegisterProcessor(g, processor)
 	require.NoError(t, err)
-	
+
 	// Build topic score map
 	scoreMap := g.buildTopicScoreMap()
 	assert.NotNil(t, scoreMap["scored_topic"])
@@ -202,39 +204,39 @@ func TestGossipsub_ProcessorScoring(t *testing.T) {
 func TestGossipsub_GetStats(t *testing.T) {
 	h := createTestHost(t)
 	defer h.Close()
-	
+
 	g := createTestGossipsub(t, h)
-	
+
 	// Stats before start
 	stats := g.GetStats()
 	assert.Equal(t, 0, stats.ActiveSubscriptions)
 	assert.Equal(t, 0, stats.ConnectedPeers)
 	assert.Equal(t, 0, stats.TopicCount)
-	
+
 	// Start and get stats
 	ctx := context.Background()
 	err := g.Start(ctx)
 	require.NoError(t, err)
-	defer g.Stop()
-	
+	defer func() { _ = g.Stop() }()
+
 	// Subscribe to a topic
 	processor := newMockProcessor("test_topic")
 	err = RegisterProcessor(g, processor) // This will fail after start
 	assert.Error(t, err)
-	
+
 	// Create a new instance for proper testing
 	g2 := createTestGossipsub(t, h)
 	processor2 := newMockProcessor("test_topic")
 	err = RegisterProcessor(g2, processor2)
 	require.NoError(t, err)
-	
+
 	err = g2.Start(ctx)
 	require.NoError(t, err)
-	defer g2.Stop()
-	
+	defer func() { _ = g2.Stop() }()
+
 	err = SubscribeWithProcessor(g2, ctx, processor2)
 	require.NoError(t, err)
-	
+
 	stats = g2.GetStats()
 	assert.Equal(t, 1, stats.ActiveSubscriptions)
 	assert.GreaterOrEqual(t, stats.ConnectedPeers, 0)
@@ -244,25 +246,25 @@ func TestGossipsub_GetStats(t *testing.T) {
 func TestGossipsub_ProcessorSubscriptionMethods(t *testing.T) {
 	h := createTestHost(t)
 	defer h.Close()
-	
+
 	g := createTestGossipsub(t, h)
-	
+
 	// Register processor
 	processor := newMockProcessor("test_topic")
 	err := RegisterProcessor(g, processor)
 	require.NoError(t, err)
-	
+
 	// Start Gossipsub
 	ctx := context.Background()
 	err = g.Start(ctx)
 	require.NoError(t, err)
-	defer g.Stop()
-	
+	defer func() { _ = g.Stop() }()
+
 	// Test SubscribeToProcessorTopic - should return error as processor interface check fails
 	err = g.SubscribeToProcessorTopic(ctx, "test_topic")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "direct processor subscription not supported")
-	
+
 	// Test with unregistered topic
 	err = g.SubscribeToProcessorTopic(ctx, "unknown_topic")
 	assert.Error(t, err)

@@ -4,17 +4,17 @@ import (
 	"testing"
 	"time"
 
-	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/client_golang/prometheus"
+	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestNewMetrics(t *testing.T) {
 	metrics := NewMetrics("test")
-	
+
 	assert.NotNil(t, metrics)
-	
+
 	// Verify metrics are initialized
 	assert.NotNil(t, metrics.MessagesReceived)
 	assert.NotNil(t, metrics.MessagesPublished)
@@ -42,7 +42,7 @@ func TestMetricsRecordMethods(t *testing.T) {
 	metrics.RecordMessagePublished("test_topic", false)
 	metrics.RecordMessageValidated("test_topic", ValidationAccept)
 	metrics.RecordMessageValidated("test_topic", ValidationReject)
-	
+
 	// Test recording with duration
 	duration := 100 * time.Millisecond
 	metrics.RecordMessageHandled("test_topic", true, duration)
@@ -157,10 +157,13 @@ func TestMetricsRecordMessageHandled(t *testing.T) {
 
 	// Check duration histogram
 	histMetric := &dto.Metric{}
-	err = metrics.HandlerDuration.WithLabelValues(topic).(interface {
+	observer := metrics.HandlerDuration.WithLabelValues(topic)
+	if h, ok := observer.(interface {
 		Write(*dto.Metric) error
-	}).Write(histMetric)
-	require.NoError(t, err)
+	}); ok {
+		err = h.Write(histMetric)
+		require.NoError(t, err)
+	}
 	assert.Equal(t, uint64(3), *histMetric.Histogram.SampleCount)
 }
 
@@ -212,10 +215,13 @@ func TestMetricsRecordDurations(t *testing.T) {
 
 	// Check validation histogram
 	valHistMetric := &dto.Metric{}
-	err := metrics.ValidationDuration.WithLabelValues(topic).(interface {
+	valObserver := metrics.ValidationDuration.WithLabelValues(topic)
+	if h, ok := valObserver.(interface {
 		Write(*dto.Metric) error
-	}).Write(valHistMetric)
-	require.NoError(t, err)
+	}); ok {
+		err := h.Write(valHistMetric)
+		require.NoError(t, err)
+	}
 	assert.Equal(t, uint64(3), *valHistMetric.Histogram.SampleCount)
 
 	// Record handler durations
@@ -225,10 +231,13 @@ func TestMetricsRecordDurations(t *testing.T) {
 
 	// Check handler histogram
 	handlerHistMetric := &dto.Metric{}
-	err = metrics.HandlerDuration.WithLabelValues(topic).(interface {
+	handlerObserver := metrics.HandlerDuration.WithLabelValues(topic)
+	if h, ok := handlerObserver.(interface {
 		Write(*dto.Metric) error
-	}).Write(handlerHistMetric)
-	require.NoError(t, err)
+	}); ok {
+		err = h.Write(handlerHistMetric)
+		require.NoError(t, err)
+	}
 	assert.Equal(t, uint64(3), *handlerHistMetric.Histogram.SampleCount)
 
 	// Record publish durations

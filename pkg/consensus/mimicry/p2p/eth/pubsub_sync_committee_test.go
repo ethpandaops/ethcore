@@ -38,7 +38,7 @@ func TestSyncCommitteeProcessorAllPossibleTopics(t *testing.T) {
 
 	topics := processor.AllPossibleTopics()
 	assert.Len(t, topics, SyncCommitteeSubnetCount)
-	
+
 	// Verify all topics are unique and properly formatted
 	seen := make(map[string]bool)
 	for i, topic := range topics {
@@ -63,10 +63,10 @@ func TestSyncCommitteeProcessorDecode(t *testing.T) {
 
 	// Create a test sync committee message
 	message := &pb.SyncCommitteeMessage{
-		Slot:            primitives.Slot(200),
-		BlockRoot:       make([]byte, 32),
-		ValidatorIndex:  primitives.ValidatorIndex(1000),
-		Signature:       make([]byte, 96),
+		Slot:           primitives.Slot(200),
+		BlockRoot:      make([]byte, 32),
+		ValidatorIndex: primitives.ValidatorIndex(1000),
+		Signature:      make([]byte, 96),
 	}
 
 	// Encode the message
@@ -134,8 +134,10 @@ func TestSyncCommitteeProcessorValidate(t *testing.T) {
 			expectError:    true,
 		},
 		{
-			name:           "no validator",
-			setupValidator: func() func(context.Context, *pb.SyncCommitteeMessage, uint64) (pubsub.ValidationResult, error) { return nil },
+			name: "no validator",
+			setupValidator: func() func(context.Context, *pb.SyncCommitteeMessage, uint64) (pubsub.ValidationResult, error) {
+				return nil
+			},
 			subnets:        []uint64{3},
 			topic:          "/eth2/01020304/sync_committee_3/ssz_snappy",
 			expectedResult: pubsub.ValidationAccept,
@@ -165,14 +167,14 @@ func TestSyncCommitteeProcessorValidate(t *testing.T) {
 			}
 
 			message := &pb.SyncCommitteeMessage{
-				Slot:            primitives.Slot(200),
-				BlockRoot:       make([]byte, 32),
-				ValidatorIndex:  primitives.ValidatorIndex(1000),
-				Signature:       make([]byte, 96),
+				Slot:           primitives.Slot(200),
+				BlockRoot:      make([]byte, 32),
+				ValidatorIndex: primitives.ValidatorIndex(1000),
+				Signature:      make([]byte, 96),
 			}
 
 			result, err := processor.Validate(context.Background(), tt.topic, message, "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf")
-			
+
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {
@@ -244,14 +246,14 @@ func TestSyncCommitteeProcessorProcess(t *testing.T) {
 			}
 
 			message := &pb.SyncCommitteeMessage{
-				Slot:            primitives.Slot(200),
-				BlockRoot:       make([]byte, 32),
-				ValidatorIndex:  primitives.ValidatorIndex(1000),
-				Signature:       make([]byte, 96),
+				Slot:           primitives.Slot(200),
+				BlockRoot:      make([]byte, 32),
+				ValidatorIndex: primitives.ValidatorIndex(1000),
+				Signature:      make([]byte, 96),
 			}
 
 			err := processor.Process(context.Background(), tt.topic, message, "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf")
-			
+
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {
@@ -283,11 +285,11 @@ func TestSyncCommitteeProcessorSubscribeUnsubscribe(t *testing.T) {
 	// Restore gossipsub for unsubscribe test
 	processor.gossipsub = mockGS
 	processor.subnets = []uint64{0, 1, 2}
-	
+
 	// Test unsubscribe
 	err = processor.Unsubscribe(context.Background(), []uint64{0, 1})
 	assert.NoError(t, err) // Unsubscribe returns nil even if gossipsub.Unsubscribe fails (it just logs errors)
-	
+
 	// Test unsubscribe with no gossipsub
 	processor.gossipsub = nil
 	err = processor.Unsubscribe(context.Background(), []uint64{0})
@@ -360,7 +362,7 @@ func TestSyncCommitteeProcessorGetActiveSubnets(t *testing.T) {
 
 	active := processor.GetActiveSubnets()
 	assert.Equal(t, []uint64{0, 1, 3}, active)
-	
+
 	// Verify it's a copy
 	active[0] = 999
 	assert.Equal(t, uint64(0), processor.subnets[0])

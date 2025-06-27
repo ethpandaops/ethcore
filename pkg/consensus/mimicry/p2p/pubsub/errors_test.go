@@ -9,6 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const testTopic = "test/topic"
+
 func TestNewError(t *testing.T) {
 	baseErr := errors.New("base error")
 	context := "test operation"
@@ -23,7 +25,7 @@ func TestNewError(t *testing.T) {
 
 func TestNewTopicError(t *testing.T) {
 	baseErr := errors.New("topic error")
-	topic := "test/topic"
+	topic := testTopic
 	context := "subscription"
 
 	err := NewTopicError(baseErr, topic, context)
@@ -184,7 +186,7 @@ func TestErrorChaining(t *testing.T) {
 
 	// Should be able to find the base error through the chain
 	assert.True(t, errors.Is(wrappedErr, baseErr))
-	
+
 	// Should be able to extract the pubsub error
 	var perr *Error
 	require.True(t, errors.As(wrappedErr, &perr))

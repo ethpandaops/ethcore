@@ -11,7 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// BeaconchainGossipsub provides Ethereum consensus layer gossipsub functionality
+// BeaconchainGossipsub provides Ethereum consensus layer gossipsub functionality.
 type BeaconchainGossipsub struct {
 	*pubsub.Gossipsub
 	forkDigest [4]byte
@@ -19,7 +19,7 @@ type BeaconchainGossipsub struct {
 	log        logrus.FieldLogger
 }
 
-// NewBeaconchainGossipsub creates a new Ethereum beacon chain gossipsub wrapper
+// NewBeaconchainGossipsub creates a new Ethereum beacon chain gossipsub wrapper.
 func NewBeaconchainGossipsub(
 	ps *pubsub.Gossipsub,
 	forkDigest [4]byte,
@@ -201,7 +201,7 @@ func (g *BeaconchainGossipsub) SubscribeBeaconBlock(ctx context.Context) error {
 	// Create a temporary processor to get the correct topic
 	tempProcessor := &beaconBlockProcessor{forkDigest: g.forkDigest}
 	topic := tempProcessor.Topic()
-	
+
 	processorInterface, exists := g.Gossipsub.GetRegisteredProcessor(topic)
 	if !exists {
 		return fmt.Errorf("no beacon block processor registered for topic: %s", topic)
@@ -235,7 +235,7 @@ func (g *BeaconchainGossipsub) SubscribeAggregateAndProof(ctx context.Context) e
 	// Create a temporary processor to get the correct topic
 	tempProcessor := &aggregateProcessor{forkDigest: g.forkDigest}
 	topic := tempProcessor.Topic()
-	
+
 	processorInterface, exists := g.Gossipsub.GetRegisteredProcessor(topic)
 	if !exists {
 		return fmt.Errorf("no aggregate and proof processor registered for topic: %s", topic)
@@ -269,7 +269,7 @@ func (g *BeaconchainGossipsub) SubscribeVoluntaryExit(ctx context.Context) error
 	// Create a temporary processor to get the correct topic
 	tempProcessor := &voluntaryExitProcessor{forkDigest: g.forkDigest}
 	topic := tempProcessor.Topic()
-	
+
 	processorInterface, exists := g.Gossipsub.GetRegisteredProcessor(topic)
 	if !exists {
 		return fmt.Errorf("no voluntary exit processor registered for topic: %s", topic)
@@ -288,7 +288,7 @@ func (g *BeaconchainGossipsub) SubscribeProposerSlashing(ctx context.Context) er
 	// Create a temporary processor to get the correct topic
 	tempProcessor := &proposerSlashingProcessor{forkDigest: g.forkDigest}
 	topic := tempProcessor.Topic()
-	
+
 	processorInterface, exists := g.Gossipsub.GetRegisteredProcessor(topic)
 	if !exists {
 		return fmt.Errorf("no proposer slashing processor registered for topic: %s", topic)
@@ -307,7 +307,7 @@ func (g *BeaconchainGossipsub) SubscribeAttesterSlashing(ctx context.Context) er
 	// Create a temporary processor to get the correct topic
 	tempProcessor := &attesterSlashingProcessor{forkDigest: g.forkDigest}
 	topic := tempProcessor.Topic()
-	
+
 	processorInterface, exists := g.Gossipsub.GetRegisteredProcessor(topic)
 	if !exists {
 		return fmt.Errorf("no attester slashing processor registered for topic: %s", topic)
@@ -326,7 +326,7 @@ func (g *BeaconchainGossipsub) SubscribeSyncContributionAndProof(ctx context.Con
 	// Create a temporary processor to get the correct topic
 	tempProcessor := &syncContributionProcessor{forkDigest: g.forkDigest}
 	topic := tempProcessor.Topic()
-	
+
 	processorInterface, exists := g.Gossipsub.GetRegisteredProcessor(topic)
 	if !exists {
 		return fmt.Errorf("no sync contribution and proof processor registered for topic: %s", topic)
@@ -345,7 +345,7 @@ func (g *BeaconchainGossipsub) SubscribeBlsToExecutionChange(ctx context.Context
 	// Create a temporary processor to get the correct topic
 	tempProcessor := &blsToExecutionProcessor{forkDigest: g.forkDigest}
 	topic := tempProcessor.Topic()
-	
+
 	processorInterface, exists := g.Gossipsub.GetRegisteredProcessor(topic)
 	if !exists {
 		return fmt.Errorf("no BLS to execution change processor registered for topic: %s", topic)

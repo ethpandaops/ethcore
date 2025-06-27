@@ -22,10 +22,10 @@ func TestProcessorSubscriptionBasics(t *testing.T) {
 
 	assert.False(t, ps.IsStarted())
 	assert.False(t, ps.IsStopped())
-	
+
 	ps.started = true
 	assert.True(t, ps.IsStarted())
-	
+
 	ps.stopped = true
 	assert.True(t, ps.IsStopped())
 }
@@ -35,35 +35,35 @@ func TestProcessorSubscriptionBasics(t *testing.T) {
 func TestSubscriptionProcessorMetrics(t *testing.T) {
 	log := logrus.New()
 	log.SetLevel(logrus.ErrorLevel)
-	
+
 	metrics := NewProcessorMetrics(log)
 	assert.NotNil(t, metrics)
-	
+
 	// Test basic metric recording
 	metrics.RecordMessage()
 	stats := metrics.GetStats()
 	assert.Equal(t, uint64(1), stats.MessagesReceived)
-	
+
 	// Test validation results
 	metrics.RecordValidationResult(ValidationAccept)
 	metrics.RecordValidationResult(ValidationReject)
 	metrics.RecordValidationResult(ValidationIgnore)
-	
+
 	stats = metrics.GetStats()
 	assert.Equal(t, uint64(1), stats.MessagesAccepted)
 	assert.Equal(t, uint64(1), stats.MessagesRejected)
 	assert.Equal(t, uint64(1), stats.MessagesIgnored)
-	
+
 	// Test error recording
 	metrics.RecordDecodingError()
 	metrics.RecordValidationError()
 	metrics.RecordProcessingError()
-	
+
 	stats = metrics.GetStats()
 	assert.Equal(t, uint64(1), stats.DecodingErrors)
 	assert.Equal(t, uint64(1), stats.ValidationErrors)
 	assert.Equal(t, uint64(1), stats.ProcessingErrors)
-	
+
 	// Test processing time
 	metrics.RecordProcessingTime(100 * time.Millisecond)
 	stats = metrics.GetStats()
@@ -73,9 +73,9 @@ func TestSubscriptionProcessorMetrics(t *testing.T) {
 func TestProcessorMetricsConcurrency(t *testing.T) {
 	log := logrus.New()
 	log.SetLevel(logrus.ErrorLevel)
-	
+
 	metrics := NewProcessorMetrics(log)
-	
+
 	// Test concurrent access
 	var wg sync.WaitGroup
 	for i := 0; i < 10; i++ {
@@ -90,9 +90,9 @@ func TestProcessorMetricsConcurrency(t *testing.T) {
 			}
 		}()
 	}
-	
+
 	wg.Wait()
-	
+
 	stats := metrics.GetStats()
 	assert.Equal(t, uint64(1000), stats.MessagesReceived)
 	assert.Equal(t, uint64(1000), stats.MessagesProcessed)
@@ -112,7 +112,7 @@ func TestProcessorStats(t *testing.T) {
 		ProcessingErrors:    5,
 		TotalProcessingTime: 500 * time.Millisecond,
 	}
-	
+
 	// Basic assertions
 	assert.Equal(t, uint64(100), stats.MessagesReceived)
 	assert.Equal(t, uint64(90), stats.MessagesProcessed)
@@ -129,15 +129,15 @@ func TestEmitterIntegration(t *testing.T) {
 	// Test that emission package works correctly
 	emitter := emission.NewEmitter()
 	assert.NotNil(t, emitter)
-	
+
 	var called bool
 	emitter.On("test-event", func(data string) {
 		called = true
 		assert.Equal(t, "test-data", data)
 	})
-	
+
 	emitter.Emit("test-event", "test-data")
-	
+
 	// Give some time for async emission
 	time.Sleep(10 * time.Millisecond)
 	assert.True(t, called)
@@ -149,7 +149,7 @@ func TestSubscriptionHelperFunctions(t *testing.T) {
 		// This test would require a real Gossipsub instance
 		t.Skip("Requires full Gossipsub setup")
 	})
-	
+
 	t.Run("SubscribeMultiWithProcessor requires started gossipsub", func(t *testing.T) {
 		// This test would require a real Gossipsub instance
 		t.Skip("Requires full Gossipsub setup")

@@ -75,14 +75,14 @@ type MultiProcessor[T any] interface {
 // ProcessorMetrics tracks performance metrics for message processing
 type ProcessorMetrics struct {
 	// Processing metrics (use atomic operations)
-	messagesReceived    uint64
-	messagesProcessed   uint64
-	messagesAccepted    uint64
-	messagesRejected    uint64
-	messagesIgnored     uint64
-	processingErrors    uint64
-	validationErrors    uint64
-	decodingErrors      uint64
+	messagesReceived  uint64
+	messagesProcessed uint64
+	messagesAccepted  uint64
+	messagesRejected  uint64
+	messagesIgnored   uint64
+	processingErrors  uint64
+	validationErrors  uint64
+	decodingErrors    uint64
 
 	// Timing metrics (protected by mutex)
 	mu                  sync.RWMutex
@@ -155,7 +155,7 @@ func (m *ProcessorMetrics) RecordProcessingTime(duration time.Duration) {
 func (m *ProcessorMetrics) GetTopicMetrics(topic string) *ProcessorMetrics {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	if metrics, exists := m.topicMetrics[topic]; exists {
 		return metrics
 	}
@@ -172,52 +172,52 @@ func (m *ProcessorMetrics) GetTopicMetrics(topic string) *ProcessorMetrics {
 func (m *ProcessorMetrics) GetStats() ProcessorStats {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	return ProcessorStats{
-		MessagesReceived:     atomic.LoadUint64(&m.messagesReceived),
-		MessagesProcessed:    atomic.LoadUint64(&m.messagesProcessed),
-		MessagesAccepted:     atomic.LoadUint64(&m.messagesAccepted),
-		MessagesRejected:     atomic.LoadUint64(&m.messagesRejected),
-		MessagesIgnored:      atomic.LoadUint64(&m.messagesIgnored),
-		ProcessingErrors:     atomic.LoadUint64(&m.processingErrors),
-		ValidationErrors:     atomic.LoadUint64(&m.validationErrors),
-		DecodingErrors:       atomic.LoadUint64(&m.decodingErrors),
-		TotalProcessingTime:  m.totalProcessingTime,
-		AvgProcessingTime:    m.avgProcessingTime,
-		TopicCount:           len(m.topicMetrics),
+		MessagesReceived:    atomic.LoadUint64(&m.messagesReceived),
+		MessagesProcessed:   atomic.LoadUint64(&m.messagesProcessed),
+		MessagesAccepted:    atomic.LoadUint64(&m.messagesAccepted),
+		MessagesRejected:    atomic.LoadUint64(&m.messagesRejected),
+		MessagesIgnored:     atomic.LoadUint64(&m.messagesIgnored),
+		ProcessingErrors:    atomic.LoadUint64(&m.processingErrors),
+		ValidationErrors:    atomic.LoadUint64(&m.validationErrors),
+		DecodingErrors:      atomic.LoadUint64(&m.decodingErrors),
+		TotalProcessingTime: m.totalProcessingTime,
+		AvgProcessingTime:   m.avgProcessingTime,
+		TopicCount:          len(m.topicMetrics),
 	}
 }
 
 // ProcessorStats contains processor performance statistics
 type ProcessorStats struct {
-	MessagesReceived     uint64
-	MessagesProcessed    uint64
-	MessagesAccepted     uint64
-	MessagesRejected     uint64
-	MessagesIgnored      uint64
-	ProcessingErrors     uint64
-	ValidationErrors     uint64
-	DecodingErrors       uint64
-	TotalProcessingTime  time.Duration
-	AvgProcessingTime    time.Duration
-	TopicCount           int
+	MessagesReceived    uint64
+	MessagesProcessed   uint64
+	MessagesAccepted    uint64
+	MessagesRejected    uint64
+	MessagesIgnored     uint64
+	ProcessingErrors    uint64
+	ValidationErrors    uint64
+	DecodingErrors      uint64
+	TotalProcessingTime time.Duration
+	AvgProcessingTime   time.Duration
+	TopicCount          int
 }
 
 // LogStats logs the current processor statistics
 func (m *ProcessorMetrics) LogStats() {
 	stats := m.GetStats()
 	m.log.WithFields(logrus.Fields{
-		"messages_received":      stats.MessagesReceived,
-		"messages_processed":     stats.MessagesProcessed,
-		"messages_accepted":      stats.MessagesAccepted,
-		"messages_rejected":      stats.MessagesRejected,
-		"messages_ignored":       stats.MessagesIgnored,
-		"processing_errors":      stats.ProcessingErrors,
-		"validation_errors":      stats.ValidationErrors,
-		"decoding_errors":        stats.DecodingErrors,
-		"total_processing_time":  stats.TotalProcessingTime,
-		"avg_processing_time":    stats.AvgProcessingTime,
-		"topic_count":            stats.TopicCount,
+		"messages_received":     stats.MessagesReceived,
+		"messages_processed":    stats.MessagesProcessed,
+		"messages_accepted":     stats.MessagesAccepted,
+		"messages_rejected":     stats.MessagesRejected,
+		"messages_ignored":      stats.MessagesIgnored,
+		"processing_errors":     stats.ProcessingErrors,
+		"validation_errors":     stats.ValidationErrors,
+		"decoding_errors":       stats.DecodingErrors,
+		"total_processing_time": stats.TotalProcessingTime,
+		"avg_processing_time":   stats.AvgProcessingTime,
+		"topic_count":           stats.TopicCount,
 	}).Info("processor metrics")
 }
 

@@ -46,13 +46,13 @@ func TestGoodbyeReasonValues(t *testing.T) {
 
 func TestGoodbyeReasonType(t *testing.T) {
 	// Test that GoodbyeReason is uint8
-	var reason GoodbyeReason = GoodbyeReasonClientShutdown
+	reason := GoodbyeReasonClientShutdown
 	assert.IsType(t, GoodbyeReason(0), reason)
-	
+
 	// Test conversions
-	var u8 uint8 = uint8(reason)
+	u8 := uint8(reason)
 	assert.Equal(t, uint8(0), u8)
-	
+
 	// Test that we can create custom reasons
 	customReason := GoodbyeReason(255)
 	assert.Equal(t, uint8(255), uint8(customReason))

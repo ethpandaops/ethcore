@@ -38,21 +38,21 @@ func TestEventNames(t *testing.T) {
 func TestCallbackTypes(t *testing.T) {
 	// This test just ensures callback types compile correctly
 	var (
-		_ PubsubStartedCallback      = func() {}
-		_ PubsubStoppedCallback      = func() {}
-		_ TopicSubscribedCallback    = func(topic string) {}
-		_ TopicUnsubscribedCallback  = func(topic string) {}
-		_ SubscriptionErrorCallback  = func(topic string, err error) {}
-		_ MessageReceivedCallback    = func(topic string, from peer.ID) {}
-		_ MessagePublishedCallback   = func(topic string) {}
-		_ MessageValidatedCallback   = func(topic string, result ValidationResult) {}
-		_ MessageHandledCallback     = func(topic string, success bool) {}
-		_ ValidationFailedCallback   = func(topic string, from peer.ID, err error) {}
-		_ HandlerErrorCallback       = func(topic string, err error) {}
-		_ PublishErrorCallback       = func(topic string, err error) {}
-		_ PeerJoinedTopicCallback    = func(topic string, peerID peer.ID) {}
-		_ PeerLeftTopicCallback      = func(topic string, peerID peer.ID) {}
-		_ PeerScoreUpdatedCallback   = func(peerID peer.ID, score float64) {}
+		_ PubsubStartedCallback     = func() {}
+		_ PubsubStoppedCallback     = func() {}
+		_ TopicSubscribedCallback   = func(topic string) {}
+		_ TopicUnsubscribedCallback = func(topic string) {}
+		_ SubscriptionErrorCallback = func(topic string, err error) {}
+		_ MessageReceivedCallback   = func(topic string, from peer.ID) {}
+		_ MessagePublishedCallback  = func(topic string) {}
+		_ MessageValidatedCallback  = func(topic string, result ValidationResult) {}
+		_ MessageHandledCallback    = func(topic string, success bool) {}
+		_ ValidationFailedCallback  = func(topic string, from peer.ID, err error) {}
+		_ HandlerErrorCallback      = func(topic string, err error) {}
+		_ PublishErrorCallback      = func(topic string, err error) {}
+		_ PeerJoinedTopicCallback   = func(topic string, peerID peer.ID) {}
+		_ PeerLeftTopicCallback     = func(topic string, peerID peer.ID) {}
+		_ PeerScoreUpdatedCallback  = func(peerID peer.ID, score float64) {}
 	)
 }
 
@@ -95,7 +95,7 @@ func TestEventCategories(t *testing.T) {
 	errorEvents := []string{ValidationFailedEvent, HandlerErrorEvent, PublishErrorEvent}
 	for _, event := range errorEvents {
 		assert.Contains(t, event, "pubsub:")
-		assert.True(t, 
+		assert.True(t,
 			contains(event, "error") || contains(event, "failed"),
 			"Error event should contain 'error' or 'failed': %s", event,
 		)

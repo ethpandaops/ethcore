@@ -167,7 +167,7 @@ func TestProposerSlashingProcessorValidate(t *testing.T) {
 			}
 
 			result, err := processor.Validate(context.Background(), proposerSlashing, "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf")
-			
+
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {
@@ -240,7 +240,7 @@ func TestProposerSlashingProcessorProcess(t *testing.T) {
 			}
 
 			err := processor.Process(context.Background(), proposerSlashing, "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf")
-			
+
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {

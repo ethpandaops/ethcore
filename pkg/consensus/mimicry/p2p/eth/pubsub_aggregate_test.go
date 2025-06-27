@@ -128,8 +128,10 @@ func TestAggregateProcessorValidate(t *testing.T) {
 			expectError:    true,
 		},
 		{
-			name:           "no validator",
-			setupValidator: func() func(context.Context, *pb.AggregateAttestationAndProof) (pubsub.ValidationResult, error) { return nil },
+			name: "no validator",
+			setupValidator: func() func(context.Context, *pb.AggregateAttestationAndProof) (pubsub.ValidationResult, error) {
+				return nil
+			},
 			expectedResult: pubsub.ValidationAccept,
 			expectError:    false,
 		},
@@ -165,7 +167,7 @@ func TestAggregateProcessorValidate(t *testing.T) {
 			}
 
 			result, err := processor.Validate(context.Background(), aggregateAndProof, "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf")
-			
+
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {
@@ -237,7 +239,7 @@ func TestAggregateProcessorProcess(t *testing.T) {
 			}
 
 			err := processor.Process(context.Background(), aggregateAndProof, "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf")
-			
+
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {

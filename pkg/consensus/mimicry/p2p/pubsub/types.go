@@ -46,7 +46,6 @@ type Message struct {
 	Sequence uint64
 }
 
-
 // TopicScoreParams allows configuration of topic-specific scoring parameters
 // These parameters are used by the gossipsub protocol to score peers based on their behavior
 type TopicScoreParams struct {
@@ -84,7 +83,6 @@ func DefaultTopicScoreParams() *TopicScoreParams {
 		InvalidMessageDeliveriesDecay:  0.99,
 	}
 }
-
 
 // PeerScoreSnapshot represents a peer's current score across all topics
 type PeerScoreSnapshot struct {

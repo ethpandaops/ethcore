@@ -38,7 +38,7 @@ func TestAttestationProcessorAllPossibleTopics(t *testing.T) {
 
 	topics := processor.AllPossibleTopics()
 	assert.Len(t, topics, AttestationSubnetCount)
-	
+
 	// Verify all topics are unique and properly formatted
 	seen := make(map[string]bool)
 	for i, topic := range topics {
@@ -193,7 +193,7 @@ func TestAttestationProcessorValidate(t *testing.T) {
 			}
 
 			result, err := processor.Validate(context.Background(), tt.topic, attestation, "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf")
-			
+
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {
@@ -283,7 +283,7 @@ func TestAttestationProcessorProcess(t *testing.T) {
 			}
 
 			err := processor.Process(context.Background(), tt.topic, attestation, "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf")
-			
+
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {
@@ -315,11 +315,11 @@ func TestAttestationProcessorSubscribeUnsubscribe(t *testing.T) {
 	// Restore gossipsub for unsubscribe test
 	processor.gossipsub = mockGS
 	processor.subnets = []uint64{1, 2, 3}
-	
+
 	// Test unsubscribe
 	err = processor.Unsubscribe(context.Background(), []uint64{1, 2})
 	assert.NoError(t, err) // Unsubscribe returns nil even if gossipsub.Unsubscribe fails (it just logs errors)
-	
+
 	// Test unsubscribe with no gossipsub
 	processor.gossipsub = nil
 	err = processor.Unsubscribe(context.Background(), []uint64{1})
@@ -392,7 +392,7 @@ func TestAttestationProcessorGetActiveSubnets(t *testing.T) {
 
 	active := processor.GetActiveSubnets()
 	assert.Equal(t, []uint64{10, 20, 30}, active)
-	
+
 	// Verify it's a copy
 	active[0] = 999
 	assert.Equal(t, uint64(10), processor.subnets[0])

@@ -89,7 +89,7 @@ func TestBeaconBlockProcessorDecode(t *testing.T) {
 					DepositCount: 100,
 					BlockHash:    make([]byte, 32),
 				},
-				Graffiti:     make([]byte, 32),
+				Graffiti: make([]byte, 32),
 			},
 		},
 		Signature: make([]byte, 96),
@@ -114,10 +114,10 @@ func TestBeaconBlockProcessorDecode(t *testing.T) {
 
 func TestBeaconBlockProcessorValidate(t *testing.T) {
 	tests := []struct {
-		name             string
-		setupValidator   func() func(context.Context, *pb.SignedBeaconBlock) (pubsub.ValidationResult, error)
-		expectedResult   pubsub.ValidationResult
-		expectError      bool
+		name           string
+		setupValidator func() func(context.Context, *pb.SignedBeaconBlock) (pubsub.ValidationResult, error)
+		expectedResult pubsub.ValidationResult
+		expectError    bool
 	}{
 		{
 			name: "successful validation",
@@ -173,18 +173,18 @@ func TestBeaconBlockProcessorValidate(t *testing.T) {
 					Body: &pb.BeaconBlockBody{
 						RandaoReveal: make([]byte, 96),
 						Eth1Data: &pb.Eth1Data{
-					DepositRoot:  make([]byte, 32),
-					DepositCount: 100,
-					BlockHash:    make([]byte, 32),
-				},
-						Graffiti:     make([]byte, 32),
+							DepositRoot:  make([]byte, 32),
+							DepositCount: 100,
+							BlockHash:    make([]byte, 32),
+						},
+						Graffiti: make([]byte, 32),
 					},
 				},
 				Signature: make([]byte, 96),
 			}
 
 			result, err := processor.Validate(context.Background(), block, "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf")
-			
+
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {
@@ -197,9 +197,9 @@ func TestBeaconBlockProcessorValidate(t *testing.T) {
 
 func TestBeaconBlockProcessorProcess(t *testing.T) {
 	tests := []struct {
-		name          string
-		setupHandler  func() func(context.Context, *pb.SignedBeaconBlock, peer.ID) error
-		expectError   bool
+		name         string
+		setupHandler func() func(context.Context, *pb.SignedBeaconBlock, peer.ID) error
+		expectError  bool
 	}{
 		{
 			name: "successful processing",
@@ -242,18 +242,18 @@ func TestBeaconBlockProcessorProcess(t *testing.T) {
 					Body: &pb.BeaconBlockBody{
 						RandaoReveal: make([]byte, 96),
 						Eth1Data: &pb.Eth1Data{
-					DepositRoot:  make([]byte, 32),
-					DepositCount: 100,
-					BlockHash:    make([]byte, 32),
-				},
-						Graffiti:     make([]byte, 32),
+							DepositRoot:  make([]byte, 32),
+							DepositCount: 100,
+							BlockHash:    make([]byte, 32),
+						},
+						Graffiti: make([]byte, 32),
 					},
 				},
 				Signature: make([]byte, 96),
 			}
 
 			err := processor.Process(context.Background(), block, "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf")
-			
+
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {
@@ -305,7 +305,7 @@ func TestBeaconBlockProcessorWithNilFields(t *testing.T) {
 					DepositCount: 100,
 					BlockHash:    make([]byte, 32),
 				},
-				Graffiti:     make([]byte, 32),
+				Graffiti: make([]byte, 32),
 			},
 		},
 		Signature: make([]byte, 96),

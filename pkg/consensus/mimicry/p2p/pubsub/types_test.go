@@ -45,15 +45,15 @@ func TestMessage(t *testing.T) {
 
 func TestTopicScoreParams(t *testing.T) {
 	params := &TopicScoreParams{
-		TopicWeight:                     0.5,
-		TimeInMeshWeight:                0.1,
-		TimeInMeshQuantum:               time.Second,
-		TimeInMeshCap:                   10.0,
-		FirstMessageDeliveriesWeight:    1.0,
-		FirstMessageDeliveriesDecay:     0.9,
-		FirstMessageDeliveriesCap:       100.0,
-		InvalidMessageDeliveriesWeight:  -2.0,
-		InvalidMessageDeliveriesDecay:   0.9,
+		TopicWeight:                    0.5,
+		TimeInMeshWeight:               0.1,
+		TimeInMeshQuantum:              time.Second,
+		TimeInMeshCap:                  10.0,
+		FirstMessageDeliveriesWeight:   1.0,
+		FirstMessageDeliveriesDecay:    0.9,
+		FirstMessageDeliveriesCap:      100.0,
+		InvalidMessageDeliveriesWeight: -2.0,
+		InvalidMessageDeliveriesDecay:  0.9,
 	}
 
 	// Test all fields are set correctly
@@ -70,7 +70,7 @@ func TestTopicScoreParams(t *testing.T) {
 
 func TestDefaultTopicScoreParams(t *testing.T) {
 	defaults := DefaultTopicScoreParams()
-	
+
 	assert.NotNil(t, defaults)
 	assert.Greater(t, defaults.TopicWeight, 0.0)
 	assert.Greater(t, defaults.TimeInMeshWeight, 0.0)
@@ -86,12 +86,12 @@ func TestDefaultTopicScoreParams(t *testing.T) {
 func TestPeerScoreSnapshot(t *testing.T) {
 	peerID := peer.ID("test-peer")
 	snapshot := PeerScoreSnapshot{
-		PeerID:      peerID,
-		Score:       0.8,
-		Topics:      map[string]float64{"topic1": 0.5, "topic2": 0.3},
-		AppSpecific: 0.9,
+		PeerID:       peerID,
+		Score:        0.8,
+		Topics:       map[string]float64{"topic1": 0.5, "topic2": 0.3},
+		AppSpecific:  0.9,
 		IPColocation: -0.1,
-		Behavioural: -0.2,
+		Behavioural:  -0.2,
 	}
 
 	assert.Equal(t, peerID, snapshot.PeerID)

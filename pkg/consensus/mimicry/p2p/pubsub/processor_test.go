@@ -21,16 +21,16 @@ import (
 // mockProcessor implements the Processor interface for testing
 type mockProcessor struct {
 	topic string
-	
+
 	// Test control fields
-	decodeError      error
-	validateError    error
-	processError     error
-	decodeResult     string
-	validateResult   ValidationResult
-	processingDelay  time.Duration
-	scoreParams      *TopicScoreParams
-	
+	decodeError     error
+	validateError   error
+	processError    error
+	decodeResult    string
+	validateResult  ValidationResult
+	processingDelay time.Duration
+	scoreParams     *TopicScoreParams
+
 	// Call tracking
 	decodeCalls   int32
 	validateCalls int32
@@ -52,25 +52,25 @@ func (m *mockProcessor) Topic() string {
 
 func (m *mockProcessor) Decode(ctx context.Context, data []byte) (string, error) {
 	atomic.AddInt32(&m.decodeCalls, 1)
-	
+
 	if m.decodeError != nil {
 		return "", m.decodeError
 	}
-	
+
 	if m.decodeResult != "" {
 		return m.decodeResult, nil
 	}
-	
+
 	return string(data), nil
 }
 
 func (m *mockProcessor) Validate(ctx context.Context, msg string, from string) (ValidationResult, error) {
 	atomic.AddInt32(&m.validateCalls, 1)
-	
+
 	if m.validateError != nil {
 		return ValidationReject, m.validateError
 	}
-	
+
 	// Default behavior based on message content
 	if msg == "invalid" {
 		return ValidationReject, nil
@@ -78,13 +78,13 @@ func (m *mockProcessor) Validate(ctx context.Context, msg string, from string) (
 	if msg == "ignore" {
 		return ValidationIgnore, nil
 	}
-	
+
 	return m.validateResult, nil
 }
 
 func (m *mockProcessor) Process(ctx context.Context, msg string, from string) error {
 	atomic.AddInt32(&m.processCalls, 1)
-	
+
 	if m.processingDelay > 0 {
 		select {
 		case <-time.After(m.processingDelay):
@@ -92,7 +92,7 @@ func (m *mockProcessor) Process(ctx context.Context, msg string, from string) er
 			return ctx.Err()
 		}
 	}
-	
+
 	return m.processError
 }
 
@@ -180,15 +180,15 @@ func (m *mockProcessor) reset() {
 // mockMultiProcessor implements the MultiProcessor interface for testing
 type mockMultiProcessor struct {
 	topics []string
-	
+
 	// Test control fields
-	decodeErrors   map[string]error
-	validateErrors map[string]error
-	processErrors  map[string]error
-	validateResult ValidationResult
+	decodeErrors    map[string]error
+	validateErrors  map[string]error
+	processErrors   map[string]error
+	validateResult  ValidationResult
 	processingDelay time.Duration
-	scoreParams    map[string]*TopicScoreParams
-	
+	scoreParams     map[string]*TopicScoreParams
+
 	// Call tracking
 	decodeCalls   map[string]int32
 	validateCalls map[string]int32
@@ -219,11 +219,11 @@ func (m *mockMultiProcessor) Decode(ctx context.Context, topic string, data []by
 	m.decodeCalls[topic]++
 	decodeError := m.decodeErrors[topic]
 	m.mu.Unlock()
-	
+
 	if decodeError != nil {
 		return "", decodeError
 	}
-	
+
 	return string(data), nil
 }
 
@@ -233,16 +233,16 @@ func (m *mockMultiProcessor) Validate(ctx context.Context, topic string, msg str
 	validateError := m.validateErrors[topic]
 	result := m.validateResult
 	m.mu.Unlock()
-	
+
 	if validateError != nil {
 		return ValidationReject, validateError
 	}
-	
+
 	// Default behavior based on message content
 	if msg == "invalid" {
 		return ValidationReject, nil
 	}
-	
+
 	return result, nil
 }
 
@@ -252,7 +252,7 @@ func (m *mockMultiProcessor) Process(ctx context.Context, topic string, msg stri
 	processError := m.processErrors[topic]
 	delay := m.processingDelay
 	m.mu.Unlock()
-	
+
 	if delay > 0 {
 		select {
 		case <-time.After(delay):
@@ -260,7 +260,7 @@ func (m *mockMultiProcessor) Process(ctx context.Context, topic string, msg stri
 			return ctx.Err()
 		}
 	}
-	
+
 	return processError
 }
 
@@ -357,7 +357,6 @@ func (m *mockMultiProcessor) reset() {
 	m.processingDelay = 0
 }
 
-
 func TestProcessorInterface(t *testing.T) {
 	processor := newMockProcessor("test-topic")
 
@@ -386,7 +385,7 @@ func TestProcessorInterface(t *testing.T) {
 
 	err = processor.Process(ctx, "test message", "peer1")
 	assert.NoError(t, err)
-	
+
 	// Test call tracking
 	assert.Equal(t, int32(1), processor.getDecodeCalls())
 	assert.Equal(t, int32(3), processor.getValidateCalls())
@@ -418,12 +417,12 @@ func TestMultiProcessorInterface(t *testing.T) {
 
 	err = processor.Process(ctx, "topic1", "test message", "peer1")
 	assert.NoError(t, err)
-	
+
 	// Test call tracking
 	assert.Equal(t, int32(1), processor.getDecodeCalls("topic1"))
 	assert.Equal(t, int32(2), processor.getValidateCalls("topic1"))
 	assert.Equal(t, int32(1), processor.getProcessCalls("topic1"))
-	
+
 	// Test that other topics weren't affected
 	assert.Equal(t, int32(0), processor.getDecodeCalls("topic2"))
 	assert.Equal(t, int32(0), processor.getValidateCalls("topic2"))
@@ -592,11 +591,11 @@ func TestProcessorMessageHandling(t *testing.T) {
 	// Test error handling in the pipeline
 	t.Run("error_handling", func(t *testing.T) {
 		tests := []struct {
-			name           string
-			setupProcessor func(*mockProcessor)
-			expectDecodeError    bool
-			expectValidateError  bool
-			expectProcessError   bool
+			name                string
+			setupProcessor      func(*mockProcessor)
+			expectDecodeError   bool
+			expectValidateError bool
+			expectProcessError  bool
 		}{
 			{
 				name: "decode_error",
@@ -625,7 +624,7 @@ func TestProcessorMessageHandling(t *testing.T) {
 			t.Run(tt.name, func(t *testing.T) {
 				processor := newMockProcessor("test-topic")
 				tt.setupProcessor(processor)
-				
+
 				ctx := context.Background()
 				testPeer := "test-peer"
 				testData := []byte("test message")
@@ -767,7 +766,7 @@ func TestMultiProcessor(t *testing.T) {
 	// Test topic-specific errors
 	t.Run("topic_specific_errors", func(t *testing.T) {
 		processor.reset()
-		
+
 		// Set error only for topic1
 		processor.setDecodeError("topic1", errors.New("topic1 decode error"))
 		processor.setValidateError("topic2", errors.New("topic2 validate error"))
@@ -821,10 +820,10 @@ func TestProcessorMetricsRaceConditions(t *testing.T) {
 			go func(id int) {
 				defer wg.Done()
 				topic := fmt.Sprintf("topic-%d", id%3) // Use 3 topics
-				
+
 				for j := 0; j < numOperations; j++ {
 					metrics.RecordMessage()
-					
+
 					if j%2 == 0 {
 						metrics.RecordValidationResult(ValidationAccept)
 						metrics.RecordProcessed()
@@ -833,11 +832,11 @@ func TestProcessorMetricsRaceConditions(t *testing.T) {
 						metrics.RecordValidationResult(ValidationReject)
 						metrics.RecordValidationError()
 					}
-					
+
 					// Access topic metrics concurrently
 					topicMetrics := metrics.GetTopicMetrics(topic)
 					topicMetrics.RecordMessage()
-					
+
 					// Randomly record other errors
 					if j%5 == 0 {
 						metrics.RecordDecodingError()
@@ -855,7 +854,7 @@ func TestProcessorMetricsRaceConditions(t *testing.T) {
 		stats := metrics.GetStats()
 		assert.Equal(t, uint64(numGoroutines*numOperations), stats.MessagesReceived)
 		assert.Equal(t, 3, stats.TopicCount) // Should have 3 topics
-		
+
 		// Verify counts add up correctly
 		totalValidations := stats.MessagesAccepted + stats.MessagesRejected
 		assert.Equal(t, uint64(numGoroutines*numOperations), totalValidations)
@@ -873,16 +872,16 @@ func TestProcessorMetricsRaceConditions(t *testing.T) {
 		for i := 0; i < numGoroutines; i++ {
 			go func(id int) {
 				defer wg.Done()
-				
+
 				// Each goroutine gets its own metrics instance
 				metrics := NewProcessorMetrics(log)
-				
+
 				for j := 0; j < numOperations; j++ {
 					metrics.RecordMessage()
 					metrics.RecordProcessed()
 					metrics.RecordValidationResult(ValidationResult(j % 3))
 				}
-				
+
 				results[id] = metrics.GetStats()
 			}(i)
 		}
@@ -900,24 +899,24 @@ func TestProcessorMetricsRaceConditions(t *testing.T) {
 // TestProcessorContextHandling tests context cancellation handling
 func TestProcessorContextHandling(t *testing.T) {
 	processor := newMockProcessor("test-topic")
-	
+
 	// Set processing delay to test cancellation
 	processor.setProcessingDelay(200 * time.Millisecond)
-	
+
 	// Create a context that will be cancelled
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	// Start processing in a goroutine
 	done := make(chan error, 1)
 	go func() {
 		err := processor.Process(ctx, "slow message", "test-peer")
 		done <- err
 	}()
-	
+
 	// Cancel the context after a short delay
 	time.Sleep(50 * time.Millisecond)
 	cancel()
-	
+
 	// Wait for the result
 	select {
 	case err := <-done:
@@ -945,16 +944,16 @@ func TestProcessorValidatorFunction(t *testing.T) {
 		emitter:   emitter,
 		log:       log,
 	}
-	
+
 	validator := ps.createValidator()
 
 	ctx := context.Background()
 	testPeer, _ := peer.Decode("12D3KooWTest")
 
 	tests := []struct {
-		name         string
-		data         []byte
-		setupProc    func(*mockProcessor)
+		name           string
+		data           []byte
+		setupProc      func(*mockProcessor)
 		expectedResult pubsub.ValidationResult
 	}{
 		{

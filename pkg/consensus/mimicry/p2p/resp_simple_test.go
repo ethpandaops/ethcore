@@ -14,24 +14,24 @@ import (
 func TestReqRespStructure(t *testing.T) {
 	log := logrus.New()
 	log.SetLevel(logrus.ErrorLevel)
-	
+
 	h, err := libp2p.New(libp2p.ListenAddrStrings("/ip4/127.0.0.1/tcp/0"))
 	require.NoError(t, err)
 	defer h.Close()
-	
+
 	config := &ReqRespConfig{
 		WriteTimeout:    5 * time.Second,
 		ReadTimeout:     5 * time.Second,
 		TimeToFirstByte: 500 * time.Millisecond,
 	}
-	
+
 	r := &ReqResp{
 		log:     log,
 		host:    h,
 		encoder: encoder.SszNetworkEncoder{},
 		config:  config,
 	}
-	
+
 	// Test basic structure
 	assert.NotNil(t, r.log)
 	assert.NotNil(t, r.host)
@@ -46,7 +46,7 @@ func TestReqRespConfig(t *testing.T) {
 		ReadTimeout:     2 * time.Second,
 		TimeToFirstByte: 500 * time.Millisecond,
 	}
-	
+
 	assert.Equal(t, 1*time.Second, config.WriteTimeout)
 	assert.Equal(t, 2*time.Second, config.ReadTimeout)
 	assert.Equal(t, 500*time.Millisecond, config.TimeToFirstByte)

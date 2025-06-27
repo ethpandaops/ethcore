@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/OffchainLabs/prysm/v6/beacon-chain/p2p/encoder"
-		"github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -20,19 +20,19 @@ import (
 func TestNewReqResp(t *testing.T) {
 	log := logrus.New()
 	log.SetLevel(logrus.ErrorLevel)
-	
+
 	h, err := libp2p.New(libp2p.ListenAddrStrings("/ip4/127.0.0.1/tcp/0"))
 	require.NoError(t, err)
 	defer h.Close()
-	
+
 	config := &ReqRespConfig{
 		WriteTimeout:    5 * time.Second,
 		ReadTimeout:     5 * time.Second,
 		TimeToFirstByte: 500 * time.Millisecond,
 	}
-	
+
 	r := NewReqResp(log, h, encoder.SszNetworkEncoder{}, config)
-	
+
 	assert.NotNil(t, r)
 	assert.Equal(t, h, r.host)
 	assert.NotNil(t, r.encoder)
@@ -44,7 +44,7 @@ func TestSupportedProtocols(t *testing.T) {
 	r := &ReqResp{
 		protocols: []protocol.ID{"/test/1", "/test/2"},
 	}
-	
+
 	protocols := r.SupportedProtocols()
 	assert.Equal(t, []protocol.ID{"/test/1", "/test/2"}, protocols)
 }
@@ -52,19 +52,19 @@ func TestSupportedProtocols(t *testing.T) {
 func TestRegisterHandler(t *testing.T) {
 	log := logrus.New()
 	log.SetLevel(logrus.ErrorLevel)
-	
+
 	h, err := libp2p.New(libp2p.ListenAddrStrings("/ip4/127.0.0.1/tcp/0"))
 	require.NoError(t, err)
 	defer h.Close()
-	
+
 	config := &ReqRespConfig{
 		WriteTimeout:    5 * time.Second,
 		ReadTimeout:     5 * time.Second,
 		TimeToFirstByte: 500 * time.Millisecond,
 	}
-	
+
 	r := NewReqResp(log, h, encoder.SszNetworkEncoder{}, config)
-	
+
 	tests := []struct {
 		name        string
 		protocol    protocol.ID
@@ -98,12 +98,12 @@ func TestRegisterHandler(t *testing.T) {
 			expectError: false,
 		},
 	}
-	
+
 	ctx := context.Background()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := r.RegisterHandler(ctx, tt.protocol, tt.handler)
-			
+
 			if tt.expectError {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errorMsg)
@@ -115,7 +115,7 @@ func TestRegisterHandler(t *testing.T) {
 	}
 }
 
-// mockHost implements a minimal host.Host for testing
+// mockHost implements a minimal host.Host for testing.
 type mockHost struct {
 	host.Host
 	streamHandlers map[protocol.ID]network.StreamHandler
@@ -138,27 +138,27 @@ func (m *mockHost) NewStream(ctx context.Context, p peer.ID, pids ...protocol.ID
 func TestWrapper(t *testing.T) {
 	log := logrus.New()
 	log.SetLevel(logrus.ErrorLevel)
-	
+
 	h := newMockHost()
-	
+
 	config := &ReqRespConfig{
 		WriteTimeout:    5 * time.Second,
 		ReadTimeout:     5 * time.Second,
 		TimeToFirstByte: 500 * time.Millisecond,
 	}
-	
+
 	r := &ReqResp{
 		log:    log,
 		host:   h,
 		config: config,
 	}
-	
+
 	handler := func(ctx context.Context, stream network.Stream) error {
 		return nil
 	}
-	
+
 	wrapped := r.wrapper(context.Background(), handler)
-	
+
 	// Test wrapper functionality by ensuring it doesn't panic
 	// The wrapper function should return a valid StreamHandler
 	assert.NotNil(t, wrapped)

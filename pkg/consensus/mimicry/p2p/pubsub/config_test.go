@@ -111,13 +111,13 @@ func TestConfigCopy(t *testing.T) {
 
 func TestNewConfigWithCustomGossipSub(t *testing.T) {
 	cfg := NewConfigWithCustomGossipSub()
-	
+
 	// Should have default values
 	assert.Equal(t, 10<<20, cfg.MaxMessageSize)
 	assert.Equal(t, 100, cfg.ValidationBufferSize)
 	assert.Equal(t, 10, cfg.ValidationConcurrency)
 	assert.Equal(t, 5*time.Second, cfg.PublishTimeout)
-	
+
 	// Should have GossipSubParams set
 	assert.NotNil(t, cfg.GossipSubParams)
 }

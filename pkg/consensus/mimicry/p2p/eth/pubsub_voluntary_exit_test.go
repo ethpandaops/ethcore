@@ -137,7 +137,7 @@ func TestVoluntaryExitProcessorValidate(t *testing.T) {
 			}
 
 			result, err := processor.Validate(context.Background(), voluntaryExit, "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf")
-			
+
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {
@@ -195,7 +195,7 @@ func TestVoluntaryExitProcessorProcess(t *testing.T) {
 			}
 
 			err := processor.Process(context.Background(), voluntaryExit, "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf")
-			
+
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {
