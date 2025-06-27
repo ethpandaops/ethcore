@@ -49,7 +49,7 @@ func NewBeaconNode(
 	metadata := services.NewMetadataService(log, node, config.NetworkOverride)
 
 	return &BeaconNode{
-		log:         log,
+		log:         log.WithField("module", "ethcore/ethereum/beacon"),
 		config:      config,
 		beacon:      node,
 		metadataSvc: &metadata,

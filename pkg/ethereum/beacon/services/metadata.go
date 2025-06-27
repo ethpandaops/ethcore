@@ -39,7 +39,7 @@ func NewMetadataService(log logrus.FieldLogger, sbeacon beacon.Node, networkOver
 	return MetadataService{
 		beacon:           sbeacon,
 		log:              log.WithField("module", "ethcore/ethereum/beacon/metadata"),
-		Network:          &networks.Network{Name: networks.NetworkNameHoodi},
+		Network:          &networks.Network{Name: networks.NetworkNameNone},
 		onReadyCallbacks: []func(context.Context) error{},
 		networkOverride:  networkOverride,
 	}

@@ -108,6 +108,7 @@ func (c *Crawler) Start(ctx context.Context) error {
 
 	// Create the beacon node
 	opts := beacon.DefaultOptions()
+	opts = opts.DisablePrometheusMetrics()
 
 	opts.HealthCheck.Interval.Duration = time.Second * 3
 	opts.HealthCheck.SuccessfulResponses = 1
@@ -117,7 +118,7 @@ func (c *Crawler) Start(ctx context.Context) error {
 
 	b, err := ethereum.NewBeaconNode(
 		c.log,
-		"ethcore/ethereum/consensus/mimicry/crawler",
+		"ethcore/crawler",
 		c.config.Beacon,
 		*opts,
 	)
