@@ -235,7 +235,7 @@ func TestMetricsRecordDurations(t *testing.T) {
 	if h, ok := handlerObserver.(interface {
 		Write(*dto.Metric) error
 	}); ok {
-		err = h.Write(handlerHistMetric)
+		err := h.Write(handlerHistMetric)
 		require.NoError(t, err)
 	}
 	assert.Equal(t, uint64(3), *handlerHistMetric.Histogram.SampleCount)
@@ -247,10 +247,13 @@ func TestMetricsRecordDurations(t *testing.T) {
 
 	// Check publish histogram
 	pubHistMetric := &dto.Metric{}
-	err = metrics.PublishDuration.WithLabelValues(topic).(interface {
+	pubObserver := metrics.PublishDuration.WithLabelValues(topic)
+	if h, ok := pubObserver.(interface {
 		Write(*dto.Metric) error
-	}).Write(pubHistMetric)
-	require.NoError(t, err)
+	}); ok {
+		err := h.Write(pubHistMetric)
+		require.NoError(t, err)
+	}
 	assert.Equal(t, uint64(3), *pubHistMetric.Histogram.SampleCount)
 }
 
