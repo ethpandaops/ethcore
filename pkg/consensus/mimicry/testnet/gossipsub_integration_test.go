@@ -12,7 +12,6 @@
 //   - AttestationPropagation: Tests attestation propagation across subnet topics
 //   - MultipleTopicHandling: Tests concurrent handling of multiple Ethereum message types
 //   - MessageValidation: Tests custom validation rules and message rejection
-//   - PeerScoring: Tests peer scoring configuration and score retrieval
 //   - ConcurrentOperations: Tests thread safety under concurrent publishing and subscribing
 //
 // TestGossipsubPerformance includes performance and scalability tests:
@@ -30,7 +29,6 @@
 //   - Test timeout: 30 seconds per test (configurable via testTimeout)
 //   - Performance tests: 1000 messages with 60-second timeout
 //   - Message validation: Custom validators that reject specific message patterns
-//   - Peer scoring: Default scoring parameters with topic-specific weights
 //
 // Usage:
 //   - Run with -short flag to skip integration tests during regular development
@@ -69,7 +67,7 @@ import (
 )
 
 const (
-	// Test network configuration
+	// Test network configuration.
 	testNetworkSize       = 5
 	testMessageCount      = 100
 	testConcurrentWorkers = 10
@@ -77,7 +75,7 @@ const (
 	testMessageTimeout    = 5 * time.Second
 	networkSetupTimeout   = 10 * time.Second
 
-	// Performance test parameters
+	// Performance test parameters.
 	performanceMessageCount = 1000
 	performanceTimeout      = 60 * time.Second
 	maxLatencyThreshold     = 100 * time.Millisecond
@@ -85,28 +83,29 @@ const (
 )
 
 var (
-	// Test fork digest for Ethereum mainnet
+	// Test fork digest for Ethereum mainnet.
 	testForkDigest = [4]byte{0x01, 0x02, 0x03, 0x04}
 )
 
-// TestNetwork represents a test gossipsub network
+// TestNetwork represents a test gossipsub network.
 type TestNetwork struct {
 	hosts       []host.Host
 	gossipsubs  []*pubsub.Gossipsub
-	ethWrappers []*eth.Gossipsub
+	ethWrappers []*eth.BeaconchainGossipsub
 	encoder     encoder.SszNetworkEncoder
 	logger      logrus.FieldLogger
 	cancel      context.CancelFunc
 }
 
-// createTestLogger creates a logger for testing with appropriate level
+// createTestLogger creates a logger for testing with appropriate level.
 func createTestLogger() logrus.FieldLogger {
 	logger := logrus.New()
 	logger.SetLevel(logrus.InfoLevel) // Set to info to see test progress
+
 	return logger.WithField("component", "gossipsub_integration_test")
 }
 
-// createTestHost creates a libp2p host for testing
+// createTestHost creates a libp2p host for testing.
 func createTestHost(t *testing.T) host.Host {
 	t.Helper()
 	h, err := libp2p.New(
@@ -115,15 +114,18 @@ func createTestHost(t *testing.T) host.Host {
 	)
 	require.NoError(t, err)
 	t.Cleanup(func() { h.Close() })
+
 	return h
 }
 
-// createTestEncoder creates an SSZ encoder for testing
+// createTestEncoder creates an SSZ encoder for testing.
 func createTestEncoder() encoder.SszNetworkEncoder {
 	return encoder.SszNetworkEncoder{}
 }
 
 // setupTestNetwork creates a test network with the specified number of nodes
+// Note: This creates gossipsub instances but does NOT start them. Processors must be
+// registered before calling Start() on the gossipsub instances.
 func setupTestNetwork(t *testing.T, nodeCount int) *TestNetwork {
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
@@ -147,30 +149,21 @@ func setupTestNetwork(t *testing.T, nodeCount int) *TestNetwork {
 		}
 	}
 
-	// Create gossipsub instances
+	// Create gossipsub instances (but don't start them yet)
 	gossipsubs := make([]*pubsub.Gossipsub, nodeCount)
-	ethWrappers := make([]*eth.Gossipsub, nodeCount)
+	ethWrappers := make([]*eth.BeaconchainGossipsub, nodeCount)
 
 	for i := 0; i < nodeCount; i++ {
 		config := pubsub.DefaultConfig()
-		config.EnablePeerScoring = true
 		config.ValidationConcurrency = 2
 		config.ValidationBufferSize = 100
 
 		gs, err := pubsub.NewGossipsub(logger, hosts[i], config)
 		require.NoError(t, err)
 
-		// Use a separate context for gossipsub that won't be cancelled during test cleanup
-		gsCtx := context.Background()
-		err = gs.Start(gsCtx)
-		require.NoError(t, err)
-
 		gossipsubs[i] = gs
-		ethWrappers[i] = eth.NewGossipsub(logger, gs, testForkDigest, enc)
+		ethWrappers[i] = eth.NewBeaconchainGossipsub(gs, testForkDigest, enc, logger)
 	}
-
-	// Wait for network to stabilize
-	time.Sleep(2 * time.Second)
 
 	network := &TestNetwork{
 		hosts:       hosts,
@@ -188,7 +181,7 @@ func setupTestNetwork(t *testing.T, nodeCount int) *TestNetwork {
 	return network
 }
 
-// Cleanup cleans up the test network
+// Cleanup cleans up the test network.
 func (tn *TestNetwork) Cleanup() {
 	tn.cancel()
 
@@ -207,7 +200,7 @@ func (tn *TestNetwork) Cleanup() {
 	}
 }
 
-// createTestBeaconBlock creates a test beacon block for publishing
+// createTestBeaconBlock creates a test beacon block for publishing.
 func createTestBeaconBlock(slot uint64) *pb.SignedBeaconBlock {
 	return &pb.SignedBeaconBlock{
 		Block: &pb.BeaconBlock{
@@ -234,7 +227,7 @@ func createTestBeaconBlock(slot uint64) *pb.SignedBeaconBlock {
 	}
 }
 
-// createTestAttestation creates a test attestation for publishing
+// createTestAttestation creates a test attestation for publishing.
 func createTestAttestation(slot uint64, committeeIndex uint64) *pb.Attestation {
 	return &pb.Attestation{
 		AggregationBits: []byte{0xFF, 0xFF, 0xFF, 0xFF},
@@ -255,55 +248,116 @@ func createTestAttestation(slot uint64, committeeIndex uint64) *pb.Attestation {
 	}
 }
 
-// TestGossipsubIntegration tests comprehensive gossipsub functionality across multiple nodes
+// simpleTestProcessor implements a basic processor for testing generic topics.
+type simpleTestProcessor struct {
+	topic       string
+	handler     func(context.Context, []byte, peer.ID) error
+	gossipsub   *pubsub.Gossipsub
+	scoreParams *pubsub.TopicScoreParams
+}
+
+func (p *simpleTestProcessor) Topic() string {
+	return p.topic
+}
+
+func (p *simpleTestProcessor) AllPossibleTopics() []string {
+	return []string{p.topic}
+}
+
+func (p *simpleTestProcessor) GetTopicScoreParams() *pubsub.TopicScoreParams {
+	return p.scoreParams
+}
+func (p *simpleTestProcessor) Decode(ctx context.Context, data []byte) ([]byte, error) {
+	return data, nil
+}
+func (p *simpleTestProcessor) Validate(ctx context.Context, msg []byte, from string) (pubsub.ValidationResult, error) {
+	return pubsub.ValidationAccept, nil
+}
+func (p *simpleTestProcessor) Process(ctx context.Context, msg []byte, from string) error {
+	fromPeer, err := peer.Decode(from)
+	if err != nil {
+		return err
+	}
+
+	return p.handler(ctx, msg, fromPeer)
+}
+func (p *simpleTestProcessor) Subscribe(ctx context.Context) error {
+	if p.gossipsub == nil {
+		return fmt.Errorf("gossipsub reference not set")
+	}
+
+	return p.gossipsub.SubscribeToProcessorTopic(ctx, p.topic)
+}
+func (p *simpleTestProcessor) Unsubscribe(ctx context.Context) error {
+	if p.gossipsub == nil {
+		return fmt.Errorf("gossipsub reference not set")
+	}
+
+	return p.gossipsub.Unsubscribe(p.topic)
+}
+
+// TestGossipsubIntegration tests comprehensive gossipsub functionality across multiple nodes.
 func TestGossipsubIntegration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
 
-	network := setupTestNetwork(t, testNetworkSize)
-
 	t.Run("NetworkTopology", func(t *testing.T) {
-		// Verify all nodes are connected
-		for i, host := range network.hosts {
-			peers := host.Network().Peers()
-			assert.GreaterOrEqual(t, len(peers), testNetworkSize-2,
-				"Node %d should be connected to at least %d peers", i, testNetworkSize-2)
-		}
+		testNetworkTopology(t)
 	})
 
 	t.Run("BasicSubscriptionAndPublishing", func(t *testing.T) {
-		testBasicSubscriptionAndPublishing(t, network)
+		testBasicSubscriptionAndPublishing(t)
 	})
 
 	t.Run("BeaconBlockPropagation", func(t *testing.T) {
-		testBeaconBlockPropagation(t, network)
+		testBeaconBlockPropagation(t)
 	})
 
 	t.Run("AttestationPropagation", func(t *testing.T) {
-		testAttestationPropagation(t, network)
+		testAttestationPropagation(t)
 	})
 
 	t.Run("MultipleTopicHandling", func(t *testing.T) {
-		testMultipleTopicHandling(t, network)
+		testMultipleTopicHandling(t)
 	})
 
 	t.Run("MessageValidation", func(t *testing.T) {
-		testMessageValidation(t, network)
-	})
-
-	t.Run("PeerScoring", func(t *testing.T) {
-		testPeerScoring(t, network)
+		testMessageValidation(t)
 	})
 
 	t.Run("ConcurrentOperations", func(t *testing.T) {
-		testConcurrentOperations(t, network)
+		testConcurrentOperations(t)
 	})
 }
 
-// testBasicSubscriptionAndPublishing tests basic gossipsub subscription and publishing
-func testBasicSubscriptionAndPublishing(t *testing.T, network *TestNetwork) {
+// testNetworkTopology tests the basic network topology setup
+func testNetworkTopology(t *testing.T) {
 	t.Helper()
+	network := setupTestNetwork(t, testNetworkSize)
+
+	// Start all gossipsub services (no processors needed for this test)
+	ctx := context.Background()
+	for i, gs := range network.gossipsubs {
+		err := gs.Start(ctx)
+		require.NoError(t, err, "Failed to start gossipsub service %d", i)
+	}
+
+	// Wait for network to stabilize
+	time.Sleep(2 * time.Second)
+
+	// Verify all nodes are connected
+	for i, host := range network.hosts {
+		peers := host.Network().Peers()
+		assert.GreaterOrEqual(t, len(peers), testNetworkSize-2,
+			"Node %d should be connected to at least %d peers", i, testNetworkSize-2)
+	}
+}
+
+// testBasicSubscriptionAndPublishing tests basic gossipsub subscription and publishing
+func testBasicSubscriptionAndPublishing(t *testing.T) {
+	t.Helper()
+	network := setupTestNetwork(t, testNetworkSize)
 	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 	defer cancel()
 
@@ -314,16 +368,41 @@ func testBasicSubscriptionAndPublishing(t *testing.T, network *TestNetwork) {
 	var receivedMessages [][]byte
 	var receivedMutex sync.Mutex
 
-	handler := func(ctx context.Context, msg *pubsub.Message) error {
+	// Create a simple processor for basic testing
+	handler := func(ctx context.Context, msg []byte, from peer.ID) error {
 		receivedMutex.Lock()
-		receivedMessages = append(receivedMessages, msg.Data)
+		receivedMessages = append(receivedMessages, msg)
 		receivedMutex.Unlock()
+
 		return nil
 	}
 
-	// Subscribe all nodes except the first one
+	// Register processors on all nodes except the first one BEFORE starting services
+	processors := make([]*simpleTestProcessor, 0, len(network.gossipsubs)-1)
 	for i := 1; i < len(network.gossipsubs); i++ {
-		err := network.gossipsubs[i].Subscribe(ctx, testTopic, handler)
+		processor := &simpleTestProcessor{
+			topic:     testTopic,
+			handler:   handler,
+			gossipsub: network.gossipsubs[i],
+		}
+		processors = append(processors, processor)
+
+		err := pubsub.RegisterProcessor(network.gossipsubs[i], processor)
+		require.NoError(t, err)
+	}
+
+	// Now start all gossipsub services
+	for i, gs := range network.gossipsubs {
+		err := gs.Start(ctx)
+		require.NoError(t, err, "Failed to start gossipsub service %d", i)
+	}
+
+	// Wait for services to stabilize
+	time.Sleep(2 * time.Second)
+
+	// Subscribe all nodes except the first one
+	for i, processor := range processors {
+		err := pubsub.SubscribeWithProcessor(network.gossipsubs[i+1], ctx, processor)
 		require.NoError(t, err)
 	}
 
@@ -352,8 +431,9 @@ func testBasicSubscriptionAndPublishing(t *testing.T, network *TestNetwork) {
 }
 
 // testBeaconBlockPropagation tests Ethereum beacon block propagation
-func testBeaconBlockPropagation(t *testing.T, network *TestNetwork) {
+func testBeaconBlockPropagation(t *testing.T) {
 	t.Helper()
+	network := setupTestNetwork(t, testNetworkSize)
 	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 	defer cancel()
 
@@ -366,12 +446,32 @@ func testBeaconBlockPropagation(t *testing.T, network *TestNetwork) {
 		receivedBlocks = append(receivedBlocks, block)
 		receivedFromPeers = append(receivedFromPeers, from)
 		receivedMutex.Unlock()
+
 		return nil
 	}
 
-	// Subscribe all nodes except the publisher to beacon blocks
+	// Register beacon block processors on all nodes except the publisher BEFORE starting
 	for i := 1; i < len(network.ethWrappers); i++ {
-		err := network.ethWrappers[i].SubscribeBeaconBlock(ctx, handler)
+		err := network.ethWrappers[i].RegisterBeaconBlock(
+			nil, // No validator
+			handler,
+			nil, // Default score params
+		)
+		require.NoError(t, err)
+	}
+
+	// Now start all gossipsub services
+	for i, gs := range network.gossipsubs {
+		err := gs.Start(ctx)
+		require.NoError(t, err, "Failed to start gossipsub service %d", i)
+	}
+
+	// Wait for services to stabilize
+	time.Sleep(2 * time.Second)
+
+	// Subscribe to beacon blocks
+	for i := 1; i < len(network.ethWrappers); i++ {
+		err := network.ethWrappers[i].SubscribeBeaconBlock(ctx)
 		require.NoError(t, err)
 	}
 
@@ -380,7 +480,12 @@ func testBeaconBlockPropagation(t *testing.T, network *TestNetwork) {
 
 	// Create and publish a test beacon block
 	testBlock := createTestBeaconBlock(12345)
-	err := network.ethWrappers[0].PublishBeaconBlock(ctx, testBlock)
+	// Manually publish the beacon block using the underlying gossipsub
+	topic := eth.BeaconBlockTopic(testForkDigest)
+	var buf bytes.Buffer
+	_, err := network.encoder.EncodeGossip(&buf, testBlock)
+	require.NoError(t, err)
+	err = network.gossipsubs[0].Publish(ctx, topic, buf.Bytes())
 	require.NoError(t, err)
 
 	// Wait for message propagation
@@ -405,8 +510,9 @@ func testBeaconBlockPropagation(t *testing.T, network *TestNetwork) {
 }
 
 // testAttestationPropagation tests attestation propagation on subnets
-func testAttestationPropagation(t *testing.T, network *TestNetwork) {
+func testAttestationPropagation(t *testing.T) {
 	t.Helper()
+	network := setupTestNetwork(t, testNetworkSize)
 	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 	defer cancel()
 
@@ -421,12 +527,33 @@ func testAttestationPropagation(t *testing.T, network *TestNetwork) {
 		receivedMutex.Unlock()
 
 		assert.Equal(t, testSubnet, subnet, "Received attestation should be from the correct subnet")
+
 		return nil
 	}
 
-	// Subscribe all nodes except the publisher to attestations
+	// Register attestation processors BEFORE starting services
 	for i := 1; i < len(network.ethWrappers); i++ {
-		err := network.ethWrappers[i].SubscribeAttestation(ctx, testSubnet, handler)
+		err := network.ethWrappers[i].RegisterAttestation(
+			[]uint64{testSubnet},
+			nil, // No validator
+			handler,
+		)
+		require.NoError(t, err)
+	}
+
+	// Now start all gossipsub services
+	for i, gs := range network.gossipsubs {
+		err := gs.Start(ctx)
+		require.NoError(t, err, "Failed to start gossipsub service %d", i)
+	}
+
+	// Wait for services to stabilize
+	time.Sleep(2 * time.Second)
+
+	// Subscribe to attestations
+	subnetName := fmt.Sprintf("attestation_subnets_%v", []uint64{testSubnet})
+	for i := 1; i < len(network.ethWrappers); i++ {
+		err := network.ethWrappers[i].SubscribeAttestation(ctx, subnetName)
 		require.NoError(t, err)
 	}
 
@@ -436,7 +563,12 @@ func testAttestationPropagation(t *testing.T, network *TestNetwork) {
 	// Create and publish test attestations
 	for slot := uint64(1000); slot < 1005; slot++ {
 		testAttestation := createTestAttestation(slot, 1)
-		err := network.ethWrappers[0].PublishAttestation(ctx, testAttestation, testSubnet)
+		// Manually publish the attestation using the underlying gossipsub
+		topic := eth.AttestationSubnetTopic(testForkDigest, testSubnet)
+		var buf bytes.Buffer
+		_, err := network.encoder.EncodeGossip(&buf, testAttestation)
+		require.NoError(t, err)
+		err = network.gossipsubs[0].Publish(ctx, topic, buf.Bytes())
 		require.NoError(t, err)
 
 		// Small delay between publications
@@ -457,8 +589,9 @@ func testAttestationPropagation(t *testing.T, network *TestNetwork) {
 }
 
 // testMultipleTopicHandling tests handling multiple topics simultaneously
-func testMultipleTopicHandling(t *testing.T, network *TestNetwork) {
+func testMultipleTopicHandling(t *testing.T) {
 	t.Helper()
+	network := setupTestNetwork(t, testNetworkSize)
 	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 	defer cancel()
 
@@ -472,6 +605,7 @@ func testMultipleTopicHandling(t *testing.T, network *TestNetwork) {
 		mutex.Lock()
 		receivedBeaconBlocks++
 		mutex.Unlock()
+
 		return nil
 	}
 
@@ -479,6 +613,7 @@ func testMultipleTopicHandling(t *testing.T, network *TestNetwork) {
 		mutex.Lock()
 		receivedAttestations++
 		mutex.Unlock()
+
 		return nil
 	}
 
@@ -486,18 +621,55 @@ func testMultipleTopicHandling(t *testing.T, network *TestNetwork) {
 		mutex.Lock()
 		receivedVoluntaryExits++
 		mutex.Unlock()
+
 		return nil
 	}
 
-	// Subscribe all nodes except the first to all topics
+	// Register all processors BEFORE starting services
 	for i := 1; i < len(network.ethWrappers); i++ {
-		err := network.ethWrappers[i].SubscribeBeaconBlock(ctx, beaconBlockHandler)
+		// Register beacon block processor
+		err := network.ethWrappers[i].RegisterBeaconBlock(
+			nil, // No validator
+			beaconBlockHandler,
+			nil, // Default score params
+		)
 		require.NoError(t, err)
 
-		err = network.ethWrappers[i].SubscribeAttestation(ctx, 0, attestationHandler)
+		// Register attestation processor
+		err = network.ethWrappers[i].RegisterAttestation(
+			[]uint64{0},
+			nil, // No validator
+			attestationHandler,
+		)
 		require.NoError(t, err)
 
-		err = network.ethWrappers[i].SubscribeVoluntaryExit(ctx, voluntaryExitHandler)
+		// Register voluntary exit processor
+		err = network.ethWrappers[i].RegisterVoluntaryExit(
+			nil, // No validator
+			voluntaryExitHandler,
+		)
+		require.NoError(t, err)
+	}
+
+	// Now start all gossipsub services
+	for i, gs := range network.gossipsubs {
+		err := gs.Start(ctx)
+		require.NoError(t, err, "Failed to start gossipsub service %d", i)
+	}
+
+	// Wait for services to stabilize
+	time.Sleep(2 * time.Second)
+
+	// Subscribe to all topics
+	for i := 1; i < len(network.ethWrappers); i++ {
+		err := network.ethWrappers[i].SubscribeBeaconBlock(ctx)
+		require.NoError(t, err)
+
+		subnetName := fmt.Sprintf("attestation_subnets_%v", []uint64{0})
+		err = network.ethWrappers[i].SubscribeAttestation(ctx, subnetName)
+		require.NoError(t, err)
+
+		err = network.ethWrappers[i].SubscribeVoluntaryExit(ctx)
 		require.NoError(t, err)
 	}
 
@@ -513,7 +685,15 @@ func testMultipleTopicHandling(t *testing.T, network *TestNetwork) {
 		defer wg.Done()
 		for i := 0; i < 5; i++ {
 			block := createTestBeaconBlock(uint64(2000 + i))
-			err := network.ethWrappers[0].PublishBeaconBlock(ctx, block)
+			topic := eth.BeaconBlockTopic(testForkDigest)
+			var buf bytes.Buffer
+			_, err := network.encoder.EncodeGossip(&buf, block)
+			if err != nil {
+				t.Logf("Error encoding beacon block: %v", err)
+
+				continue
+			}
+			err = network.gossipsubs[0].Publish(ctx, topic, buf.Bytes())
 			if err != nil {
 				t.Logf("Error publishing beacon block: %v", err)
 			}
@@ -527,7 +707,15 @@ func testMultipleTopicHandling(t *testing.T, network *TestNetwork) {
 		defer wg.Done()
 		for i := 0; i < 5; i++ {
 			att := createTestAttestation(uint64(2000+i), 0)
-			err := network.ethWrappers[0].PublishAttestation(ctx, att, 0)
+			topic := eth.AttestationSubnetTopic(testForkDigest, 0)
+			var buf bytes.Buffer
+			_, err := network.encoder.EncodeGossip(&buf, att)
+			if err != nil {
+				t.Logf("Error encoding attestation: %v", err)
+
+				continue
+			}
+			err = network.gossipsubs[0].Publish(ctx, topic, buf.Bytes())
 			if err != nil {
 				t.Logf("Error publishing attestation: %v", err)
 			}
@@ -548,11 +736,12 @@ func testMultipleTopicHandling(t *testing.T, network *TestNetwork) {
 				Signature: make([]byte, 96),
 			}
 
-			topic := eth.VoluntaryExitTopic(testForkDigest)
+			topic := eth.VoluntaryExitTopic(testForkDigest[:])
 			var buf bytes.Buffer
 			_, err := network.encoder.EncodeGossip(&buf, exit)
 			if err != nil {
 				t.Logf("Error encoding voluntary exit: %v", err)
+
 				continue
 			}
 
@@ -583,8 +772,9 @@ func testMultipleTopicHandling(t *testing.T, network *TestNetwork) {
 }
 
 // testMessageValidation tests message validation functionality
-func testMessageValidation(t *testing.T, network *TestNetwork) {
+func testMessageValidation(t *testing.T) {
 	t.Helper()
+	network := setupTestNetwork(t, testNetworkSize)
 	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 	defer cancel()
 
@@ -596,13 +786,8 @@ func testMessageValidation(t *testing.T, network *TestNetwork) {
 		if block.Block.Slot%2 == 0 {
 			return fmt.Errorf("rejecting block with even slot: %d", block.Block.Slot)
 		}
-		return nil
-	}
 
-	// Register validator on all nodes
-	for i := 0; i < len(network.ethWrappers); i++ {
-		err := network.ethWrappers[i].RegisterBeaconBlockValidator(validator)
-		require.NoError(t, err)
+		return nil
 	}
 
 	// Handler to count received messages
@@ -617,9 +802,36 @@ func testMessageValidation(t *testing.T, network *TestNetwork) {
 		return nil
 	}
 
-	// Subscribe all nodes except the publisher
+	// Register processors with validators BEFORE starting services
 	for i := 1; i < len(network.ethWrappers); i++ {
-		err := network.ethWrappers[i].SubscribeBeaconBlock(ctx, handler)
+		// Register with validator
+		validatorFunc := func(ctx context.Context, block *pb.SignedBeaconBlock) (pubsub.ValidationResult, error) {
+			if err := validator(block); err != nil {
+				return pubsub.ValidationReject, err
+			}
+			return pubsub.ValidationAccept, nil
+		}
+
+		err := network.ethWrappers[i].RegisterBeaconBlock(
+			validatorFunc,
+			handler,
+			nil, // Default score params
+		)
+		require.NoError(t, err)
+	}
+
+	// Now start all gossipsub services
+	for i, gs := range network.gossipsubs {
+		err := gs.Start(ctx)
+		require.NoError(t, err, "Failed to start gossipsub service %d", i)
+	}
+
+	// Wait for services to stabilize
+	time.Sleep(2 * time.Second)
+
+	// Subscribe to beacon blocks
+	for i := 1; i < len(network.ethWrappers); i++ {
+		err := network.ethWrappers[i].SubscribeBeaconBlock(ctx)
 		require.NoError(t, err)
 	}
 
@@ -629,7 +841,11 @@ func testMessageValidation(t *testing.T, network *TestNetwork) {
 	// Publish valid and invalid blocks
 	for slot := uint64(3000); slot < 3010; slot++ {
 		block := createTestBeaconBlock(slot)
-		err := network.ethWrappers[0].PublishBeaconBlock(ctx, block)
+		topic := eth.BeaconBlockTopic(testForkDigest)
+		var buf bytes.Buffer
+		_, err := network.encoder.EncodeGossip(&buf, block)
+		require.NoError(t, err)
+		err = network.gossipsubs[0].Publish(ctx, topic, buf.Bytes())
 		require.NoError(t, err)
 		time.Sleep(100 * time.Millisecond)
 	}
@@ -652,91 +868,50 @@ func testMessageValidation(t *testing.T, network *TestNetwork) {
 		"Expected at least %d valid messages, got %d", expectedValidMin, validMessages)
 }
 
-// testPeerScoring tests peer scoring functionality
-func testPeerScoring(t *testing.T, network *TestNetwork) {
-	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
-	defer cancel()
-
-	// Set up peer scoring parameters
-	scoreParams := pubsub.DefaultTopicScoreParams()
-	scoreParams.TopicWeight = 1.0
-	scoreParams.TimeInMeshWeight = 1.0
-	scoreParams.FirstMessageDeliveriesWeight = 1.0
-
-	topic := eth.BeaconBlockTopic(testForkDigest)
-
-	// Configure scoring on all nodes
-	for i := 0; i < len(network.gossipsubs); i++ {
-		err := network.gossipsubs[i].SetTopicScoreParams(topic, scoreParams)
-		require.NoError(t, err)
-	}
-
-	// Subscribe all nodes to create mesh
-	handler := func(ctx context.Context, block *pb.SignedBeaconBlock, from peer.ID) error {
-		return nil
-	}
-
-	for i := 0; i < len(network.ethWrappers); i++ {
-		err := network.ethWrappers[i].SubscribeBeaconBlock(ctx, handler)
-		require.NoError(t, err)
-	}
-
-	// Give time for mesh formation
-	time.Sleep(3 * time.Second)
-
-	// Publish some messages to establish scoring
-	for i := 0; i < 10; i++ {
-		block := createTestBeaconBlock(uint64(4000 + i))
-		err := network.ethWrappers[i%len(network.ethWrappers)].PublishBeaconBlock(ctx, block)
-		require.NoError(t, err)
-		time.Sleep(200 * time.Millisecond)
-	}
-
-	// Wait for scoring to update
-	time.Sleep(5 * time.Second)
-
-	// Check peer scores
-	for i := 0; i < len(network.gossipsubs); i++ {
-		scores, err := network.gossipsubs[i].GetAllPeerScores()
-		require.NoError(t, err)
-
-		network.logger.WithFields(logrus.Fields{
-			"node":       i,
-			"peer_count": len(scores),
-		}).Info("Peer scores retrieved")
-
-		// Should have scores for connected peers
-		assert.GreaterOrEqual(t, len(scores), 1, "Node %d should have scores for at least 1 peer", i)
-
-		// Verify score structure
-		for _, score := range scores {
-			assert.NotEmpty(t, score.PeerID, "Peer ID should not be empty")
-			assert.NotNil(t, score.Topics, "Topics should not be nil")
-		}
-	}
-}
-
 // testConcurrentOperations tests concurrent operations across the network
-func testConcurrentOperations(t *testing.T, network *TestNetwork) {
+func testConcurrentOperations(t *testing.T) {
 	t.Helper()
+	network := setupTestNetwork(t, testNetworkSize)
 	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 	defer cancel()
 
 	var publishCount, receiveCount int64
 	var mutex sync.Mutex
 
-	handler := func(ctx context.Context, msg *pubsub.Message) error {
+	handler := func(ctx context.Context, msg []byte, from peer.ID) error {
 		mutex.Lock()
 		receiveCount++
 		mutex.Unlock()
 		return nil
 	}
 
-	// Subscribe all nodes to a test topic
+	// Register processors BEFORE starting services
 	testTopic := "concurrent-test-topic"
+	processors := make([]*simpleTestProcessor, 0, len(network.gossipsubs))
 	for i := 0; i < len(network.gossipsubs); i++ {
-		err := network.gossipsubs[i].Subscribe(ctx, testTopic, handler)
+		processor := &simpleTestProcessor{
+			topic:     testTopic,
+			handler:   handler,
+			gossipsub: network.gossipsubs[i],
+		}
+		processors = append(processors, processor)
+
+		err := pubsub.RegisterProcessor(network.gossipsubs[i], processor)
+		require.NoError(t, err)
+	}
+
+	// Now start all gossipsub services
+	for i, gs := range network.gossipsubs {
+		err := gs.Start(ctx)
+		require.NoError(t, err, "Failed to start gossipsub service %d", i)
+	}
+
+	// Wait for services to stabilize
+	time.Sleep(2 * time.Second)
+
+	// Subscribe all nodes
+	for i, processor := range processors {
+		err := pubsub.SubscribeWithProcessor(network.gossipsubs[i], ctx, processor)
 		require.NoError(t, err)
 	}
 
@@ -792,32 +967,31 @@ func TestGossipsubPerformance(t *testing.T) {
 		t.Skip("Skipping performance test in short mode")
 	}
 
-	network := setupTestNetwork(t, testNetworkSize)
-
 	t.Run("HighVolumeMessagePropagation", func(t *testing.T) {
-		testHighVolumeMessagePropagation(t, network)
+		testHighVolumeMessagePropagation(t)
 	})
 
 	t.Run("LatencyMeasurement", func(t *testing.T) {
-		testLatencyMeasurement(t, network)
+		testLatencyMeasurement(t)
 	})
 
 	t.Run("ThroughputMeasurement", func(t *testing.T) {
-		testThroughputMeasurement(t, network)
+		testThroughputMeasurement(t)
 	})
 
 	t.Run("ConcurrentSubscriptions", func(t *testing.T) {
-		testConcurrentSubscriptions(t, network)
+		testConcurrentSubscriptions(t)
 	})
 
 	t.Run("LargeMessageHandling", func(t *testing.T) {
-		testLargeMessageHandling(t, network)
+		testLargeMessageHandling(t)
 	})
 }
 
 // testHighVolumeMessagePropagation tests handling of high message volumes
-func testHighVolumeMessagePropagation(t *testing.T, network *TestNetwork) {
+func testHighVolumeMessagePropagation(t *testing.T) {
 	t.Helper()
+	network := setupTestNetwork(t, testNetworkSize)
 	ctx, cancel := context.WithTimeout(context.Background(), performanceTimeout)
 	defer cancel()
 
@@ -825,16 +999,39 @@ func testHighVolumeMessagePropagation(t *testing.T, network *TestNetwork) {
 	var receivedCount int64
 	var mutex sync.Mutex
 
-	handler := func(ctx context.Context, msg *pubsub.Message) error {
+	handler := func(ctx context.Context, msg []byte, from peer.ID) error {
 		mutex.Lock()
 		receivedCount++
 		mutex.Unlock()
 		return nil
 	}
 
-	// Subscribe all nodes except the publisher
+	// Register processors BEFORE starting services
+	processors := make([]*simpleTestProcessor, 0, len(network.gossipsubs)-1)
 	for i := 1; i < len(network.gossipsubs); i++ {
-		err := network.gossipsubs[i].Subscribe(ctx, testTopic, handler)
+		processor := &simpleTestProcessor{
+			topic:     testTopic,
+			handler:   handler,
+			gossipsub: network.gossipsubs[i],
+		}
+		processors = append(processors, processor)
+
+		err := pubsub.RegisterProcessor(network.gossipsubs[i], processor)
+		require.NoError(t, err)
+	}
+
+	// Start all gossipsub services
+	for i, gs := range network.gossipsubs {
+		err := gs.Start(ctx)
+		require.NoError(t, err, "Failed to start gossipsub service %d", i)
+	}
+
+	// Wait for services to stabilize
+	time.Sleep(2 * time.Second)
+
+	// Subscribe nodes
+	for i, processor := range processors {
+		err := pubsub.SubscribeWithProcessor(network.gossipsubs[i+1], ctx, processor)
 		require.NoError(t, err)
 	}
 
@@ -887,8 +1084,9 @@ func testHighVolumeMessagePropagation(t *testing.T, network *TestNetwork) {
 }
 
 // testLatencyMeasurement measures message propagation latency
-func testLatencyMeasurement(t *testing.T, network *TestNetwork) {
+func testLatencyMeasurement(t *testing.T) {
 	t.Helper()
+	network := setupTestNetwork(t, testNetworkSize)
 	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 	defer cancel()
 
@@ -897,11 +1095,10 @@ func testLatencyMeasurement(t *testing.T, network *TestNetwork) {
 	var mutex sync.Mutex
 
 	// Record publish time in message metadata
-
-	handler := func(ctx context.Context, msg *pubsub.Message) error {
-		if len(msg.Data) >= 16 { // Basic validation
+	handler := func(ctx context.Context, msg []byte, from peer.ID) error {
+		if len(msg) >= 16 { // Basic validation
 			// Parse timestamp (simplified for test)
-			publishTime := time.Unix(0, int64(binary.BigEndian.Uint64(msg.Data[:8])))
+			publishTime := time.Unix(0, int64(binary.BigEndian.Uint64(msg[:8])))
 			receiveTime := time.Now()
 			latency := receiveTime.Sub(publishTime)
 
@@ -912,9 +1109,32 @@ func testLatencyMeasurement(t *testing.T, network *TestNetwork) {
 		return nil
 	}
 
-	// Subscribe all nodes except the publisher
+	// Register processors BEFORE starting services
+	processors := make([]*simpleTestProcessor, 0, len(network.gossipsubs)-1)
 	for i := 1; i < len(network.gossipsubs); i++ {
-		err := network.gossipsubs[i].Subscribe(ctx, testTopic, handler)
+		processor := &simpleTestProcessor{
+			topic:     testTopic,
+			handler:   handler,
+			gossipsub: network.gossipsubs[i],
+		}
+		processors = append(processors, processor)
+
+		err := pubsub.RegisterProcessor(network.gossipsubs[i], processor)
+		require.NoError(t, err)
+	}
+
+	// Start all gossipsub services
+	for i, gs := range network.gossipsubs {
+		err := gs.Start(ctx)
+		require.NoError(t, err, "Failed to start gossipsub service %d", i)
+	}
+
+	// Wait for services to stabilize
+	time.Sleep(2 * time.Second)
+
+	// Subscribe nodes
+	for i, processor := range processors {
+		err := pubsub.SubscribeWithProcessor(network.gossipsubs[i+1], ctx, processor)
 		require.NoError(t, err)
 	}
 
@@ -976,8 +1196,9 @@ func testLatencyMeasurement(t *testing.T, network *TestNetwork) {
 }
 
 // testThroughputMeasurement measures sustained throughput
-func testThroughputMeasurement(t *testing.T, network *TestNetwork) {
+func testThroughputMeasurement(t *testing.T) {
 	t.Helper()
+	network := setupTestNetwork(t, testNetworkSize)
 	ctx, cancel := context.WithTimeout(context.Background(), performanceTimeout)
 	defer cancel()
 
@@ -985,16 +1206,39 @@ func testThroughputMeasurement(t *testing.T, network *TestNetwork) {
 	var receivedCount int64
 	var mutex sync.Mutex
 
-	handler := func(ctx context.Context, msg *pubsub.Message) error {
+	handler := func(ctx context.Context, msg []byte, from peer.ID) error {
 		mutex.Lock()
 		receivedCount++
 		mutex.Unlock()
 		return nil
 	}
 
-	// Subscribe all nodes except the publisher
+	// Register processors BEFORE starting services
+	processors := make([]*simpleTestProcessor, 0, len(network.gossipsubs)-1)
 	for i := 1; i < len(network.gossipsubs); i++ {
-		err := network.gossipsubs[i].Subscribe(ctx, testTopic, handler)
+		processor := &simpleTestProcessor{
+			topic:     testTopic,
+			handler:   handler,
+			gossipsub: network.gossipsubs[i],
+		}
+		processors = append(processors, processor)
+
+		err := pubsub.RegisterProcessor(network.gossipsubs[i], processor)
+		require.NoError(t, err)
+	}
+
+	// Start all gossipsub services
+	for i, gs := range network.gossipsubs {
+		err := gs.Start(ctx)
+		require.NoError(t, err, "Failed to start gossipsub service %d", i)
+	}
+
+	// Wait for services to stabilize
+	time.Sleep(2 * time.Second)
+
+	// Subscribe nodes
+	for i, processor := range processors {
+		err := pubsub.SubscribeWithProcessor(network.gossipsubs[i+1], ctx, processor)
 		require.NoError(t, err)
 	}
 
@@ -1059,8 +1303,9 @@ measureResults:
 }
 
 // testConcurrentSubscriptions tests handling many concurrent subscriptions
-func testConcurrentSubscriptions(t *testing.T, network *TestNetwork) {
+func testConcurrentSubscriptions(t *testing.T) {
 	t.Helper()
+	network := setupTestNetwork(t, testNetworkSize)
 	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 	defer cancel()
 
@@ -1068,18 +1313,45 @@ func testConcurrentSubscriptions(t *testing.T, network *TestNetwork) {
 	var totalReceived int64
 	var mutex sync.Mutex
 
-	handler := func(ctx context.Context, msg *pubsub.Message) error {
+	handler := func(ctx context.Context, msg []byte, from peer.ID) error {
 		mutex.Lock()
 		totalReceived++
 		mutex.Unlock()
 		return nil
 	}
 
-	// Create subscriptions to multiple topics on all nodes
+	// Register processors for all topics BEFORE starting services
+	allProcessors := make([][]*simpleTestProcessor, len(network.gossipsubs))
 	for nodeIdx := 0; nodeIdx < len(network.gossipsubs); nodeIdx++ {
+		allProcessors[nodeIdx] = make([]*simpleTestProcessor, topicCount)
 		for topicIdx := 0; topicIdx < topicCount; topicIdx++ {
 			topic := fmt.Sprintf("concurrent-topic-%d", topicIdx)
-			err := network.gossipsubs[nodeIdx].Subscribe(ctx, topic, handler)
+			processor := &simpleTestProcessor{
+				topic:     topic,
+				handler:   handler,
+				gossipsub: network.gossipsubs[nodeIdx],
+			}
+			allProcessors[nodeIdx][topicIdx] = processor
+
+			err := pubsub.RegisterProcessor(network.gossipsubs[nodeIdx], processor)
+			require.NoError(t, err)
+		}
+	}
+
+	// Start all gossipsub services
+	for i, gs := range network.gossipsubs {
+		err := gs.Start(ctx)
+		require.NoError(t, err, "Failed to start gossipsub service %d", i)
+	}
+
+	// Wait for services to stabilize
+	time.Sleep(2 * time.Second)
+
+	// Subscribe to all topics
+	for nodeIdx := 0; nodeIdx < len(network.gossipsubs); nodeIdx++ {
+		for topicIdx := 0; topicIdx < topicCount; topicIdx++ {
+			processor := allProcessors[nodeIdx][topicIdx]
+			err := pubsub.SubscribeWithProcessor(network.gossipsubs[nodeIdx], ctx, processor)
 			require.NoError(t, err)
 		}
 	}
@@ -1131,8 +1403,9 @@ func testConcurrentSubscriptions(t *testing.T, network *TestNetwork) {
 }
 
 // testLargeMessageHandling tests handling of large messages
-func testLargeMessageHandling(t *testing.T, network *TestNetwork) {
+func testLargeMessageHandling(t *testing.T) {
 	t.Helper()
+	network := setupTestNetwork(t, testNetworkSize)
 	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 	defer cancel()
 
@@ -1140,16 +1413,39 @@ func testLargeMessageHandling(t *testing.T, network *TestNetwork) {
 	var receivedSizes []int
 	var mutex sync.Mutex
 
-	handler := func(ctx context.Context, msg *pubsub.Message) error {
+	handler := func(ctx context.Context, msg []byte, from peer.ID) error {
 		mutex.Lock()
-		receivedSizes = append(receivedSizes, len(msg.Data))
+		receivedSizes = append(receivedSizes, len(msg))
 		mutex.Unlock()
 		return nil
 	}
 
-	// Subscribe all nodes except the publisher
+	// Register processors BEFORE starting services
+	processors := make([]*simpleTestProcessor, 0, len(network.gossipsubs)-1)
 	for i := 1; i < len(network.gossipsubs); i++ {
-		err := network.gossipsubs[i].Subscribe(ctx, testTopic, handler)
+		processor := &simpleTestProcessor{
+			topic:     testTopic,
+			handler:   handler,
+			gossipsub: network.gossipsubs[i],
+		}
+		processors = append(processors, processor)
+
+		err := pubsub.RegisterProcessor(network.gossipsubs[i], processor)
+		require.NoError(t, err)
+	}
+
+	// Start all gossipsub services
+	for i, gs := range network.gossipsubs {
+		err := gs.Start(ctx)
+		require.NoError(t, err, "Failed to start gossipsub service %d", i)
+	}
+
+	// Wait for services to stabilize
+	time.Sleep(2 * time.Second)
+
+	// Subscribe nodes
+	for i, processor := range processors {
+		err := pubsub.SubscribeWithProcessor(network.gossipsubs[i+1], ctx, processor)
 		require.NoError(t, err)
 	}
 

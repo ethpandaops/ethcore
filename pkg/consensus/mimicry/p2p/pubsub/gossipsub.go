@@ -13,7 +13,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// Gossipsub provides a generic, application-agnostic gossipsub implementation
+// Gossipsub provides a processor-based gossipsub implementation
 type Gossipsub struct {
 	log     logrus.FieldLogger
 	host    host.Host
@@ -23,17 +23,16 @@ type Gossipsub struct {
 	metrics *Metrics
 
 	// Topic and subscription management
-	topicManager  *topicManager
-	subscriptions map[string]*Subscription
-	subMutex      sync.RWMutex
+	topicManager *topicManager
 
-	// Validation and message handling
-	validationPipeline *ValidationPipeline
-	handlerRegistry    *handlerRegistry
+	// Processor subscriptions
+	processorSubs map[string]interface{} // stores ProcessorSubscription[T]
+	procMutex     sync.RWMutex
 
-	// Peer scoring
-	scoreParams map[string]*TopicScoreParams
-	scoreMutex  sync.RWMutex
+	// Processor registration
+	registeredProcessors      map[string]interface{} // stores Processor[T] or MultiProcessor[T]
+	registeredMultiProcessors map[string]interface{} // stores MultiProcessor[T]
+	regMutex                  sync.RWMutex
 
 	// Lifecycle management
 	cancel  context.CancelFunc
@@ -62,18 +61,15 @@ func NewGossipsub(log logrus.FieldLogger, host host.Host, config *Config) (*Goss
 	metrics := NewMetrics("gossipsub")
 
 	g := &Gossipsub{
-		log:           logger,
-		host:          host,
-		config:        config,
-		emitter:       emitter,
-		metrics:       metrics,
-		subscriptions: make(map[string]*Subscription),
-		scoreParams:   make(map[string]*TopicScoreParams),
+		log:                       logger,
+		host:                      host,
+		config:                    config,
+		emitter:                   emitter,
+		metrics:                   metrics,
+		processorSubs:             make(map[string]interface{}),
+		registeredProcessors:      make(map[string]interface{}),
+		registeredMultiProcessors: make(map[string]interface{}),
 	}
-
-	// Initialize sub-components
-	g.validationPipeline = newValidationPipeline(logger, metrics, emitter)
-	g.handlerRegistry = newHandlerRegistry(logger, metrics, emitter)
 
 	return g, nil
 }
@@ -121,15 +117,18 @@ func (g *Gossipsub) Stop() error {
 
 	g.log.Info("Stopping gossipsub service")
 
-	// Close all subscriptions
-	g.subMutex.Lock()
-	for topic, sub := range g.subscriptions {
-		if err := g.closeSubscription(sub); err != nil {
-			g.log.WithError(err).WithField("topic", topic).Warn("Error closing subscription")
+	// Close all processor subscriptions
+	g.procMutex.Lock()
+	for topic, procSubInterface := range g.processorSubs {
+		// Use type assertion to call Stop() method
+		if stopper, ok := procSubInterface.(interface{ Stop() error }); ok {
+			if err := stopper.Stop(); err != nil {
+				g.log.WithError(err).WithField("topic", topic).Warn("Error stopping processor subscription")
+			}
 		}
 	}
-	g.subscriptions = make(map[string]*Subscription)
-	g.subMutex.Unlock()
+	g.processorSubs = make(map[string]interface{})
+	g.procMutex.Unlock()
 
 	// Close topic manager
 	if g.topicManager != nil {
@@ -163,9 +162,9 @@ func (g *Gossipsub) GetStats() *Stats {
 		return &Stats{}
 	}
 
-	g.subMutex.RLock()
-	activeSubscriptions := len(g.subscriptions)
-	g.subMutex.RUnlock()
+	g.procMutex.RLock()
+	activeSubscriptions := len(g.processorSubs)
+	g.procMutex.RUnlock()
 
 	var connectedPeers int
 	if g.host != nil {
@@ -207,109 +206,284 @@ func (g *Gossipsub) createPubsubOptions() []pubsub.Option {
 		pubsub.WithValidateWorkers(g.config.ValidationConcurrency),
 	}
 
-	// Configure gossipsub parameters
-	gossipsubConfig := pubsub.DefaultGossipSubParams()
-	gossipsubConfig.D = g.config.D
-	gossipsubConfig.Dlo = g.config.Dlo
-	gossipsubConfig.Dhi = g.config.Dhi
-	gossipsubConfig.Dlazy = g.config.Dlazy
-	gossipsubConfig.HeartbeatInterval = g.config.HeartbeatInterval
-	gossipsubConfig.HistoryLength = g.config.HistoryLength
-	gossipsubConfig.HistoryGossip = g.config.HistoryGossip
+	// Apply custom gossipsub parameters if specified, otherwise use libp2p defaults
+	if g.config.GossipSubParams != nil {
+		options = append(options, pubsub.WithGossipSubParams(*g.config.GossipSubParams))
+	}
 
-	options = append(options, pubsub.WithGossipSubParams(gossipsubConfig))
-
-	// Enable peer scoring if configured
-	if g.config.EnablePeerScoring {
-		// Convert stored topic score parameters to libp2p format
-		topics := make(map[string]*pubsub.TopicScoreParams)
-		g.scoreMutex.RLock()
-		for topic, params := range g.scoreParams {
-			topics[topic] = &pubsub.TopicScoreParams{
-				TopicWeight:                    params.TopicWeight,
-				TimeInMeshWeight:               params.TimeInMeshWeight,
-				TimeInMeshQuantum:              params.TimeInMeshQuantum,
-				TimeInMeshCap:                  params.TimeInMeshCap,
-				FirstMessageDeliveriesWeight:   params.FirstMessageDeliveriesWeight,
-				FirstMessageDeliveriesDecay:    params.FirstMessageDeliveriesDecay,
-				FirstMessageDeliveriesCap:      params.FirstMessageDeliveriesCap,
-				InvalidMessageDeliveriesWeight: params.InvalidMessageDeliveriesWeight,
-				InvalidMessageDeliveriesDecay:  params.InvalidMessageDeliveriesDecay,
-			}
-		}
-		g.scoreMutex.RUnlock()
-
-		scoreParams := &pubsub.PeerScoreParams{
-			Topics: topics,
+	// Enable peer scoring with default parameters
+	// Topic-specific scoring is configured from stored processor parameters
+	topicScores := g.buildTopicScoreMap()
+	options = append(options, pubsub.WithPeerScore(
+		&pubsub.PeerScoreParams{
 			AppSpecificScore: func(p peer.ID) float64 {
-				// Default implementation - can be customized
+				// Default to 0, can be overridden by application
 				return 0
 			},
-			DecayInterval:     time.Second,
-			DecayToZero:       0.01,
-			RetainScore:       time.Minute * 10,
-			AppSpecificWeight: 1.0,
-			TopicScoreCap:     100.0,
-		}
-
-		thresholds := &pubsub.PeerScoreThresholds{
-			GossipThreshold:             -100,
-			PublishThreshold:            -500,
-			GraylistThreshold:           -1000,
-			AcceptPXThreshold:           100,
-			OpportunisticGraftThreshold: 5,
-		}
-
-		options = append(options, pubsub.WithPeerScore(scoreParams, thresholds))
-	}
+			AppSpecificWeight:           1.0,
+			IPColocationFactorWeight:    -1.0,
+			IPColocationFactorThreshold: 5.0,
+			BehaviourPenaltyWeight:      -1.0,
+			BehaviourPenaltyThreshold:   6.0,
+			BehaviourPenaltyDecay:       0.99,
+			DecayInterval:               time.Second,
+			DecayToZero:                 0.01,
+			RetainScore:                 time.Minute * 10,
+			Topics:                      topicScores,
+		},
+		&pubsub.PeerScoreThresholds{
+			GossipThreshold:             -500,
+			PublishThreshold:            -1000,
+			GraylistThreshold:           -2500,
+			AcceptPXThreshold:           0,
+			OpportunisticGraftThreshold: 2,
+		},
+	))
 
 	return options
 }
 
-// Subscribe subscribes to a topic with a message handler
-func (g *Gossipsub) Subscribe(ctx context.Context, topic string, handler MessageHandler) error {
-	if !g.IsStarted() {
-		return NewTopicError(ErrNotStarted, topic, "subscribe")
+// buildTopicScoreMap converts registered processor scoring to libp2p format
+func (g *Gossipsub) buildTopicScoreMap() map[string]*pubsub.TopicScoreParams {
+	g.regMutex.RLock()
+	defer g.regMutex.RUnlock()
+
+	topicScores := make(map[string]*pubsub.TopicScoreParams)
+
+	// Process single-topic processors
+	for _, procInterface := range g.registeredProcessors {
+		if singleProc, ok := procInterface.(interface {
+			AllPossibleTopics() []string
+			GetTopicScoreParams() *TopicScoreParams
+		}); ok {
+			for _, topic := range singleProc.AllPossibleTopics() {
+				if params := singleProc.GetTopicScoreParams(); params != nil {
+					topicScores[topic] = &pubsub.TopicScoreParams{
+						TopicWeight:                    params.TopicWeight,
+						TimeInMeshWeight:               params.TimeInMeshWeight,
+						TimeInMeshQuantum:              params.TimeInMeshQuantum,
+						TimeInMeshCap:                  params.TimeInMeshCap,
+						FirstMessageDeliveriesWeight:   params.FirstMessageDeliveriesWeight,
+						FirstMessageDeliveriesDecay:    params.FirstMessageDeliveriesDecay,
+						FirstMessageDeliveriesCap:      params.FirstMessageDeliveriesCap,
+						InvalidMessageDeliveriesWeight: params.InvalidMessageDeliveriesWeight,
+						InvalidMessageDeliveriesDecay:  params.InvalidMessageDeliveriesDecay,
+					}
+				}
+			}
+		}
 	}
 
+	// Process multi-topic processors
+	for _, procInterface := range g.registeredMultiProcessors {
+		if multiProc, ok := procInterface.(interface {
+			AllPossibleTopics() []string
+			GetTopicScoreParams(topic string) *TopicScoreParams
+		}); ok {
+			for _, topic := range multiProc.AllPossibleTopics() {
+				if params := multiProc.GetTopicScoreParams(topic); params != nil {
+					topicScores[topic] = &pubsub.TopicScoreParams{
+						TopicWeight:                    params.TopicWeight,
+						TimeInMeshWeight:               params.TimeInMeshWeight,
+						TimeInMeshQuantum:              params.TimeInMeshQuantum,
+						TimeInMeshCap:                  params.TimeInMeshCap,
+						FirstMessageDeliveriesWeight:   params.FirstMessageDeliveriesWeight,
+						FirstMessageDeliveriesDecay:    params.FirstMessageDeliveriesDecay,
+						FirstMessageDeliveriesCap:      params.FirstMessageDeliveriesCap,
+						InvalidMessageDeliveriesWeight: params.InvalidMessageDeliveriesWeight,
+						InvalidMessageDeliveriesDecay:  params.InvalidMessageDeliveriesDecay,
+					}
+				}
+			}
+		}
+	}
+
+	return topicScores
+}
+
+// RegisterProcessor registers a single-topic processor for later subscription
+// Must be called before Start()
+func RegisterProcessor[T any](g *Gossipsub, processor Processor[T]) error {
+	if g.IsStarted() {
+		return NewError(fmt.Errorf("cannot register processors after gossipsub has started"), "register_processor")
+	}
+
+	if processor == nil {
+		return NewError(fmt.Errorf("processor cannot be nil"), "register_processor")
+	}
+
+	topic := processor.Topic()
 	if topic == "" {
-		return NewTopicError(ErrInvalidTopic, topic, "subscribe")
+		return NewError(fmt.Errorf("processor topic cannot be empty"), "register_processor")
 	}
 
-	if handler == nil {
-		return NewTopicError(fmt.Errorf("handler cannot be nil"), topic, "subscribe")
+	g.regMutex.Lock()
+	defer g.regMutex.Unlock()
+
+	if _, exists := g.registeredProcessors[topic]; exists {
+		return NewError(fmt.Errorf("processor already registered for topic %s", topic), "register_processor")
 	}
 
-	g.subMutex.Lock()
-	defer g.subMutex.Unlock()
+	g.registeredProcessors[topic] = processor
+	g.log.WithField("topic", topic).Debug("Registered single-topic processor")
+
+	return nil
+}
+
+// RegisterMultiProcessor registers a multi-topic processor for later subscription
+// Must be called before Start()
+func RegisterMultiProcessor[T any](g *Gossipsub, name string, processor MultiProcessor[T]) error {
+	if g.IsStarted() {
+		return NewError(fmt.Errorf("cannot register processors after gossipsub has started"), "register_multi_processor")
+	}
+
+	if processor == nil {
+		return NewError(fmt.Errorf("processor cannot be nil"), "register_multi_processor")
+	}
+
+	if name == "" {
+		return NewError(fmt.Errorf("processor name cannot be empty"), "register_multi_processor")
+	}
+
+	g.regMutex.Lock()
+	defer g.regMutex.Unlock()
+
+	if _, exists := g.registeredMultiProcessors[name]; exists {
+		return NewError(fmt.Errorf("multi-processor already registered with name %s", name), "register_multi_processor")
+	}
+
+	g.registeredMultiProcessors[name] = processor
+	g.log.WithFields(logrus.Fields{
+		"name":            name,
+		"possible_topics": len(processor.AllPossibleTopics()),
+	}).Debug("Registered multi-topic processor")
+
+	return nil
+}
+
+// SubscribeWithProcessor subscribes to a topic using a processor for type-safe message handling
+func SubscribeWithProcessor[T any](g *Gossipsub, ctx context.Context, processor Processor[T]) error {
+	if !g.IsStarted() {
+		return NewTopicError(ErrNotStarted, processor.Topic(), "subscribe_with_processor")
+	}
+
+	if processor == nil {
+		return NewTopicError(fmt.Errorf("processor cannot be nil"), "", "subscribe_with_processor")
+	}
+
+	topic := processor.Topic()
+	if topic == "" {
+		return NewTopicError(ErrInvalidTopic, topic, "subscribe_with_processor")
+	}
+
+	g.procMutex.Lock()
+	defer g.procMutex.Unlock()
 
 	// Check if already subscribed
-	if _, exists := g.subscriptions[topic]; exists {
-		return NewTopicError(ErrTopicAlreadySubscribed, topic, "subscribe")
+	if _, exists := g.processorSubs[topic]; exists {
+		return NewTopicError(ErrTopicAlreadySubscribed, topic, "subscribe_with_processor")
 	}
 
-	g.log.WithField("topic", topic).Info("Subscribing to topic")
+	g.log.WithField("topic", topic).Info("Subscribing to topic with processor")
 
-	// Create subscription
-	sub, err := g.createSubscription(ctx, topic, handler)
+	// Join topic
+	topicHandle, err := g.topicManager.joinTopic(topic)
 	if err != nil {
 		g.emitSubscriptionError(topic, err)
-		return NewTopicError(err, topic, "subscribe")
+		return NewTopicError(err, topic, "subscribe_with_processor")
 	}
 
-	// Store subscription
-	g.subscriptions[topic] = sub
+	// Subscribe to topic
+	sub, err := topicHandle.Subscribe()
+	if err != nil {
+		g.emitSubscriptionError(topic, err)
+		return NewTopicError(err, topic, "subscribe_with_processor")
+	}
 
-	// Register handler
-	g.handlerRegistry.register(topic, handler)
+	// Create processor subscription
+	metrics := NewProcessorMetrics(g.log)
+	procSub := newProcessorSubscription(processor, sub, metrics, g.emitter, g.log)
+
+	// Register validator
+	validator := procSub.createValidator()
+	if err := g.pubsub.RegisterTopicValidator(topic, validator); err != nil {
+		sub.Cancel()
+		g.emitSubscriptionError(topic, err)
+		return NewTopicError(err, topic, "subscribe_with_processor")
+	}
+
+	// Topic scoring is handled during pubsub initialization from registered processors
+
+	// Start processor subscription
+	if err := procSub.Start(); err != nil {
+		if unregErr := g.pubsub.UnregisterTopicValidator(topic); unregErr != nil {
+			g.log.WithError(unregErr).WithField("topic", topic).Warn("Failed to unregister validator during cleanup")
+		}
+		sub.Cancel()
+		g.emitSubscriptionError(topic, err)
+		return NewTopicError(err, topic, "subscribe_with_processor")
+	}
+
+	// Store processor subscription
+	g.processorSubs[topic] = procSub
 
 	// Update metrics
 	if g.metrics != nil {
-		g.metrics.SetActiveSubscriptions(len(g.subscriptions))
+		g.metrics.SetActiveSubscriptions(len(g.processorSubs))
 	}
 
-	g.log.WithField("topic", topic).Info("Successfully subscribed to topic")
+	g.log.WithField("topic", topic).Info("Successfully subscribed to topic with processor")
 	g.emitTopicSubscribed(topic)
+
+	return nil
+}
+
+// SubscribeMultiWithProcessor subscribes to multiple topics using a MultiProcessor
+func SubscribeMultiWithProcessor[T any](g *Gossipsub, ctx context.Context, multiProcessor MultiProcessor[T]) error {
+	if !g.IsStarted() {
+		return NewError(ErrNotStarted, "subscribe_multi_with_processor")
+	}
+
+	if multiProcessor == nil {
+		return NewError(fmt.Errorf("multiProcessor cannot be nil"), "subscribe_multi_with_processor")
+	}
+
+	// Get all possible topics from the processor
+	allTopics := multiProcessor.AllPossibleTopics()
+	if len(allTopics) == 0 {
+		return NewError(fmt.Errorf("multiProcessor returned no topics"), "subscribe_multi_with_processor")
+	}
+
+	g.log.WithField("topics", len(allTopics)).Info("Subscribing to multiple topics with multi-processor")
+
+	// Track subscriptions for rollback on error
+	var subscribedTopics []string
+	rollback := func() {
+		for _, topic := range subscribedTopics {
+			if err := g.Unsubscribe(topic); err != nil {
+				g.log.WithError(err).WithField("topic", topic).Warn("Failed to rollback subscription")
+			}
+		}
+	}
+
+	// Subscribe to each topic
+	for _, topic := range allTopics {
+		// Create a topic-specific processor wrapper that delegates to the multi-processor
+		wrapper := &multiProcessorWrapper[T]{
+			multiProcessor: multiProcessor,
+			topic:          topic,
+		}
+
+		// Use the existing single-topic subscription logic
+		if err := SubscribeWithProcessor(g, ctx, wrapper); err != nil {
+			rollback()
+			return NewError(fmt.Errorf("failed to subscribe to topic %s: %w", topic, err), "subscribe_multi_with_processor")
+		}
+
+		subscribedTopics = append(subscribedTopics, topic)
+	}
+
+	g.log.WithField("topics", len(subscribedTopics)).Info("Successfully subscribed to all topics with multi-processor")
 
 	return nil
 }
@@ -320,27 +494,28 @@ func (g *Gossipsub) Unsubscribe(topic string) error {
 		return NewTopicError(ErrNotStarted, topic, "unsubscribe")
 	}
 
-	g.subMutex.Lock()
-	defer g.subMutex.Unlock()
+	// Check if we have a processor subscription for this topic
+	g.procMutex.RLock()
+	_, hasProcessorSub := g.processorSubs[topic]
+	g.procMutex.RUnlock()
 
-	sub, exists := g.subscriptions[topic]
-	if !exists {
+	if !hasProcessorSub {
 		return NewTopicError(ErrTopicNotSubscribed, topic, "unsubscribe")
 	}
 
 	g.log.WithField("topic", topic).Info("Unsubscribing from topic")
 
-	// Close subscription
-	if err := g.closeSubscription(sub); err != nil {
-		g.log.WithError(err).WithField("topic", topic).Warn("Error closing subscription")
+	// Handle processor subscription
+	g.procMutex.Lock()
+	if procSubInterface, exists := g.processorSubs[topic]; exists {
+		if stopper, ok := procSubInterface.(interface{ Stop() error }); ok {
+			if err := stopper.Stop(); err != nil {
+				g.log.WithError(err).WithField("topic", topic).Warn("Error stopping processor subscription during unsubscribe")
+			}
+		}
+		delete(g.processorSubs, topic)
 	}
-
-	// Remove from tracking
-	delete(g.subscriptions, topic)
-
-	// Unregister handler and validator
-	g.handlerRegistry.unregister(topic)
-	g.validationPipeline.removeValidator(topic)
+	g.procMutex.Unlock()
 
 	// Leave topic
 	if err := g.topicManager.leaveTopic(topic); err != nil {
@@ -349,7 +524,10 @@ func (g *Gossipsub) Unsubscribe(topic string) error {
 
 	// Update metrics
 	if g.metrics != nil {
-		g.metrics.SetActiveSubscriptions(len(g.subscriptions))
+		g.procMutex.RLock()
+		totalSubs := len(g.processorSubs)
+		g.procMutex.RUnlock()
+		g.metrics.SetActiveSubscriptions(totalSubs)
 	}
 
 	g.log.WithField("topic", topic).Info("Successfully unsubscribed from topic")
@@ -364,13 +542,13 @@ func (g *Gossipsub) GetSubscriptions() []string {
 		return nil
 	}
 
-	g.subMutex.RLock()
-	defer g.subMutex.RUnlock()
-
-	topics := make([]string, 0, len(g.subscriptions))
-	for topic := range g.subscriptions {
+	// Collect processor subscriptions
+	g.procMutex.RLock()
+	topics := make([]string, 0, len(g.processorSubs))
+	for topic := range g.processorSubs {
 		topics = append(topics, topic)
 	}
+	g.procMutex.RUnlock()
 
 	return topics
 }
@@ -381,10 +559,11 @@ func (g *Gossipsub) IsSubscribed(topic string) bool {
 		return false
 	}
 
-	g.subMutex.RLock()
-	defer g.subMutex.RUnlock()
+	// Check processor subscriptions
+	g.procMutex.RLock()
+	_, exists := g.processorSubs[topic]
+	g.procMutex.RUnlock()
 
-	_, exists := g.subscriptions[topic]
 	return exists
 }
 
@@ -455,140 +634,6 @@ func (g *Gossipsub) PublishWithTimeout(ctx context.Context, topic string, data [
 	return nil
 }
 
-// RegisterValidator registers a validator for a topic
-func (g *Gossipsub) RegisterValidator(topic string, validator Validator) error {
-	if !g.IsStarted() {
-		return NewTopicError(ErrNotStarted, topic, "register_validator")
-	}
-
-	if topic == "" {
-		return NewTopicError(ErrInvalidTopic, topic, "register_validator")
-	}
-
-	if validator == nil {
-		return NewTopicError(ErrInvalidValidator, topic, "register_validator")
-	}
-
-	// Register with validation pipeline
-	g.validationPipeline.addValidator(topic, validator)
-
-	// Register with libp2p pubsub
-	libp2pValidator := g.validationPipeline.createLibp2pValidator(topic)
-	err := g.pubsub.RegisterTopicValidator(topic, libp2pValidator)
-	if err != nil {
-		g.validationPipeline.removeValidator(topic)
-		return NewTopicError(err, topic, "register_validator")
-	}
-
-	g.log.WithField("topic", topic).Info("Validator registered for topic")
-	return nil
-}
-
-// UnregisterValidator removes a validator for a topic
-func (g *Gossipsub) UnregisterValidator(topic string) error {
-	if !g.IsStarted() {
-		return NewTopicError(ErrNotStarted, topic, "unregister_validator")
-	}
-
-	// Unregister from libp2p pubsub
-	err := g.pubsub.UnregisterTopicValidator(topic)
-	if err != nil {
-		return NewTopicError(err, topic, "unregister_validator")
-	}
-
-	// Remove from validation pipeline
-	g.validationPipeline.removeValidator(topic)
-
-	g.log.WithField("topic", topic).Info("Validator unregistered for topic")
-	return nil
-}
-
-// SetTopicScoreParams sets scoring parameters for a topic
-func (g *Gossipsub) SetTopicScoreParams(topic string, params *TopicScoreParams) error {
-	if !g.IsStarted() {
-		return NewTopicError(ErrNotStarted, topic, "set_score_params")
-	}
-
-	if topic == "" {
-		return NewTopicError(ErrInvalidTopic, topic, "set_score_params")
-	}
-
-	if params == nil {
-		params = DefaultTopicScoreParams()
-	}
-
-	g.scoreMutex.Lock()
-	g.scoreParams[topic] = params
-	g.scoreMutex.Unlock()
-
-	g.log.WithField("topic", topic).Info("Topic score parameters stored (applied at startup)")
-	return nil
-}
-
-// GetPeerScore returns the current score for a specific peer
-func (g *Gossipsub) GetPeerScore(peerID peer.ID) (*PeerScoreSnapshot, error) {
-	if !g.IsStarted() {
-		return nil, NewError(ErrNotStarted, "get_peer_score")
-	}
-
-	// Check if peer is connected
-	connected := false
-	for _, connectedPeer := range g.host.Network().Peers() {
-		if connectedPeer == peerID {
-			connected = true
-			break
-		}
-	}
-
-	if !connected {
-		return nil, NewError(fmt.Errorf("peer not connected: %s", peerID), "get_peer_score")
-	}
-
-	// Build topic scores based on current subscriptions
-	topicScores := make(map[string]float64)
-	for topic := range g.scoreParams {
-		// Check if peer is subscribed to this topic
-		peers := g.pubsub.ListPeers(topic)
-		for _, peer := range peers {
-			if peer == peerID {
-				// Peer is subscribed to this topic, assign a default positive score
-				topicScores[topic] = 1.0
-				break
-			}
-		}
-	}
-
-	return &PeerScoreSnapshot{
-		PeerID:       peerID,
-		Score:        1.0, // Default positive score for connected peers
-		Topics:       topicScores,
-		AppSpecific:  0.0,
-		IPColocation: 0.0,
-		Behavioural:  0.0,
-	}, nil
-}
-
-// GetAllPeerScores returns scores for all known peers
-func (g *Gossipsub) GetAllPeerScores() ([]*PeerScoreSnapshot, error) {
-	if !g.IsStarted() {
-		return nil, NewError(ErrNotStarted, "get_all_peer_scores")
-	}
-
-	// Get connected peers
-	peers := g.host.Network().Peers()
-	scores := make([]*PeerScoreSnapshot, 0, len(peers))
-
-	for _, peerID := range peers {
-		score, err := g.GetPeerScore(peerID)
-		if err != nil {
-			continue
-		}
-		scores = append(scores, score)
-	}
-
-	return scores, nil
-}
-
 // GetTopicPeers returns the peer IDs of peers subscribed to a topic
 func (g *Gossipsub) GetTopicPeers(topic string) []peer.ID {
 	if !g.IsStarted() {
@@ -613,119 +658,83 @@ func (g *Gossipsub) GetAllTopics() []string {
 	return g.topicManager.getTopicNames()
 }
 
-// createSubscription creates a new subscription for a topic
-func (g *Gossipsub) createSubscription(ctx context.Context, topic string, handler MessageHandler) (*Subscription, error) {
-	// Join topic
-	topicHandle, err := g.topicManager.joinTopic(topic)
-	if err != nil {
-		return nil, err
-	}
+// GetRegisteredProcessor retrieves a registered single-topic processor by topic
+func (g *Gossipsub) GetRegisteredProcessor(topic string) (interface{}, bool) {
+	g.regMutex.RLock()
+	defer g.regMutex.RUnlock()
 
-	// Subscribe to topic
-	sub, err := topicHandle.Subscribe()
-	if err != nil {
-		return nil, err
-	}
-
-	// Create subscription context
-	subCtx, cancel := context.WithCancel(ctx)
-
-	subscription := &Subscription{
-		topic:        topic,
-		subscription: sub,
-		handler:      handler,
-		cancel:       cancel,
-	}
-
-	// Start message handling goroutine
-	go g.handleSubscription(subCtx, subscription)
-
-	return subscription, nil
+	processor, exists := g.registeredProcessors[topic]
+	return processor, exists
 }
 
-// closeSubscription closes a subscription and cleans up resources
-func (g *Gossipsub) closeSubscription(sub *Subscription) error {
-	if sub.cancel != nil {
-		sub.cancel()
-	}
+// GetRegisteredMultiProcessor retrieves a registered multi-topic processor by name
+func (g *Gossipsub) GetRegisteredMultiProcessor(name string) (interface{}, bool) {
+	g.regMutex.RLock()
+	defer g.regMutex.RUnlock()
 
-	if sub.subscription != nil {
-		sub.subscription.Cancel()
-	}
-
-	return nil
+	processor, exists := g.registeredMultiProcessors[name]
+	return processor, exists
 }
 
-// handleSubscription processes messages for a subscription
-func (g *Gossipsub) handleSubscription(ctx context.Context, sub *Subscription) {
-	defer func() {
-		if r := recover(); r != nil {
-			g.log.WithFields(logrus.Fields{
-				"topic": sub.topic,
-				"panic": r,
-			}).Error("Subscription handler panicked")
-		}
-	}()
-
-	for {
-		select {
-		case <-ctx.Done():
-			g.log.WithField("topic", sub.topic).Debug("Subscription context canceled")
-			return
-		default:
-			// Read next message
-			msg, err := sub.subscription.Next(ctx)
-			if err != nil {
-				if ctx.Err() != nil {
-					// Context canceled, exit gracefully
-					return
-				}
-				g.log.WithError(err).WithField("topic", sub.topic).Error("Error reading message from subscription")
-				continue
-			}
-
-			// Process message
-			g.processMessage(ctx, msg, sub.handler)
-		}
+// SubscribeToProcessorTopic handles subscription for a registered processor
+// This is called by processors during their Subscribe() method
+func (g *Gossipsub) SubscribeToProcessorTopic(ctx context.Context, topic string) error {
+	if !g.IsStarted() {
+		return NewTopicError(ErrNotStarted, topic, "subscribe_processor_topic")
 	}
+
+	// Check if we have a registered processor for this topic
+	g.regMutex.RLock()
+	processorInterface, exists := g.registeredProcessors[topic]
+	g.regMutex.RUnlock()
+
+	if !exists {
+		return NewTopicError(fmt.Errorf("no processor registered for topic %s", topic), topic, "subscribe_processor_topic")
+	}
+
+	// Use the existing SubscribeWithProcessor logic
+	if _, ok := processorInterface.(interface {
+		Topic() string
+		Decode(context.Context, []byte) (interface{}, error)
+		Validate(context.Context, interface{}, string) (ValidationResult, error)
+		Process(context.Context, interface{}, string) error
+		GetTopicScoreParams() *TopicScoreParams
+	}); ok {
+		// This is a type erasure workaround - in practice we'd use proper generics
+		return fmt.Errorf("direct processor subscription not yet implemented - use SubscribeWithProcessor for now")
+	}
+
+	return NewTopicError(fmt.Errorf("processor does not implement required interface"), topic, "subscribe_processor_topic")
 }
 
-// processMessage processes a single message through the handler pipeline
-func (g *Gossipsub) processMessage(ctx context.Context, pmsg *pubsub.Message, handler MessageHandler) {
-	// Convert sequence number from bytes to uint64
-	var sequence uint64
-	if seqno := pmsg.GetSeqno(); len(seqno) > 0 {
-		// Convert byte slice to uint64 (big-endian)
-		for i, b := range seqno {
-			if i >= 8 { // Limit to 8 bytes for uint64
-				break
-			}
-			sequence = (sequence << 8) | uint64(b)
-		}
+// SubscribeToMultiProcessorTopics handles subscription for a registered multi-processor
+// This is called by multi-processors during their Subscribe() method
+func (g *Gossipsub) SubscribeToMultiProcessorTopics(ctx context.Context, name string, subnets []uint64) error {
+	if !g.IsStarted() {
+		return NewError(ErrNotStarted, "subscribe_multi_processor_topics")
 	}
 
-	// Convert to generic message
-	msg := &Message{
-		Topic:        pmsg.GetTopic(),
-		Data:         pmsg.Data,
-		From:         pmsg.GetFrom(),
-		ReceivedTime: time.Now(),
-		Sequence:     sequence,
+	// Check if we have a registered multi-processor with this name
+	g.regMutex.RLock()
+	processorInterface, exists := g.registeredMultiProcessors[name]
+	g.regMutex.RUnlock()
+
+	if !exists {
+		return NewError(fmt.Errorf("no multi-processor registered with name %s", name), "subscribe_multi_processor_topics")
 	}
 
-	// Record metrics
-	if g.metrics != nil {
-		g.metrics.RecordMessageReceived(msg.Topic)
+	// Use the existing SubscribeMultiWithProcessor logic
+	if _, ok := processorInterface.(interface {
+		AllPossibleTopics() []string
+		GetTopicScoreParams(string) *TopicScoreParams
+		TopicIndex(string) (int, error)
+		Decode(context.Context, string, []byte) (interface{}, error)
+		Validate(context.Context, string, interface{}, string) (ValidationResult, error)
+		Process(context.Context, string, interface{}, string) error
+	}); ok {
+		// This is a type erasure workaround - in practice we'd use proper generics
+		return fmt.Errorf("direct multi-processor subscription not yet implemented - use SubscribeMultiWithProcessor for now")
 	}
 
-	// Emit event
-	g.emitMessageReceived(msg.Topic, msg.From)
-
-	// Process with handler registry
-	if err := g.handlerRegistry.processMessage(ctx, msg); err != nil {
-		g.log.WithError(err).WithFields(logrus.Fields{
-			"topic": msg.Topic,
-			"from":  msg.From,
-		}).Error("Message processing failed")
-	}
+	return NewError(fmt.Errorf("multi-processor does not implement required interface"), "subscribe_multi_processor_topics")
 }

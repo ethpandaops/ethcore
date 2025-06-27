@@ -1,10 +1,8 @@
 package pubsub
 
 import (
-	"context"
 	"time"
 
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
 )
 
@@ -48,12 +46,6 @@ type Message struct {
 	Sequence uint64
 }
 
-// MessageHandler processes received messages for a specific topic
-type MessageHandler func(ctx context.Context, msg *Message) error
-
-// Validator validates messages and returns a validation result
-// The validator should be fast and non-blocking for optimal performance
-type Validator func(ctx context.Context, msg *Message) (ValidationResult, error)
 
 // TopicScoreParams allows configuration of topic-specific scoring parameters
 // These parameters are used by the gossipsub protocol to score peers based on their behavior
@@ -93,18 +85,6 @@ func DefaultTopicScoreParams() *TopicScoreParams {
 	}
 }
 
-// Subscription represents an active topic subscription
-type Subscription struct {
-	topic        string
-	subscription *pubsub.Subscription
-	handler      MessageHandler
-	cancel       context.CancelFunc
-}
-
-// Topic returns the topic name for this subscription
-func (s *Subscription) Topic() string {
-	return s.topic
-}
 
 // PeerScoreSnapshot represents a peer's current score across all topics
 type PeerScoreSnapshot struct {
