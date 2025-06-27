@@ -29,7 +29,7 @@ func NewTopicError(err error, topic string, context string) *Error {
 	}
 }
 
-// Error returns the error message
+// Error returns the error message.
 func (e *Error) Error() string {
 	if e.topic != "" {
 		return fmt.Sprintf("pubsub %s [topic: %s]: %v", e.context, e.topic, e.err)
@@ -38,12 +38,12 @@ func (e *Error) Error() string {
 	return fmt.Sprintf("pubsub %s: %v", e.context, e.err)
 }
 
-// Unwrap returns the wrapped error
+// Unwrap returns the wrapped error.
 func (e *Error) Unwrap() error {
 	return e.err
 }
 
-// Topic returns the topic associated with the error, if any
+// Topic returns the topic associated with the error, if any.
 func (e *Error) Topic() string {
 	return e.topic
 }

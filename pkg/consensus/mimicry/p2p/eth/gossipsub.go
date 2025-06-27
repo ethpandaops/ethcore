@@ -89,7 +89,7 @@ func (g *Gossipsub) SubscribeBlsToExecutionChange(ctx context.Context, handler B
 
 // Subnet subscriptions
 
-// SubscribeAttestation subscribes to attestation messages for a specific subnet
+// SubscribeAttestation subscribes to attestation messages for a specific subnet.
 func (g *Gossipsub) SubscribeAttestation(ctx context.Context, subnet uint64, handler AttestationHandler) error {
 	if subnet >= AttestationSubnetCount {
 		return fmt.Errorf("invalid attestation subnet: %d (max: %d)", subnet, AttestationSubnetCount-1)
@@ -101,7 +101,7 @@ func (g *Gossipsub) SubscribeAttestation(ctx context.Context, subnet uint64, han
 	return g.Subscribe(ctx, topic, msgHandler)
 }
 
-// SubscribeSyncCommittee subscribes to sync committee messages for a specific subnet
+// SubscribeSyncCommittee subscribes to sync committee messages for a specific subnet.
 func (g *Gossipsub) SubscribeSyncCommittee(ctx context.Context, subnet uint64, handler SyncCommitteeHandler) error {
 	if subnet >= SyncCommitteeSubnetCount {
 		return fmt.Errorf("invalid sync committee subnet: %d (max: %d)", subnet, SyncCommitteeSubnetCount-1)
@@ -115,7 +115,7 @@ func (g *Gossipsub) SubscribeSyncCommittee(ctx context.Context, subnet uint64, h
 
 // Bulk subscriptions
 
-// SubscribeAllGlobalTopics subscribes to all global topics using the provided handlers
+// SubscribeAllGlobalTopics subscribes to all global topics using the provided handlers.
 func (g *Gossipsub) SubscribeAllGlobalTopics(ctx context.Context, handlers *GlobalTopicHandlers) error {
 	if handlers == nil {
 		return fmt.Errorf("handlers cannot be nil")
@@ -175,7 +175,7 @@ func (g *Gossipsub) SubscribeAllGlobalTopics(ctx context.Context, handlers *Glob
 	return lastErr
 }
 
-// SubscribeAttestationSubnets subscribes to multiple attestation subnets
+// SubscribeAttestationSubnets subscribes to multiple attestation subnets.
 func (g *Gossipsub) SubscribeAttestationSubnets(ctx context.Context, subnets []uint64, handler AttestationHandler) error {
 	var lastErr error
 
@@ -189,7 +189,7 @@ func (g *Gossipsub) SubscribeAttestationSubnets(ctx context.Context, subnets []u
 	return lastErr
 }
 
-// SubscribeSyncCommitteeSubnets subscribes to multiple sync committee subnets
+// SubscribeSyncCommitteeSubnets subscribes to multiple sync committee subnets.
 func (g *Gossipsub) SubscribeSyncCommitteeSubnets(ctx context.Context, subnets []uint64, handler SyncCommitteeHandler) error {
 	var lastErr error
 
@@ -205,7 +205,7 @@ func (g *Gossipsub) SubscribeSyncCommitteeSubnets(ctx context.Context, subnets [
 
 // Publishing helpers
 
-// PublishBeaconBlock publishes a beacon block
+// PublishBeaconBlock publishes a beacon block.
 func (g *Gossipsub) PublishBeaconBlock(ctx context.Context, block *pb.SignedBeaconBlock) error {
 	topic := BeaconBlockTopic(g.forkDigest)
 
@@ -217,7 +217,7 @@ func (g *Gossipsub) PublishBeaconBlock(ctx context.Context, block *pb.SignedBeac
 	return g.Publish(ctx, topic, buf.Bytes())
 }
 
-// PublishAttestation publishes an attestation to the appropriate subnet
+// PublishAttestation publishes an attestation to the appropriate subnet.
 func (g *Gossipsub) PublishAttestation(ctx context.Context, att *pb.Attestation, subnet uint64) error {
 	if subnet >= AttestationSubnetCount {
 		return fmt.Errorf("invalid attestation subnet: %d", subnet)
@@ -233,7 +233,7 @@ func (g *Gossipsub) PublishAttestation(ctx context.Context, att *pb.Attestation,
 	return g.Publish(ctx, topic, buf.Bytes())
 }
 
-// PublishSyncCommitteeMessage publishes a sync committee message to the appropriate subnet
+// PublishSyncCommitteeMessage publishes a sync committee message to the appropriate subnet.
 func (g *Gossipsub) PublishSyncCommitteeMessage(ctx context.Context, msg *pb.SyncCommitteeMessage, subnet uint64) error { //nolint:staticcheck // deprecated but still functional
 	if subnet >= SyncCommitteeSubnetCount {
 		return fmt.Errorf("invalid sync committee subnet: %d", subnet)
@@ -251,7 +251,7 @@ func (g *Gossipsub) PublishSyncCommitteeMessage(ctx context.Context, msg *pb.Syn
 
 // Validation helpers
 
-// RegisterBeaconBlockValidator registers a validator for beacon block messages
+// RegisterBeaconBlockValidator registers a validator for beacon block messages.
 func (g *Gossipsub) RegisterBeaconBlockValidator(validator BeaconBlockValidator) error {
 	topic := BeaconBlockTopic(g.forkDigest)
 

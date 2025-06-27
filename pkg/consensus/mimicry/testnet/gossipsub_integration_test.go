@@ -1130,6 +1130,7 @@ func testConcurrentSubscriptions(t *testing.T, network *TestNetwork) {
 
 // testLargeMessageHandling tests handling of large messages
 func testLargeMessageHandling(t *testing.T, network *TestNetwork) {
+	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 	defer cancel()
 
