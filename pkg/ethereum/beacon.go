@@ -140,7 +140,7 @@ func (b *BeaconNode) Synced(ctx context.Context) error {
 		return errors.New("beacon node is not synced")
 	}
 
-	wallclock := b.Metadata().Wallclock()
+	wallclock := b.Metadata().GetWallclock()
 	if wallclock == nil {
 		return errors.New("missing wallclock")
 	}
