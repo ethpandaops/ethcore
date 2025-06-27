@@ -5,7 +5,7 @@ import "time"
 const (
 	// Network configuration.
 	DefaultEnclaveName        = "ethcore-test-enclave"
-	DefaultNetworkTimeout     = 60 * time.Second
+	DefaultNetworkTimeout     = 120 * time.Second
 	GenesisWaitTimeout        = 2 * time.Minute
 	BeaconHealthCheckInterval = 250 * time.Millisecond
 

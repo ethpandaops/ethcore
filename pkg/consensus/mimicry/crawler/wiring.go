@@ -97,7 +97,7 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 	// The identify protocol exchanges peer information like agent version, protocols, etc.
 	// Without this wait, we may see "unknown" agent versions which makes it hard to crawl/map.
 	// We use a generous timeout to accommodate clients that take longer to initialize.
-	identifyTimeout := 25 * time.Second
+	identifyTimeout := 60 * time.Second
 	identifyCtx, identifyCancel := context.WithTimeout(context.Background(), identifyTimeout)
 
 	defer identifyCancel()
