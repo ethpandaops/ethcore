@@ -14,7 +14,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-
 // For unit testing that doesn't need mocked pubsub calls
 func createTestGossipsub() *Gossipsub {
 	logger := logrus.NewEntry(logrus.New())
@@ -30,7 +29,6 @@ func createTestGossipsub() *Gossipsub {
 func createTestForkDigest() [4]byte {
 	return [4]byte{0x01, 0x02, 0x03, 0x04}
 }
-
 
 // TestEthereumGossipsub tests the constructor and basic wrapper functionality
 func TestEthereumGossipsub(t *testing.T) {
@@ -110,7 +108,7 @@ func TestTopicConstruction(t *testing.T) {
 	t.Run("Topic parsing", func(t *testing.T) {
 		topic := BeaconBlockTopic(forkDigest)
 		parsedForkDigest, name, err := ParseGossipsubTopic(topic)
-		
+
 		require.NoError(t, err)
 		assert.Equal(t, forkDigest, parsedForkDigest)
 		assert.Equal(t, BeaconBlockTopicName, name)
@@ -134,14 +132,14 @@ func TestTopicConstruction(t *testing.T) {
 		isAtt, subnet := IsAttestationTopic("beacon_attestation_0")
 		assert.True(t, isAtt)
 		assert.Equal(t, uint64(0), subnet)
-		
+
 		isAtt, _ = IsAttestationTopic("beacon_block")
 		assert.False(t, isAtt)
 
 		isSync, subnet := IsSyncCommitteeTopic("sync_committee_0")
 		assert.True(t, isSync)
 		assert.Equal(t, uint64(0), subnet)
-		
+
 		isSync, _ = IsSyncCommitteeTopic("beacon_block")
 		assert.False(t, isSync)
 	})
@@ -173,7 +171,7 @@ func TestTypedHandlers(t *testing.T) {
 
 	t.Run("Subnet validation", func(t *testing.T) {
 		ctx := context.Background()
-		
+
 		// Test attestation subnet validation
 		handler := func(ctx context.Context, att *pb.Attestation, subnet uint64, from peer.ID) error {
 			return nil
@@ -193,7 +191,7 @@ func TestTypedHandlers(t *testing.T) {
 
 	t.Run("SyncCommittee subnet validation", func(t *testing.T) {
 		ctx := context.Background()
-		
+
 		handler := func(ctx context.Context, msg *pb.SyncCommitteeMessage, subnet uint64, from peer.ID) error { //nolint:staticcheck // deprecated but still functional
 			return nil
 		}
@@ -212,7 +210,7 @@ func TestTypedHandlers(t *testing.T) {
 	t.Run("Topic construction in handlers", func(t *testing.T) {
 		// Test that correct topics are constructed for different handler types
 		forkDigest := g.forkDigest
-		
+
 		// Verify topic construction matches expected patterns
 		beaconTopic := BeaconBlockTopic(forkDigest)
 		assert.Contains(t, beaconTopic, "beacon_block")
@@ -278,10 +276,10 @@ func TestValidatorIntegration(t *testing.T) {
 	t.Run("Validator topic construction", func(t *testing.T) {
 		// Test that validators use correct topics
 		forkDigest := g.forkDigest
-		
+
 		expectedBeaconTopic := BeaconBlockTopic(forkDigest)
 		assert.Contains(t, expectedBeaconTopic, "beacon_block")
-		
+
 		expectedAttTopic := AttestationSubnetTopic(forkDigest, 5)
 		assert.Contains(t, expectedAttTopic, "beacon_attestation_5")
 	})
@@ -361,7 +359,7 @@ func TestPublishingHelpers(t *testing.T) {
 	})
 
 	t.Run("PublishSyncCommitteeMessage invalid subnet", func(t *testing.T) {
-		testMsg := &pb.SyncCommitteeMessage{} //nolint:staticcheck // deprecated but still functional
+		testMsg := &pb.SyncCommitteeMessage{}      //nolint:staticcheck // deprecated but still functional
 		subnet := uint64(SyncCommitteeSubnetCount) // Invalid subnet
 
 		err := g.PublishSyncCommitteeMessage(ctx, testMsg, subnet)

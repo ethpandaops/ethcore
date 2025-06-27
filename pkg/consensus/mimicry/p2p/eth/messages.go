@@ -83,7 +83,6 @@ type GlobalTopicValidators struct {
 	BlsToExecutionChange     func(*pb.SignedBLSToExecutionChange) error
 }
 
-
 // Message type detection helpers
 
 // IsBeaconBlockTopic checks if a topic is a beacon block topic

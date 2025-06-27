@@ -560,7 +560,7 @@ func BenchmarkHandlerProcessing(b *testing.B) {
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			hr.processMessage(ctx, testMsg)
+			_ = hr.processMessage(ctx, testMsg)
 		}
 	})
 }
@@ -592,7 +592,7 @@ func BenchmarkAsyncHandler(b *testing.B) {
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			asyncHandler(ctx, testMsg)
+			_ = asyncHandler(ctx, testMsg)
 		}
 	})
 }
