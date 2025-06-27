@@ -160,7 +160,9 @@ func setupTestNetwork(t *testing.T, nodeCount int) *TestNetwork {
 		gs, err := pubsub.NewGossipsub(logger, hosts[i], config)
 		require.NoError(t, err)
 
-		err = gs.Start(ctx)
+		// Use a separate context for gossipsub that won't be cancelled during test cleanup
+		gsCtx := context.Background()
+		err = gs.Start(gsCtx)
 		require.NoError(t, err)
 
 		gossipsubs[i] = gs
