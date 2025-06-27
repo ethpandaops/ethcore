@@ -652,6 +652,7 @@ func testMessageValidation(t *testing.T, network *TestNetwork) {
 
 // testPeerScoring tests peer scoring functionality
 func testPeerScoring(t *testing.T, network *TestNetwork) {
+	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 	defer cancel()
 
@@ -716,6 +717,7 @@ func testPeerScoring(t *testing.T, network *TestNetwork) {
 
 // testConcurrentOperations tests concurrent operations across the network
 func testConcurrentOperations(t *testing.T, network *TestNetwork) {
+	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 	defer cancel()
 
@@ -813,6 +815,7 @@ func TestGossipsubPerformance(t *testing.T) {
 
 // testHighVolumeMessagePropagation tests handling of high message volumes
 func testHighVolumeMessagePropagation(t *testing.T, network *TestNetwork) {
+	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), performanceTimeout)
 	defer cancel()
 
@@ -883,6 +886,7 @@ func testHighVolumeMessagePropagation(t *testing.T, network *TestNetwork) {
 
 // testLatencyMeasurement measures message propagation latency
 func testLatencyMeasurement(t *testing.T, network *TestNetwork) {
+	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 	defer cancel()
 
@@ -971,6 +975,7 @@ func testLatencyMeasurement(t *testing.T, network *TestNetwork) {
 
 // testThroughputMeasurement measures sustained throughput
 func testThroughputMeasurement(t *testing.T, network *TestNetwork) {
+	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), performanceTimeout)
 	defer cancel()
 
@@ -1053,6 +1058,7 @@ measureResults:
 
 // testConcurrentSubscriptions tests handling many concurrent subscriptions
 func testConcurrentSubscriptions(t *testing.T, network *TestNetwork) {
+	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 	defer cancel()
 

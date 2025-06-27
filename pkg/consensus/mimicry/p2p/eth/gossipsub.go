@@ -63,7 +63,7 @@ func (g *Gossipsub) SubscribeProposerSlashing(ctx context.Context, handler Propo
 	return g.Subscribe(ctx, topic, msgHandler)
 }
 
-// SubscribeAttesterSlashing subscribes to attester slashing messages
+// SubscribeAttesterSlashing subscribes to attester slashing messages.
 func (g *Gossipsub) SubscribeAttesterSlashing(ctx context.Context, handler AttesterSlashingHandler) error {
 	topic := AttesterSlashingTopic(g.forkDigest)
 
@@ -71,7 +71,7 @@ func (g *Gossipsub) SubscribeAttesterSlashing(ctx context.Context, handler Attes
 	return g.Subscribe(ctx, topic, msgHandler)
 }
 
-// SubscribeSyncContributionAndProof subscribes to sync contribution and proof messages
+// SubscribeSyncContributionAndProof subscribes to sync contribution and proof messages.
 func (g *Gossipsub) SubscribeSyncContributionAndProof(ctx context.Context, handler SyncContributionAndProofHandler) error {
 	topic := SyncContributionAndProofTopic(g.forkDigest)
 
@@ -79,7 +79,7 @@ func (g *Gossipsub) SubscribeSyncContributionAndProof(ctx context.Context, handl
 	return g.Subscribe(ctx, topic, msgHandler)
 }
 
-// SubscribeBlsToExecutionChange subscribes to BLS to execution change messages
+// SubscribeBlsToExecutionChange subscribes to BLS to execution change messages.
 func (g *Gossipsub) SubscribeBlsToExecutionChange(ctx context.Context, handler BlsToExecutionChangeHandler) error {
 	topic := BlsToExecutionChangeTopic(g.forkDigest)
 

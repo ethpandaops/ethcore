@@ -5,14 +5,14 @@ import (
 	"fmt"
 )
 
-// Error wraps an error with additional context for pubsub operations
+// Error wraps an error with additional context for pubsub operations.
 type Error struct {
 	err     error
 	context string
 	topic   string
 }
 
-// NewError creates a new Error with context
+// NewError creates a new Error with context.
 func NewError(err error, context string) *Error {
 	return &Error{
 		err:     err,
@@ -20,7 +20,7 @@ func NewError(err error, context string) *Error {
 	}
 }
 
-// NewTopicError creates a new Error with topic and context
+// NewTopicError creates a new Error with topic and context.
 func NewTopicError(err error, topic string, context string) *Error {
 	return &Error{
 		err:     err,
