@@ -317,11 +317,11 @@ func (m *MetadataService) DeriveNetwork(_ context.Context) error {
 	return nil
 }
 
-func (m *MetadataService) fetchSpec(ctx context.Context) error {
+func (m *MetadataService) fetchSpec(_ context.Context) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	spec, err := m.beacon.FetchSpec(ctx)
+	spec, err := m.beacon.Spec()
 	if err != nil {
 		return err
 	}
@@ -331,11 +331,11 @@ func (m *MetadataService) fetchSpec(ctx context.Context) error {
 	return nil
 }
 
-func (m *MetadataService) fetchGenesis(ctx context.Context) error {
+func (m *MetadataService) fetchGenesis(_ context.Context) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	genesis, err := m.beacon.FetchGenesis(ctx)
+	genesis, err := m.beacon.Genesis()
 	if err != nil {
 		return err
 	}

@@ -2,32 +2,27 @@ package crawler_test
 
 import (
 	"context"
-	"fmt"
 	"net"
-	"os"
-	"regexp"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/ethpandaops/beacon/pkg/beacon"
 	"github.com/ethpandaops/beacon/pkg/beacon/api/types"
 	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/crawler"
 	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/host"
 	"github.com/ethpandaops/ethcore/pkg/discovery"
 	"github.com/ethpandaops/ethcore/pkg/ethereum"
+	"github.com/ethpandaops/ethcore/pkg/testutil/kurtosis"
+	"github.com/ethpandaops/ethereum-package-go/pkg/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 )
 
-// Kurtosis enclave name validation regex.
-var enclaveNameRegex = regexp.MustCompile(`^[-A-Za-z0-9]{1,60}$`)
-
-// TestConfig holds configuration for the crawler tests.
-type TestConfig struct {
-	// NetworkConfig is the configuration for the network environment.
-	NetworkConfig *NetworkConfig
+// TestCrawlerConfig holds configuration for the crawler tests.
+type TestCrawlerConfig struct {
 	// CrawlerTimeout is the timeout for crawler operations.
 	CrawlerTimeout time.Duration
 	// DialConcurrency is the number of concurrent dials.
@@ -36,84 +31,55 @@ type TestConfig struct {
 	CooloffDuration time.Duration
 }
 
-// TestOptions holds options for the crawler tests.
-type TestOptions struct {
-	// Config is the test configuration
-	Config *TestConfig
-	// Logger is the logger for the tests
-	Logger *logrus.Logger
-}
-
-// DefaultTestConfig returns a default configuration for the crawler tests.
-func DefaultTestConfig() *TestConfig {
-	return &TestConfig{
-		NetworkConfig:   DefaultNetworkConfig(),
-		CrawlerTimeout:  CrawlerTimeout,
-		DialConcurrency: CrawlerDialConcurrency,
-		CooloffDuration: CrawlerCooloffDuration,
+// DefaultTestCrawlerConfig returns a default configuration for the crawler tests.
+func DefaultTestCrawlerConfig() *TestCrawlerConfig {
+	return &TestCrawlerConfig{
+		CrawlerTimeout:  60 * time.Second,
+		DialConcurrency: 10,
+		CooloffDuration: 1 * time.Second,
 	}
-}
-
-// DefaultTestOptions returns default options for the crawler tests.
-func DefaultTestOptions() *TestOptions {
-	return &TestOptions{
-		Config: DefaultTestConfig(),
-		Logger: nil, // Will be initialized in the test
-	}
-}
-
-// validateEnclaveName validates that the enclave name follows Kurtosis's naming rules.
-func validateEnclaveName(name string) error {
-	if !enclaveNameRegex.MatchString(name) {
-		return fmt.Errorf("enclave name '%s' doesn't match allowed enclave name regex '^[-A-Za-z0-9]{1,60}$'", name)
-	}
-
-	return nil
 }
 
 // Test_RunKurtosisTests runs the network-based tests.
 func Test_RunKurtosisTests(t *testing.T) {
-	// Initialize test options
-	options := DefaultTestOptions()
+	// Get the shared test foundation config from TestMain
+	testConfig := GetTestFoundation()
+	require.NotNil(t, testConfig, "Test foundation config must be initialized")
 
-	// Override from environment variables if provided.
-	if envEnclave := os.Getenv("KURTOSIS_ENCLAVE"); envEnclave != "" {
-		// Validate the enclave name.
-		if err := validateEnclaveName(envEnclave); err != nil {
-			t.Fatalf("Invalid enclave name: %v", err)
-		}
-
-		options.Config.NetworkConfig.NetworkName = envEnclave
-	}
-
-	if os.Getenv("KEEP_ENCLAVE") == "true" {
-		options.Config.NetworkConfig.KeepNetwork = true
-	}
+	// Get or create the actual network using kurtosis.GetNetwork with real testing.T
+	foundation, err := kurtosis.GetNetwork(t, testConfig.Config)
+	require.NoError(t, err, "Failed to get network")
 
 	// Initialize logger
-	logger := logrus.New()
-	logger.SetLevel(logrus.InfoLevel)
-	options.Logger = logger
+	logger := foundation.Logger
+	if logger == nil {
+		logger = logrus.New()
+		logger.SetLevel(logrus.InfoLevel)
+	}
 
-	// Setup the network environment
-	testFoundation := SetupKurtosisEnvironment(t, options.Config.NetworkConfig, logger)
+	// Initialize test config for crawler-specific settings
+	crawlerConfig := DefaultTestCrawlerConfig()
 
-	// Run all the network tests in parallel
-	t.Run("ListParticipants", func(t *testing.T) {
-		ListParticipants(t, testFoundation)
+	// Get the EPG network from foundation
+	epgNetwork := kurtosis.GetEPGNetwork(foundation)
+	require.NotNil(t, epgNetwork, "EPG network must be available")
+
+	// Run all the network tests
+	t.Run("list-network-participants", func(t *testing.T) {
+		ListParticipants(t, foundation, epgNetwork)
 	})
-	t.Run("AllDiscoverableNodes", func(t *testing.T) {
-		AllDiscoverableNodes(t, testFoundation, options)
+	t.Run("discover-crawlable-nodes", func(t *testing.T) {
+		AllDiscoverableNodes(t, foundation, epgNetwork, crawlerConfig, logger)
 	})
 }
 
 // ListParticipants lists all participants in the network environment.
-func ListParticipants(t *testing.T, tf *TestFoundation) {
+func ListParticipants(t *testing.T, tf *kurtosis.TestFoundation, network network.Network) {
 	t.Helper()
 
 	// List all consensus clients
-	consensusClients := tf.Network.ConsensusClients().All()
-	executionClients := tf.Network.ExecutionClients().All()
+	consensusClients := network.ConsensusClients().All()
+	executionClients := network.ExecutionClients().All()
 
 	t.Logf("Found %d consensus clients in network:", len(consensusClients))
 	for _, client := range consensusClients {
@@ -127,20 +93,11 @@ func ListParticipants(t *testing.T, tf *TestFoundation) {
 }
 
 // AllDiscoverableNodes tests that all nodes are discoverable.
-func AllDiscoverableNodes(t *testing.T, tf *TestFoundation, options *TestOptions) {
+func AllDiscoverableNodes(t *testing.T, tf *kurtosis.TestFoundation, network network.Network, config *TestCrawlerConfig, logger *logrus.Logger) {
 	t.Helper()
 
-	logger := options.Logger
-
-	// Wait until genesis has happened
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-	defer cancel()
-
-	err := tf.WaitForGenesis(ctx)
-	require.NoError(t, err, "Failed waiting for genesis")
-
 	// Get all our peer IDs
-	identities, successful := setupNodeTracking(t, tf, logger)
+	identities, successful := setupNodeTracking(t, tf, network, logger)
 
 	// Create mutex for synchronizing access to the successful map
 	mu := &sync.Mutex{}
@@ -149,7 +106,7 @@ func AllDiscoverableNodes(t *testing.T, tf *TestFoundation, options *TestOptions
 	manual := &discovery.Manual{}
 
 	// Setup and start the crawler
-	cr := setupCrawler(t, tf, logger, manual, options.Config)
+	cr := setupCrawler(t, tf, network, logger, manual, config)
 
 	// Create a sink of the crawler's events
 	setupCrawlerEventHandlers(t, cr, logger, identities, successful, mu)
@@ -158,16 +115,16 @@ func AllDiscoverableNodes(t *testing.T, tf *TestFoundation, options *TestOptions
 	select {
 	case <-cr.OnReady:
 		logger.Info("Crawler is ready")
-	case <-time.After(options.Config.CrawlerTimeout):
+	case <-time.After(config.CrawlerTimeout):
 		t.Fatal("Timed out waiting for crawler to be ready")
 	}
 
 	// Feed ENRs to the crawler and wait for results
-	feedENRsToCrawler(t, tf, logger, manual, successful, mu, options.Config.CrawlerTimeout)
+	feedENRsToCrawler(t, tf, network, logger, manual, successful, mu, config.CrawlerTimeout)
 }
 
 // setupNodeTracking sets up tracking of node identities and crawl status.
-func setupNodeTracking(t *testing.T, tf *TestFoundation, logger *logrus.Logger) (map[string]*types.Identity, map[string]bool) {
+func setupNodeTracking(t *testing.T, tf *kurtosis.TestFoundation, network network.Network, logger *logrus.Logger) (map[string]*types.Identity, map[string]bool) {
 	t.Helper()
 
 	var (
@@ -175,28 +132,64 @@ func setupNodeTracking(t *testing.T, tf *TestFoundation, logger *logrus.Logger) 
 		successful = make(map[string]bool)
 	)
 
-	for _, bn := range tf.BeaconNodes {
-		identity, err := bn.Node.FetchNodeIdentity(context.Background())
-		require.NoError(t, err, "Failed to fetch node identity")
+	// Get all consensus clients
+	consensusClients := network.ConsensusClients().All()
 
-		identities[bn.Client.Name()] = identity
-		successful[bn.Client.Name()] = false
+	for _, client := range consensusClients {
+		// Create a beacon node client to fetch identity
+		opts := beacon.DefaultOptions()
+		opts.HealthCheck.Interval.Duration = 250 * time.Millisecond
 
-		logger.Infof("Identified peer ID for %s: %s", bn.Client.Name(), identity.PeerID)
+		beaconNode := beacon.NewNode(
+			logger.WithField("client", client.Name()),
+			&beacon.Config{
+				Name: client.Name(),
+				Addr: client.BeaconAPIURL(),
+			},
+			"testing",
+			*opts,
+		)
+
+		// Start the beacon node temporarily
+		nodeCtx, nodeCancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer nodeCancel()
+
+		go func() {
+			if err := beaconNode.Start(nodeCtx); err != nil {
+				logger.WithError(err).Warnf("Failed to start beacon node %s", client.Name())
+			}
+		}()
+
+		// Wait for it to be healthy
+		for i := 0; i < 20; i++ {
+			if beaconNode.Healthy() {
+				break
+			}
+			time.Sleep(500 * time.Millisecond)
+		}
+
+		identity, err := beaconNode.FetchNodeIdentity(context.Background())
+		require.NoError(t, err, "Failed to fetch node identity for %s", client.Name())
+
+		identities[client.Name()] = identity
+		successful[client.Name()] = false
+
+		logger.Infof("Identified peer ID for %s: %s", client.Name(), identity.PeerID)
 	}
 
 	return identities, successful
 }
 
 // setupCrawler creates and starts a crawler instance.
-func setupCrawler(t *testing.T, tf *TestFoundation, logger *logrus.Logger, manual *discovery.Manual, config *TestConfig) *crawler.Crawler {
+func setupCrawler(t *testing.T, tf *kurtosis.TestFoundation, network network.Network, logger *logrus.Logger, manual *discovery.Manual, config *TestCrawlerConfig) *crawler.Crawler {
 	t.Helper()
 
-	// Get the first beacon node
-	require.NotEmpty(t, tf.BeaconNodes, "No beacon nodes found")
+	// Get the first consensus client
+	consensusClients := network.ConsensusClients().All()
+	require.NotEmpty(t, consensusClients, "No consensus clients found")
 
-	firstBeacon := tf.BeaconNodes[0]
-	logger.Infof("Using beacon node: %s", firstBeacon.Client.Name())
+	firstClient := consensusClients[0]
+	logger.Infof("Using beacon node: %s", firstClient.Name())
 
 	// Create and start the crawler
 	cr := crawler.New(logger, &crawler.Config{
@@ -206,8 +199,8 @@ func setupCrawler(t *testing.T, tf *TestFoundation, logger *logrus.Logger, manua
 			IPAddr: net.ParseIP("127.0.0.1"),
 		},
 		Beacon: &ethereum.Config{
-			BeaconNodeAddress: firstBeacon.Client.BeaconAPIURL(),
-			Network:           "kurtosis",
+			BeaconNodeAddress: firstClient.BeaconAPIURL(),
+			NetworkOverride:   "kurtosis",
 		},
 	}, "mimicry/crawler", "mimicry", manual)
 
@@ -256,27 +249,61 @@ func setupCrawlerEventHandlers(t *testing.T, cr *crawler.Crawler, logger *logrus
 }
 
 // feedENRsToCrawler feeds ENRs to the crawler and waits for results.
-func feedENRsToCrawler(t *testing.T, tf *TestFoundation, logger *logrus.Logger, manual *discovery.Manual, successful map[string]bool, mu *sync.Mutex, timeout time.Duration) {
+func feedENRsToCrawler(t *testing.T, tf *kurtosis.TestFoundation, network network.Network, logger *logrus.Logger, manual *discovery.Manual, successful map[string]bool, mu *sync.Mutex, timeout time.Duration) {
 	t.Helper()
 
 	// Create a context with timeout for crawler operations
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
+	// Get all consensus clients
+	consensusClients := network.ConsensusClients().All()
+
 	// Start feeding in the ENR's
 	go func() {
 		// Get all our enrs
-		for _, bn := range tf.BeaconNodes {
-			identity, err := bn.Node.FetchNodeIdentity(context.Background())
+		for _, client := range consensusClients {
+			// Create a beacon node client to fetch identity
+			opts := beacon.DefaultOptions()
+			opts.HealthCheck.Interval.Duration = 250 * time.Millisecond
+
+			beaconNode := beacon.NewNode(
+				logger.WithField("client", client.Name()),
+				&beacon.Config{
+					Name: client.Name(),
+					Addr: client.BeaconAPIURL(),
+				},
+				"testing",
+				*opts,
+			)
+
+			// Start the beacon node temporarily
+			nodeCtx, nodeCancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer nodeCancel()
+
+			go func() {
+				if err := beaconNode.Start(nodeCtx); err != nil {
+					logger.WithError(err).Warnf("Failed to start beacon node %s", client.Name())
+				}
+			}()
+
+			// Wait for it to be healthy
+			for i := 0; i < 20; i++ {
+				if beaconNode.Healthy() {
+					break
+				}
+				time.Sleep(500 * time.Millisecond)
+			}
+
+			identity, err := beaconNode.FetchNodeIdentity(context.Background())
 			require.NoError(t, err, "Failed to fetch node identity")
 
-			if complete, ok := successful[bn.Client.Name()]; ok && complete {
-				logger.Infof("Already have status/metadata for participant: %s", bn.Client.Name())
-
+			if complete, ok := successful[client.Name()]; ok && complete {
+				logger.Infof("Already have status/metadata for participant: %s", client.Name())
 				continue
 			}
 
-			logger.Infof("Adding node %s's ENR to discovery pool (%s)", bn.Client.Name(), identity.ENR)
+			logger.Infof("Adding node %s's ENR to discovery pool (%s)", client.Name(), identity.ENR)
 
 			en, err := discovery.ENRToEnode(identity.ENR)
 			require.NoError(t, err, "Failed to convert ENR to enode")

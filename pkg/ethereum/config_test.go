@@ -18,7 +18,7 @@ func TestConfig_Validate(t *testing.T) {
 			name: "valid config with all fields",
 			config: Config{
 				BeaconNodeAddress: "http://localhost:5052",
-				Network:           "mainnet",
+				NetworkOverride:   "mainnet",
 				BeaconNodeHeaders: map[string]string{
 					"Authorization": "Bearer token",
 					"X-Custom":      "value",
@@ -36,7 +36,7 @@ func TestConfig_Validate(t *testing.T) {
 		{
 			name: "invalid config - missing beacon node address",
 			config: Config{
-				Network: "mainnet",
+				NetworkOverride: "mainnet",
 			},
 			wantErr: true,
 			errMsg:  "beaconNodeAddress is required",
@@ -45,7 +45,7 @@ func TestConfig_Validate(t *testing.T) {
 			name: "valid config with empty network",
 			config: Config{
 				BeaconNodeAddress: "http://localhost:5052",
-				Network:           "",
+				NetworkOverride:   "",
 			},
 			wantErr: false,
 		},

@@ -1,90 +1,113 @@
+// Package ethereum provides Ethereum beacon node functionality
 package ethereum
 
 import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/ethpandaops/beacon/pkg/beacon"
 	"github.com/ethpandaops/ethcore/pkg/ethereum/beacon/services"
+	"github.com/ethpandaops/ethwallclock"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
+// BeaconNode represents a connection to an Ethereum beacon node and manages any associated services (eg: metadata, etc).
 type BeaconNode struct {
-	config *Config
-	log    logrus.FieldLogger
-
-	beacon beacon.Node
-
-	services []services.Service
-
+	config           *Config
+	log              logrus.FieldLogger
+	beacon           beacon.Node
+	metadataSvc      *services.MetadataService
+	healthy          atomic.Bool
 	onReadyCallbacks []func(ctx context.Context) error
 }
 
-func NewBeaconNode(ctx context.Context, name string, config *Config, log logrus.FieldLogger, namespace string, opts beacon.Options) (*BeaconNode, error) {
-	node := beacon.NewNode(log, &beacon.Config{
-		Name:    name,
+// NewBeaconNode creates a new beacon node instance with the given configuration. It initializes any services and
+// configures the beacon subscriptions.
+func NewBeaconNode(
+	log logrus.FieldLogger,
+	namespace string,
+	config *Config,
+	opts beacon.Options,
+) (*BeaconNode, error) {
+	// Give the ethpandaops/beacon a logger that is suppressed to warn level.
+	// We'll handle any beacon specific info-level logging ourselves.
+	beaconLogger := logrus.New()
+	beaconLogger.SetLevel(logrus.WarnLevel)
+
+	// Create the beacon node.
+	node := beacon.NewNode(beaconLogger, &beacon.Config{
 		Addr:    config.BeaconNodeAddress,
 		Headers: config.BeaconNodeHeaders,
 	}, namespace, opts)
 
-	metadata := services.NewMetadataService(log, node, config.Network)
-
-	svcs := []services.Service{
-		&metadata,
-	}
+	// Initialize services.
+	metadata := services.NewMetadataService(log, node, config.NetworkOverride)
 
 	return &BeaconNode{
-		config:   config,
-		log:      log.WithField("module", "ethcore/ethereum/beacon"),
-		beacon:   node,
-		services: svcs,
+		log:         log,
+		config:      config,
+		beacon:      node,
+		metadataSvc: &metadata,
 	}, nil
 }
 
 func (b *BeaconNode) Start(ctx context.Context) error {
 	errs := make(chan error, 1)
+	ready := make(chan struct{})
 
-	go func() {
-		wg := sync.WaitGroup{}
+	// Register callback for when the node becomes healthy
+	b.beacon.OnFirstTimeHealthy(ctx, func(ctx context.Context, event *beacon.FirstTimeHealthyEvent) error {
+		b.log.Debug("Upstream beacon node is healthy")
 
-		for _, service := range b.services {
-			wg.Add(1)
+		b.healthy.Store(true)
 
-			service.OnReady(ctx, func(ctx context.Context) error {
-				b.log.WithField("service", service.Name()).Info("Service is ready")
-
-				wg.Done()
-
-				return nil
-			})
-
-			b.log.WithField("service", service.Name()).Info("Starting service")
-
-			if err := service.Start(ctx); err != nil {
-				errs <- fmt.Errorf("failed to start service: %w", err)
-			}
-
-			wg.Wait()
-		}
-
-		b.log.Info("All services are ready")
-
-		for _, callback := range b.onReadyCallbacks {
-			if err := callback(ctx); err != nil {
-				errs <- fmt.Errorf("failed to run on ready callback: %w", err)
+		// Ensure the beacon is actually reporting as healthy before starting services
+		// This handles any timing issues between the event and the health status
+		for !b.beacon.Healthy() {
+			select {
+			case <-time.After(100 * time.Millisecond):
+				b.log.Debug("Waiting for beacon health status to stabilize")
+			case <-ctx.Done():
+				return ctx.Err()
 			}
 		}
-	}()
 
-	if err := b.beacon.Start(ctx); err != nil {
-		return err
-	}
+		// Use the existing startServices method
+		if err := b.startServices(ctx, errs); err != nil {
+			return err
+		}
 
+		// Services are now ready, run onReady callbacks
+		go func() {
+			b.log.Info("All services are ready")
+
+			// Run onReady callbacks
+			for _, callback := range b.onReadyCallbacks {
+				if err := callback(ctx); err != nil {
+					errs <- fmt.Errorf("failed to run on ready callback: %w", err)
+
+					return
+				}
+			}
+
+			close(ready)
+		}()
+
+		return nil
+	})
+
+	// Start the beacon node asynchronously
+	b.beacon.StartAsync(ctx)
+
+	// Wait for either completion, error, or context cancellation
 	select {
+	case <-ready:
+		return nil
 	case err := <-errs:
 		return err
 	case <-ctx.Done():
@@ -92,72 +115,81 @@ func (b *BeaconNode) Start(ctx context.Context) error {
 	}
 }
 
-func (b *BeaconNode) Node() beacon.Node {
-	return b.beacon
-}
+// Stop gracefully shuts down the beacon node and its services.
+func (b *BeaconNode) Stop(ctx context.Context) error {
+	b.log.Info("Stopping beacon node")
+	b.healthy.Store(false)
 
-func (b *BeaconNode) getServiceByName(name services.Name) (services.Service, error) {
-	for _, service := range b.services {
-		if service.Name() == name {
-			return service, nil
-		}
+	b.log.WithField("service", b.metadataSvc.Name()).Info("Stopping service")
+
+	if err := b.metadataSvc.Stop(ctx); err != nil {
+		b.log.WithError(err).WithField("service", b.metadataSvc.Name()).Error("Failed to stop service")
 	}
 
-	return nil, errors.New("service not found")
-}
-
-func (b *BeaconNode) Metadata() *services.MetadataService {
-	service, err := b.getServiceByName("metadata")
-	if err != nil {
-		// This should never happen. If it does, good luck.
-		return nil
+	if err := b.beacon.Stop(ctx); err != nil {
+		return fmt.Errorf("failed to stop beacon node: %w", err)
 	}
 
-	metadata, ok := service.(*services.MetadataService)
-	if !ok {
-		return nil
-	}
-
-	return metadata
+	return nil
 }
 
-func (b *BeaconNode) OnReady(_ context.Context, callback func(ctx context.Context) error) {
-	b.onReadyCallbacks = append(b.onReadyCallbacks, callback)
-}
-
+// Synced checks if the beacon node is synced and ready
+// It verifies sync state, wallclock, and service readiness.
 func (b *BeaconNode) Synced(ctx context.Context) error {
 	status := b.beacon.Status()
 	if status == nil {
 		return errors.New("missing beacon status")
 	}
 
-	syncState := status.SyncState()
-	if syncState == nil {
-		return errors.New("missing beacon node status sync state")
-	}
-
-	if syncState.SyncDistance > 3 {
-		return errors.New("beacon node is not synced")
-	}
-
-	wallclock := b.Metadata().GetWallclock()
+	wallclock := b.metadataSvc.GetWallclock()
 	if wallclock == nil {
 		return errors.New("missing wallclock")
 	}
 
-	currentSlot := wallclock.Slots().Current()
-
-	if currentSlot.Number()-uint64(syncState.HeadSlot) > 32 {
-		return fmt.Errorf("beacon node is too far behind head, head slot is %d, current slot is %d", syncState.HeadSlot, currentSlot.Number())
-	}
-
-	for _, service := range b.services {
-		if err := service.Ready(ctx); err != nil {
-			return errors.Wrapf(err, "service %s is not ready", service.Name())
-		}
+	if err := b.metadataSvc.Ready(ctx); err != nil {
+		return errors.Wrapf(err, "service %s is not ready", b.metadataSvc.Name())
 	}
 
 	return nil
+}
+
+// Node returns the underlying beacon node instance.
+func (b *BeaconNode) Node() beacon.Node {
+	return b.beacon
+}
+
+// Metadata returns the metadata service instance.
+func (b *BeaconNode) Metadata() *services.MetadataService {
+	return b.metadataSvc
+}
+
+func (b *BeaconNode) OnReady(_ context.Context, callback func(ctx context.Context) error) {
+	b.onReadyCallbacks = append(b.onReadyCallbacks, callback)
+}
+
+// GetWallclock returns the wallclock for the beacon chain.
+func (b *BeaconNode) GetWallclock() *ethwallclock.EthereumBeaconChain {
+	return b.metadataSvc.GetWallclock()
+}
+
+// GetSlot returns the wallclock slot for a given slot number.
+func (b *BeaconNode) GetSlot(slot uint64) ethwallclock.Slot {
+	return b.metadataSvc.GetWallclock().Slots().FromNumber(slot)
+}
+
+// GetEpoch returns the wallclock epoch for a given slot number.
+func (b *BeaconNode) GetEpoch(epoch uint64) ethwallclock.Epoch {
+	return b.metadataSvc.GetWallclock().Epochs().FromNumber(epoch)
+}
+
+// GetEpochFromSlot returns the wallclock epoch for a given slot.
+func (b *BeaconNode) GetEpochFromSlot(slot uint64) ethwallclock.Epoch {
+	return b.metadataSvc.GetWallclock().Epochs().FromSlot(slot)
+}
+
+// IsHealthy returns whether the node is healthy.
+func (b *BeaconNode) IsHealthy() bool {
+	return b.healthy.Load()
 }
 
 func (b *BeaconNode) ForkDigest() (phase0.ForkDigest, error) {
@@ -201,4 +233,46 @@ func (b *BeaconNode) ForkDigest() (phase0.ForkDigest, error) {
 	}
 
 	return forkDigest, nil
+}
+
+func (b *BeaconNode) startServices(ctx context.Context, errs chan error) error {
+	serviceReady := make(chan struct{})
+
+	b.metadataSvc.OnReady(ctx, func(ctx context.Context) error {
+		b.log.WithField("service", b.metadataSvc.Name()).Debug("Service is ready")
+
+		hashed, err := b.metadataSvc.GetNodeIDHash()
+		if err != nil {
+			return err
+		}
+
+		b.log.WithFields(logrus.Fields{
+			"node_id":    hashed,
+			"network_id": b.metadataSvc.Network.ID,
+			"network":    b.metadataSvc.Network.Name,
+			"hash":       hashed,
+		}).Info("Detected network and node ID hash")
+
+		close(serviceReady)
+
+		return nil
+	})
+
+	b.log.WithField("service", b.metadataSvc.Name()).Debug("Starting service")
+
+	if err := b.metadataSvc.Start(ctx); err != nil {
+		errs <- fmt.Errorf("failed to start service: %w", err)
+
+		return err
+	}
+
+	b.log.WithField("service", b.metadataSvc.Name()).Debug("Waiting for service to be ready")
+
+	// Wait for the service to actually be ready before returning
+	select {
+	case <-serviceReady:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }

@@ -24,6 +24,7 @@ import (
 	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/eth"
 	"github.com/ethpandaops/ethcore/pkg/discovery"
 	"github.com/ethpandaops/ethcore/pkg/ethereum"
+	ecbeacon "github.com/ethpandaops/ethcore/pkg/ethereum/beacon"
 	"github.com/go-co-op/gocron/v2"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -115,7 +116,19 @@ func (c *Crawler) Start(ctx context.Context) error {
 	opts.BeaconSubscription.Enabled = true
 	opts.BeaconSubscription.Topics = []string{"head"}
 
-	b, err := ethereum.NewBeaconNode(ctx, "beacon_node", c.config.Beacon, c.log, "crawler", *opts)
+	traceID, err := ecbeacon.GenerateBeaconTraceID(c.config.Beacon.BeaconNodeAddress)
+	if err != nil {
+		return fmt.Errorf("failed to generate traceID: %w", err)
+	}
+
+	c.log = c.log.WithField("trace_id", traceID)
+
+	b, err := ethereum.NewBeaconNode(
+		c.log,
+		"ethcore/ethereum/consensus/mimicry/crawler",
+		c.config.Beacon,
+		*opts,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to create upstream beacon node: %w", err)
 	}
@@ -131,7 +144,7 @@ func (c *Crawler) Start(ctx context.Context) error {
 	// - Start our node dialer
 	// - Start the crons
 	c.beacon.OnReady(ctx, func(ctx context.Context) error {
-		c.log.Info("Beacon node is ready")
+		c.log.Info("Beacon node is ready WEEEE")
 
 		operation := func() (string, error) {
 			if err := c.fetchAndSetStatus(ctx); err != nil {
