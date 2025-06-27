@@ -146,6 +146,7 @@ func (m *ProcessorMetrics) RecordProcessingTime(duration time.Duration) {
 	defer m.mu.Unlock()
 	m.totalProcessingTime += duration
 	processed := atomic.LoadUint64(&m.messagesProcessed)
+
 	if processed > 0 {
 		m.avgProcessingTime = m.totalProcessingTime / time.Duration(processed)
 	}
@@ -398,13 +399,14 @@ func (smp *SelfSubscribingMultiProcessor[T]) Unsubscribe(ctx context.Context, su
 	for _, subnet := range subnets {
 		if activeMap[subnet] {
 			// Get the topic for this subnet
-			topics := smp.MultiProcessor.AllPossibleTopics()
+			topics := smp.AllPossibleTopics()
 			if int(subnet) < len(topics) {
 				if err := smp.gossipsub.Unsubscribe(topics[subnet]); err != nil {
 					smp.log.WithError(err).WithField("subnet", subnet).Error("Failed to unsubscribe from subnet")
 					// Continue unsubscribing from other subnets
 				}
 			}
+
 			delete(activeMap, subnet)
 		}
 	}

@@ -9,7 +9,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const testTopic = "test/topic"
+const (
+	testTopic            = "test/topic"
+	alreadyRegisteredMsg = "already registered"
+)
 
 func TestNewError(t *testing.T) {
 	baseErr := errors.New("base error")
@@ -130,7 +133,7 @@ func TestPredefinedErrors(t *testing.T) {
 	// Test error messages
 	assert.Equal(t, "pubsub not started", ErrNotStarted.Error())
 	assert.Equal(t, "pubsub already started", ErrAlreadyStarted.Error())
-	assert.Equal(t, "already registered", ErrAlreadyRegistered.Error())
+	assert.Equal(t, alreadyRegisteredMsg, ErrAlreadyRegistered.Error())
 }
 
 func TestIsAlreadyRegisteredError(t *testing.T) {
@@ -145,17 +148,17 @@ func TestIsAlreadyRegisteredError(t *testing.T) {
 			expected: false,
 		},
 		{
-			name:     "already registered error",
+			name:     alreadyRegisteredMsg + " error",
 			err:      ErrAlreadyRegistered,
 			expected: true,
 		},
 		{
-			name:     "wrapped already registered error",
+			name:     "wrapped " + alreadyRegisteredMsg + " error",
 			err:      fmt.Errorf("processor already registered for topic test"),
 			expected: true,
 		},
 		{
-			name:     "multi-processor already registered",
+			name:     "multi-processor " + alreadyRegisteredMsg,
 			err:      fmt.Errorf("multi-processor already registered with name test"),
 			expected: true,
 		},
@@ -165,8 +168,8 @@ func TestIsAlreadyRegisteredError(t *testing.T) {
 			expected: false,
 		},
 		{
-			name:     "pubsub Error with already registered",
-			err:      NewError(errors.New("already registered"), "register"),
+			name:     "pubsub Error with " + alreadyRegisteredMsg,
+			err:      NewError(errors.New(alreadyRegisteredMsg), "register"),
 			expected: true,
 		},
 	}

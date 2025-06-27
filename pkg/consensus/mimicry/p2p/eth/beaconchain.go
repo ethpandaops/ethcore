@@ -34,7 +34,7 @@ func NewBeaconchainGossipsub(
 	}
 }
 
-// RegisterBeaconBlock registers a beacon block processor with custom validation and processing functions
+// RegisterBeaconBlock registers a beacon block processor with custom validation and processing functions.
 func (g *BeaconchainGossipsub) RegisterBeaconBlock(
 	validator func(context.Context, *pb.SignedBeaconBlock) (pubsub.ValidationResult, error),
 	handler func(context.Context, *pb.SignedBeaconBlock, peer.ID) error,
@@ -52,7 +52,7 @@ func (g *BeaconchainGossipsub) RegisterBeaconBlock(
 	return pubsub.RegisterProcessor(g.Gossipsub, processor)
 }
 
-// RegisterAttestation registers an attestation processor for specific subnets with custom validation and processing functions
+// RegisterAttestation registers an attestation processor for specific subnets with custom validation and processing functions.
 func (g *BeaconchainGossipsub) RegisterAttestation(
 	subnets []uint64,
 	validator func(context.Context, *pb.Attestation, uint64) (pubsub.ValidationResult, error),
@@ -73,10 +73,11 @@ func (g *BeaconchainGossipsub) RegisterAttestation(
 
 	// Register multi-processor with a unique name based on subnets
 	name := fmt.Sprintf("attestation_subnets_%v", subnets)
+
 	return pubsub.RegisterMultiProcessor(g.Gossipsub, name, processor)
 }
 
-// RegisterAggregateAndProof registers an aggregate and proof processor with custom validation and processing functions
+// RegisterAggregateAndProof registers an aggregate and proof processor with custom validation and processing functions.
 func (g *BeaconchainGossipsub) RegisterAggregateAndProof(
 	validator func(context.Context, *pb.AggregateAttestationAndProof) (pubsub.ValidationResult, error),
 	handler func(context.Context, *pb.AggregateAttestationAndProof, peer.ID) error,
@@ -113,6 +114,7 @@ func (g *BeaconchainGossipsub) RegisterSyncCommittee(
 
 	// Register multi-processor with a unique name based on subnets
 	name := fmt.Sprintf("sync_committee_subnets_%v", subnets)
+
 	return pubsub.RegisterMultiProcessor(g.Gossipsub, name, processor)
 }
 
@@ -202,7 +204,7 @@ func (g *BeaconchainGossipsub) SubscribeBeaconBlock(ctx context.Context) error {
 	tempProcessor := &beaconBlockProcessor{forkDigest: g.forkDigest}
 	topic := tempProcessor.Topic()
 
-	processorInterface, exists := g.Gossipsub.GetRegisteredProcessor(topic)
+	processorInterface, exists := g.GetRegisteredProcessor(topic)
 	if !exists {
 		return fmt.Errorf("no beacon block processor registered for topic: %s", topic)
 	}
@@ -217,7 +219,7 @@ func (g *BeaconchainGossipsub) SubscribeBeaconBlock(ctx context.Context) error {
 
 // SubscribeAttestation subscribes to attestation messages for previously registered subnets
 func (g *BeaconchainGossipsub) SubscribeAttestation(ctx context.Context, name string) error {
-	processorInterface, exists := g.Gossipsub.GetRegisteredMultiProcessor(name)
+	processorInterface, exists := g.GetRegisteredMultiProcessor(name)
 	if !exists {
 		return fmt.Errorf("no attestation processor registered with name: %s", name)
 	}
@@ -236,7 +238,7 @@ func (g *BeaconchainGossipsub) SubscribeAggregateAndProof(ctx context.Context) e
 	tempProcessor := &aggregateProcessor{forkDigest: g.forkDigest}
 	topic := tempProcessor.Topic()
 
-	processorInterface, exists := g.Gossipsub.GetRegisteredProcessor(topic)
+	processorInterface, exists := g.GetRegisteredProcessor(topic)
 	if !exists {
 		return fmt.Errorf("no aggregate and proof processor registered for topic: %s", topic)
 	}
@@ -251,7 +253,7 @@ func (g *BeaconchainGossipsub) SubscribeAggregateAndProof(ctx context.Context) e
 
 // SubscribeSyncCommittee subscribes to sync committee messages for previously registered subnets
 func (g *BeaconchainGossipsub) SubscribeSyncCommittee(ctx context.Context, name string) error {
-	processorInterface, exists := g.Gossipsub.GetRegisteredMultiProcessor(name)
+	processorInterface, exists := g.GetRegisteredMultiProcessor(name)
 	if !exists {
 		return fmt.Errorf("no sync committee processor registered with name: %s", name)
 	}
@@ -270,7 +272,7 @@ func (g *BeaconchainGossipsub) SubscribeVoluntaryExit(ctx context.Context) error
 	tempProcessor := &voluntaryExitProcessor{forkDigest: g.forkDigest}
 	topic := tempProcessor.Topic()
 
-	processorInterface, exists := g.Gossipsub.GetRegisteredProcessor(topic)
+	processorInterface, exists := g.GetRegisteredProcessor(topic)
 	if !exists {
 		return fmt.Errorf("no voluntary exit processor registered for topic: %s", topic)
 	}
@@ -289,7 +291,7 @@ func (g *BeaconchainGossipsub) SubscribeProposerSlashing(ctx context.Context) er
 	tempProcessor := &proposerSlashingProcessor{forkDigest: g.forkDigest}
 	topic := tempProcessor.Topic()
 
-	processorInterface, exists := g.Gossipsub.GetRegisteredProcessor(topic)
+	processorInterface, exists := g.GetRegisteredProcessor(topic)
 	if !exists {
 		return fmt.Errorf("no proposer slashing processor registered for topic: %s", topic)
 	}
@@ -308,7 +310,7 @@ func (g *BeaconchainGossipsub) SubscribeAttesterSlashing(ctx context.Context) er
 	tempProcessor := &attesterSlashingProcessor{forkDigest: g.forkDigest}
 	topic := tempProcessor.Topic()
 
-	processorInterface, exists := g.Gossipsub.GetRegisteredProcessor(topic)
+	processorInterface, exists := g.GetRegisteredProcessor(topic)
 	if !exists {
 		return fmt.Errorf("no attester slashing processor registered for topic: %s", topic)
 	}
@@ -327,7 +329,7 @@ func (g *BeaconchainGossipsub) SubscribeSyncContributionAndProof(ctx context.Con
 	tempProcessor := &syncContributionProcessor{forkDigest: g.forkDigest}
 	topic := tempProcessor.Topic()
 
-	processorInterface, exists := g.Gossipsub.GetRegisteredProcessor(topic)
+	processorInterface, exists := g.GetRegisteredProcessor(topic)
 	if !exists {
 		return fmt.Errorf("no sync contribution and proof processor registered for topic: %s", topic)
 	}
@@ -346,7 +348,7 @@ func (g *BeaconchainGossipsub) SubscribeBlsToExecutionChange(ctx context.Context
 	tempProcessor := &blsToExecutionProcessor{forkDigest: g.forkDigest}
 	topic := tempProcessor.Topic()
 
-	processorInterface, exists := g.Gossipsub.GetRegisteredProcessor(topic)
+	processorInterface, exists := g.GetRegisteredProcessor(topic)
 	if !exists {
 		return fmt.Errorf("no BLS to execution change processor registered for topic: %s", topic)
 	}

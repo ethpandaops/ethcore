@@ -314,18 +314,6 @@ func (m *mockMultiProcessor) setProcessError(topic string, err error) {
 	m.processErrors[topic] = err
 }
 
-func (m *mockMultiProcessor) setValidateResult(result ValidationResult) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.validateResult = result
-}
-
-func (m *mockMultiProcessor) setProcessingDelay(delay time.Duration) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.processingDelay = delay
-}
-
 func (m *mockMultiProcessor) getDecodeCalls(topic string) int32 {
 	m.mu.RLock()
 	defer m.mu.RUnlock()

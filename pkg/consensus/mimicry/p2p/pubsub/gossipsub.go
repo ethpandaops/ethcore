@@ -457,7 +457,8 @@ func SubscribeMultiWithProcessor[T any](g *Gossipsub, ctx context.Context, multi
 	g.log.WithField("topics", len(allTopics)).Info("Subscribing to multiple topics with multi-processor")
 
 	// Track subscriptions for rollback on error
-	var subscribedTopics []string
+	subscribedTopics := make([]string, 0, len(allTopics))
+
 	rollback := func() {
 		for _, topic := range subscribedTopics {
 			if err := g.Unsubscribe(topic); err != nil {
@@ -545,6 +546,7 @@ func (g *Gossipsub) GetSubscriptions() []string {
 	// Collect processor subscriptions
 	g.procMutex.RLock()
 	topics := make([]string, 0, len(g.processorSubs))
+
 	for topic := range g.processorSubs {
 		topics = append(topics, topic)
 	}
@@ -604,6 +606,7 @@ func (g *Gossipsub) PublishWithTimeout(ctx context.Context, topic string, data [
 		if g.metrics != nil {
 			g.metrics.RecordPublishError(topic)
 		}
+
 		g.emitPublishError(topic, err)
 		return NewTopicError(err, topic, "publish")
 	}
@@ -621,6 +624,7 @@ func (g *Gossipsub) PublishWithTimeout(ctx context.Context, topic string, data [
 		if g.metrics != nil {
 			g.metrics.RecordPublishError(topic)
 		}
+
 		g.emitPublishError(topic, err)
 		return NewTopicError(err, topic, "publish")
 	}

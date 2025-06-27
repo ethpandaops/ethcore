@@ -21,7 +21,7 @@ type ProcessorSubscription[T any] struct {
 	log          logrus.FieldLogger
 
 	// Lifecycle management
-	ctx     context.Context
+	ctx context.Context //nolint:containedctx // needed for subscription lifecycle management
 	cancel  context.CancelFunc
 	wg      sync.WaitGroup
 	started bool

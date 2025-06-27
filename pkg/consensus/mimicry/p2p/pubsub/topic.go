@@ -107,6 +107,7 @@ func (tm *topicManager) close() error {
 	tm.log.Info("Closing topic manager")
 
 	var lastErr error
+
 	for name, topic := range tm.topics {
 		if err := topic.Close(); err != nil {
 			tm.log.WithError(err).WithField("topic", name).Error("Failed to close topic")

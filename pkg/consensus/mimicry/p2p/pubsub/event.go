@@ -131,10 +131,6 @@ func (g *Gossipsub) emitSubscriptionError(topic string, err error) {
 	g.emitter.Emit(SubscriptionErrorEvent, topic, err)
 }
 
-func (g *Gossipsub) emitMessageReceived(topic string, from peer.ID) {
-	g.emitter.Emit(MessageReceivedEvent, topic, from)
-}
-
 func (g *Gossipsub) emitMessagePublished(topic string) {
 	g.emitter.Emit(MessagePublishedEvent, topic)
 }

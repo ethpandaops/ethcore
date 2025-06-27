@@ -87,6 +87,7 @@ func (p *attestationProcessor) Unsubscribe(ctx context.Context, subnets []uint64
 				p.log.WithError(err).WithField("subnet", subnet).Error("Failed to unsubscribe from attestation subnet")
 				// Continue unsubscribing from other subnets even if one fails
 			}
+
 			delete(activeMap, subnet)
 		}
 	}
@@ -96,6 +97,7 @@ func (p *attestationProcessor) Unsubscribe(ctx context.Context, subnets []uint64
 	for subnet := range activeMap {
 		newSubnets = append(newSubnets, subnet)
 	}
+
 	p.subnets = newSubnets
 
 	return nil
@@ -109,6 +111,7 @@ func (p *attestationProcessor) TopicIndex(topic string) (int, error) {
 	// Extract subnet from topic using regex
 	re := regexp.MustCompile(`beacon_attestation_(\d+)`)
 	matches := re.FindStringSubmatch(topic)
+
 	if len(matches) != 2 {
 		return -1, fmt.Errorf("invalid attestation topic format")
 	}

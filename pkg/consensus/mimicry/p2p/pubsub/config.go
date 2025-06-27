@@ -50,12 +50,15 @@ func (c *Config) Validate() error {
 	if c.MaxMessageSize <= 0 {
 		return fmt.Errorf("MaxMessageSize must be positive, got %d", c.MaxMessageSize)
 	}
+
 	if c.ValidationBufferSize <= 0 {
 		return fmt.Errorf("ValidationBufferSize must be positive, got %d", c.ValidationBufferSize)
 	}
+
 	if c.ValidationConcurrency <= 0 {
 		return fmt.Errorf("ValidationConcurrency must be positive, got %d", c.ValidationConcurrency)
 	}
+
 	if c.PublishTimeout <= 0 {
 		return fmt.Errorf("PublishTimeout must be positive, got %v", c.PublishTimeout)
 	}
