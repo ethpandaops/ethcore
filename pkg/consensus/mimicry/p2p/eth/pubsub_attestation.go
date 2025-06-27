@@ -25,6 +25,7 @@ const (
 // AttestationSubnetTopic constructs an attestation subnet gossipsub topic name
 func AttestationSubnetTopic(forkDigest [4]byte, subnet uint64) string {
 	name := fmt.Sprintf(AttestationSubnetTopicTemplate, subnet)
+
 	return fmt.Sprintf(GossipsubTopicFormat, forkDigest, name)
 }
 
@@ -44,6 +45,7 @@ func (p *attestationProcessor) Topics() []string {
 	for i, subnet := range p.subnets {
 		topics[i] = AttestationSubnetTopic(p.forkDigest, subnet)
 	}
+
 	return topics
 }
 
@@ -53,6 +55,7 @@ func (p *attestationProcessor) AllPossibleTopics() []string {
 	for i := uint64(0); i < 64; i++ {
 		topics[i] = AttestationSubnetTopic(p.forkDigest, i)
 	}
+
 	return topics
 }
 
@@ -136,6 +139,7 @@ func (p *attestationProcessor) Decode(ctx context.Context, topic string, data []
 	if err := p.encoder.DecodeGossip(data, att); err != nil {
 		return nil, fmt.Errorf("failed to decode attestation: %w", err)
 	}
+
 	return att, nil
 }
 
@@ -159,6 +163,7 @@ func (p *attestationProcessor) Validate(ctx context.Context, topic string, att *
 func (p *attestationProcessor) Process(ctx context.Context, topic string, att *pb.Attestation, from string) error {
 	if p.handler == nil {
 		p.log.Debug("No handler provided, attestation received but not processed")
+
 		return nil
 	}
 

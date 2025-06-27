@@ -44,6 +44,7 @@ func (p *beaconBlockProcessor) Subscribe(ctx context.Context) error {
 	if p.gossipsub == nil {
 		return fmt.Errorf("gossipsub reference not set")
 	}
+
 	return p.gossipsub.SubscribeToProcessorTopic(ctx, p.Topic())
 }
 
@@ -51,6 +52,7 @@ func (p *beaconBlockProcessor) Unsubscribe(ctx context.Context) error {
 	if p.gossipsub == nil {
 		return fmt.Errorf("gossipsub reference not set")
 	}
+
 	return p.gossipsub.Unsubscribe(p.Topic())
 }
 
@@ -59,6 +61,7 @@ func (p *beaconBlockProcessor) Decode(ctx context.Context, data []byte) (*pb.Sig
 	if err := p.encoder.DecodeGossip(data, block); err != nil {
 		return nil, fmt.Errorf("failed to decode beacon block: %w", err)
 	}
+
 	return block, nil
 }
 

@@ -43,6 +43,7 @@ func (p *aggregateProcessor) Subscribe(ctx context.Context) error {
 	if p.gossipsub == nil {
 		return fmt.Errorf("gossipsub reference not set")
 	}
+
 	return p.gossipsub.SubscribeToProcessorTopic(ctx, p.Topic())
 }
 
@@ -50,6 +51,7 @@ func (p *aggregateProcessor) Unsubscribe(ctx context.Context) error {
 	if p.gossipsub == nil {
 		return fmt.Errorf("gossipsub reference not set")
 	}
+
 	return p.gossipsub.Unsubscribe(p.Topic())
 }
 
@@ -58,6 +60,7 @@ func (p *aggregateProcessor) Decode(ctx context.Context, data []byte) (*pb.Aggre
 	if err := p.encoder.DecodeGossip(data, aggProof); err != nil {
 		return nil, fmt.Errorf("failed to decode aggregate and proof: %w", err)
 	}
+
 	return aggProof, nil
 }
 
@@ -74,6 +77,7 @@ func (p *aggregateProcessor) Validate(ctx context.Context, aggProof *pb.Aggregat
 func (p *aggregateProcessor) Process(ctx context.Context, aggProof *pb.AggregateAttestationAndProof, from string) error {
 	if p.handler == nil {
 		p.log.Debug("No handler provided, aggregate proof received but not processed")
+
 		return nil
 	}
 

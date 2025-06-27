@@ -36,11 +36,12 @@ func DefaultConfig() *Config {
 	}
 }
 
-// NewConfigWithCustomGossipSub creates a config with custom gossipsub parameters starting from defaults
+// NewConfigWithCustomGossipSub creates a config with custom gossipsub parameters starting from defaults.
 func NewConfigWithCustomGossipSub() *Config {
 	config := DefaultConfig()
 	params := pubsub.DefaultGossipSubParams()
 	config.GossipSubParams = &params
+
 	return config
 }
 

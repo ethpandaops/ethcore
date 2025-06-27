@@ -43,6 +43,7 @@ func (p *blsToExecutionProcessor) Subscribe(ctx context.Context) error {
 	if p.gossipsub == nil {
 		return fmt.Errorf("gossipsub reference not set")
 	}
+
 	return p.gossipsub.SubscribeToProcessorTopic(ctx, p.Topic())
 }
 
@@ -50,6 +51,7 @@ func (p *blsToExecutionProcessor) Unsubscribe(ctx context.Context) error {
 	if p.gossipsub == nil {
 		return fmt.Errorf("gossipsub reference not set")
 	}
+
 	return p.gossipsub.Unsubscribe(p.Topic())
 }
 
@@ -58,6 +60,7 @@ func (p *blsToExecutionProcessor) Decode(ctx context.Context, data []byte) (*pb.
 	if err := p.encoder.DecodeGossip(data, change); err != nil {
 		return nil, fmt.Errorf("failed to decode BLS to execution change: %w", err)
 	}
+
 	return change, nil
 }
 

@@ -13,3 +13,7 @@ dist
 
 # Test binaries
 *.test
+
+# Test binaries
+*.test
+*.exe

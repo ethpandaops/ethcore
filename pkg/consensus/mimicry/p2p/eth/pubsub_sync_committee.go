@@ -32,10 +32,10 @@ func SyncCommitteeSubnetTopic(forkDigest [4]byte, subnet uint64) string {
 type syncCommitteeProcessor struct {
 	forkDigest [4]byte
 	encoder    encoder.SszNetworkEncoder
-	subnets    []uint64 // currently active subnets
-	handler    func(context.Context, *pb.SyncCommitteeMessage, uint64, peer.ID) error
-	validator  func(context.Context, *pb.SyncCommitteeMessage, uint64) (pubsub.ValidationResult, error)
-	gossipsub  *pubsub.Gossipsub // Reference to gossipsub for subscription management
+	subnets    []uint64                                                                                 // currently active subnets
+	handler    func(context.Context, *pb.SyncCommitteeMessage, uint64, peer.ID) error                   //nolint:staticcheck // deprecated but still functional
+	validator  func(context.Context, *pb.SyncCommitteeMessage, uint64) (pubsub.ValidationResult, error) //nolint:staticcheck // deprecated but still functional
+	gossipsub  *pubsub.Gossipsub                                                                        // Reference to gossipsub for subscription management
 	log        logrus.FieldLogger
 }
 
@@ -44,6 +44,7 @@ func (p *syncCommitteeProcessor) Topics() []string {
 	for i, subnet := range p.subnets {
 		topics[i] = SyncCommitteeSubnetTopic(p.forkDigest, subnet)
 	}
+
 	return topics
 }
 
@@ -53,6 +54,7 @@ func (p *syncCommitteeProcessor) AllPossibleTopics() []string {
 	for i := uint64(0); i < SyncCommitteeSubnetCount; i++ {
 		topics[i] = SyncCommitteeSubnetTopic(p.forkDigest, i)
 	}
+
 	return topics
 }
 
@@ -136,6 +138,7 @@ func (p *syncCommitteeProcessor) Decode(ctx context.Context, topic string, data 
 	if err := p.encoder.DecodeGossip(data, syncMsg); err != nil {
 		return nil, fmt.Errorf("failed to decode sync committee message: %w", err)
 	}
+
 	return syncMsg, nil
 }
 
@@ -184,4 +187,4 @@ func (p *syncCommitteeProcessor) GetTopicScoreParams(topic string) *pubsub.Topic
 }
 
 // Compile-time check that syncCommitteeProcessor implements pubsub.MultiProcessor
-var _ pubsub.MultiProcessor[*pb.SyncCommitteeMessage] = (*syncCommitteeProcessor)(nil)
+var _ pubsub.MultiProcessor[*pb.SyncCommitteeMessage] = (*syncCommitteeProcessor)(nil) //nolint:staticcheck // deprecated but still functional

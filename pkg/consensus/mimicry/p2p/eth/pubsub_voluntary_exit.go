@@ -38,6 +38,7 @@ func (p *voluntaryExitProcessor) Subscribe(ctx context.Context) error {
 	if p.gossipsub == nil {
 		return fmt.Errorf("gossipsub reference not set")
 	}
+
 	return p.gossipsub.SubscribeToProcessorTopic(ctx, p.Topic())
 }
 
@@ -45,6 +46,7 @@ func (p *voluntaryExitProcessor) Unsubscribe(ctx context.Context) error {
 	if p.gossipsub == nil {
 		return fmt.Errorf("gossipsub reference not set")
 	}
+
 	return p.gossipsub.Unsubscribe(p.Topic())
 }
 
@@ -53,6 +55,7 @@ func (p *voluntaryExitProcessor) Decode(ctx context.Context, data []byte) (*pb.S
 	if err := p.encoder.DecodeGossip(data, exit); err != nil {
 		return nil, fmt.Errorf("failed to decode voluntary exit: %w", err)
 	}
+
 	return exit, nil
 }
 

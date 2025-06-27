@@ -43,6 +43,7 @@ func (p *attesterSlashingProcessor) Subscribe(ctx context.Context) error {
 	if p.gossipsub == nil {
 		return fmt.Errorf("gossipsub reference not set")
 	}
+
 	return p.gossipsub.SubscribeToProcessorTopic(ctx, p.Topic())
 }
 
@@ -50,6 +51,7 @@ func (p *attesterSlashingProcessor) Unsubscribe(ctx context.Context) error {
 	if p.gossipsub == nil {
 		return fmt.Errorf("gossipsub reference not set")
 	}
+
 	return p.gossipsub.Unsubscribe(p.Topic())
 }
 
@@ -58,6 +60,7 @@ func (p *attesterSlashingProcessor) Decode(ctx context.Context, data []byte) (*p
 	if err := p.encoder.DecodeGossip(data, slashing); err != nil {
 		return nil, fmt.Errorf("failed to decode attester slashing: %w", err)
 	}
+
 	return slashing, nil
 }
 

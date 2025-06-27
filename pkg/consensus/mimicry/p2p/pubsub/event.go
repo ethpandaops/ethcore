@@ -10,23 +10,23 @@ var (
 	PubsubStartedEvent = "pubsub:started"
 	PubsubStoppedEvent = "pubsub:stopped"
 
-	// Subscription events
+	// Subscription events.
 	TopicSubscribedEvent   = "pubsub:topic:subscribed"
 	TopicUnsubscribedEvent = "pubsub:topic:unsubscribed"
 	SubscriptionErrorEvent = "pubsub:subscription:error"
 
-	// Message events
+	// Message events.
 	MessageReceivedEvent  = "pubsub:message:received"
 	MessagePublishedEvent = "pubsub:message:published"
 	MessageValidatedEvent = "pubsub:message:validated"
 	MessageHandledEvent   = "pubsub:message:handled"
 
-	// Error events
+	// Error events.
 	ValidationFailedEvent = "pubsub:validation:failed"
 	HandlerErrorEvent     = "pubsub:handler:error"
 	PublishErrorEvent     = "pubsub:publish:error"
 
-	// Peer events
+	// Peer events.
 	PeerJoinedTopicEvent  = "pubsub:peer:joined"
 	PeerLeftTopicEvent    = "pubsub:peer:left"
 	PeerScoreUpdatedEvent = "pubsub:peer:score:updated"

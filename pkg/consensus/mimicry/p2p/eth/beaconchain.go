@@ -93,11 +93,11 @@ func (g *BeaconchainGossipsub) RegisterAggregateAndProof(
 	return pubsub.RegisterProcessor(g.Gossipsub, processor)
 }
 
-// RegisterSyncCommittee registers a sync committee processor for specific subnets with custom validation and processing functions
+// RegisterSyncCommittee registers a sync committee processor for specific subnets with custom validation and processing functions.
 func (g *BeaconchainGossipsub) RegisterSyncCommittee(
 	subnets []uint64,
-	validator func(context.Context, *pb.SyncCommitteeMessage, uint64) (pubsub.ValidationResult, error),
-	handler func(context.Context, *pb.SyncCommitteeMessage, uint64, peer.ID) error,
+	validator func(context.Context, *pb.SyncCommitteeMessage, uint64) (pubsub.ValidationResult, error), //nolint:staticcheck // deprecated but still functional
+	handler func(context.Context, *pb.SyncCommitteeMessage, uint64, peer.ID) error, //nolint:staticcheck // deprecated but still functional
 ) error {
 	if len(subnets) == 0 {
 		return fmt.Errorf("no subnets specified")
@@ -118,7 +118,7 @@ func (g *BeaconchainGossipsub) RegisterSyncCommittee(
 	return pubsub.RegisterMultiProcessor(g.Gossipsub, name, processor)
 }
 
-// RegisterVoluntaryExit registers a voluntary exit processor with custom validation and processing functions
+// RegisterVoluntaryExit registers a voluntary exit processor with custom validation and processing functions.
 func (g *BeaconchainGossipsub) RegisterVoluntaryExit(
 	validator func(context.Context, *pb.SignedVoluntaryExit) (pubsub.ValidationResult, error),
 	handler func(context.Context, *pb.SignedVoluntaryExit, peer.ID) error,
@@ -134,7 +134,7 @@ func (g *BeaconchainGossipsub) RegisterVoluntaryExit(
 	return pubsub.RegisterProcessor(g.Gossipsub, processor)
 }
 
-// RegisterProposerSlashing registers a proposer slashing processor with custom validation and processing functions
+// RegisterProposerSlashing registers a proposer slashing processor with custom validation and processing functions.
 func (g *BeaconchainGossipsub) RegisterProposerSlashing(
 	validator func(context.Context, *pb.ProposerSlashing) (pubsub.ValidationResult, error),
 	handler func(context.Context, *pb.ProposerSlashing, peer.ID) error,
@@ -150,7 +150,7 @@ func (g *BeaconchainGossipsub) RegisterProposerSlashing(
 	return pubsub.RegisterProcessor(g.Gossipsub, processor)
 }
 
-// RegisterAttesterSlashing registers an attester slashing processor with custom validation and processing functions
+// RegisterAttesterSlashing registers an attester slashing processor with custom validation and processing functions.
 func (g *BeaconchainGossipsub) RegisterAttesterSlashing(
 	validator func(context.Context, *pb.AttesterSlashing) (pubsub.ValidationResult, error),
 	handler func(context.Context, *pb.AttesterSlashing, peer.ID) error,
@@ -166,7 +166,7 @@ func (g *BeaconchainGossipsub) RegisterAttesterSlashing(
 	return pubsub.RegisterProcessor(g.Gossipsub, processor)
 }
 
-// RegisterSyncContributionAndProof registers a sync contribution and proof processor with custom validation and processing functions
+// RegisterSyncContributionAndProof registers a sync contribution and proof processor with custom validation and processing functions.
 func (g *BeaconchainGossipsub) RegisterSyncContributionAndProof(
 	validator func(context.Context, *pb.SignedContributionAndProof) (pubsub.ValidationResult, error),
 	handler func(context.Context, *pb.SignedContributionAndProof, peer.ID) error,
@@ -182,7 +182,7 @@ func (g *BeaconchainGossipsub) RegisterSyncContributionAndProof(
 	return pubsub.RegisterProcessor(g.Gossipsub, processor)
 }
 
-// RegisterBlsToExecutionChange registers a BLS to execution change processor with custom validation and processing functions
+// RegisterBlsToExecutionChange registers a BLS to execution change processor with custom validation and processing functions.
 func (g *BeaconchainGossipsub) RegisterBlsToExecutionChange(
 	validator func(context.Context, *pb.SignedBLSToExecutionChange) (pubsub.ValidationResult, error),
 	handler func(context.Context, *pb.SignedBLSToExecutionChange, peer.ID) error,
@@ -198,7 +198,7 @@ func (g *BeaconchainGossipsub) RegisterBlsToExecutionChange(
 	return pubsub.RegisterProcessor(g.Gossipsub, processor)
 }
 
-// SubscribeBeaconBlock subscribes to beacon block messages using a previously registered processor
+// SubscribeBeaconBlock subscribes to beacon block messages using a previously registered processor.
 func (g *BeaconchainGossipsub) SubscribeBeaconBlock(ctx context.Context) error {
 	// Create a temporary processor to get the correct topic
 	tempProcessor := &beaconBlockProcessor{forkDigest: g.forkDigest}
@@ -217,7 +217,7 @@ func (g *BeaconchainGossipsub) SubscribeBeaconBlock(ctx context.Context) error {
 	return pubsub.SubscribeWithProcessor(g.Gossipsub, ctx, processor)
 }
 
-// SubscribeAttestation subscribes to attestation messages for previously registered subnets
+// SubscribeAttestation subscribes to attestation messages for previously registered subnets.
 func (g *BeaconchainGossipsub) SubscribeAttestation(ctx context.Context, name string) error {
 	processorInterface, exists := g.GetRegisteredMultiProcessor(name)
 	if !exists {
@@ -232,7 +232,7 @@ func (g *BeaconchainGossipsub) SubscribeAttestation(ctx context.Context, name st
 	return pubsub.SubscribeMultiWithProcessor(g.Gossipsub, ctx, processor)
 }
 
-// SubscribeAggregateAndProof subscribes to aggregate and proof messages using a previously registered processor
+// SubscribeAggregateAndProof subscribes to aggregate and proof messages using a previously registered processor.
 func (g *BeaconchainGossipsub) SubscribeAggregateAndProof(ctx context.Context) error {
 	// Create a temporary processor to get the correct topic
 	tempProcessor := &aggregateProcessor{forkDigest: g.forkDigest}
@@ -251,7 +251,7 @@ func (g *BeaconchainGossipsub) SubscribeAggregateAndProof(ctx context.Context) e
 	return pubsub.SubscribeWithProcessor(g.Gossipsub, ctx, processor)
 }
 
-// SubscribeSyncCommittee subscribes to sync committee messages for previously registered subnets
+// SubscribeSyncCommittee subscribes to sync committee messages for previously registered subnets.
 func (g *BeaconchainGossipsub) SubscribeSyncCommittee(ctx context.Context, name string) error {
 	processorInterface, exists := g.GetRegisteredMultiProcessor(name)
 	if !exists {
@@ -266,7 +266,7 @@ func (g *BeaconchainGossipsub) SubscribeSyncCommittee(ctx context.Context, name 
 	return pubsub.SubscribeMultiWithProcessor(g.Gossipsub, ctx, processor)
 }
 
-// SubscribeVoluntaryExit subscribes to voluntary exit messages using a previously registered processor
+// SubscribeVoluntaryExit subscribes to voluntary exit messages using a previously registered processor.
 func (g *BeaconchainGossipsub) SubscribeVoluntaryExit(ctx context.Context) error {
 	// Create a temporary processor to get the correct topic
 	tempProcessor := &voluntaryExitProcessor{forkDigest: g.forkDigest}
@@ -285,7 +285,7 @@ func (g *BeaconchainGossipsub) SubscribeVoluntaryExit(ctx context.Context) error
 	return pubsub.SubscribeWithProcessor(g.Gossipsub, ctx, processor)
 }
 
-// SubscribeProposerSlashing subscribes to proposer slashing messages using a previously registered processor
+// SubscribeProposerSlashing subscribes to proposer slashing messages using a previously registered processor.
 func (g *BeaconchainGossipsub) SubscribeProposerSlashing(ctx context.Context) error {
 	// Create a temporary processor to get the correct topic
 	tempProcessor := &proposerSlashingProcessor{forkDigest: g.forkDigest}
@@ -304,7 +304,7 @@ func (g *BeaconchainGossipsub) SubscribeProposerSlashing(ctx context.Context) er
 	return pubsub.SubscribeWithProcessor(g.Gossipsub, ctx, processor)
 }
 
-// SubscribeAttesterSlashing subscribes to attester slashing messages using a previously registered processor
+// SubscribeAttesterSlashing subscribes to attester slashing messages using a previously registered processor.
 func (g *BeaconchainGossipsub) SubscribeAttesterSlashing(ctx context.Context) error {
 	// Create a temporary processor to get the correct topic
 	tempProcessor := &attesterSlashingProcessor{forkDigest: g.forkDigest}
@@ -323,7 +323,7 @@ func (g *BeaconchainGossipsub) SubscribeAttesterSlashing(ctx context.Context) er
 	return pubsub.SubscribeWithProcessor(g.Gossipsub, ctx, processor)
 }
 
-// SubscribeSyncContributionAndProof subscribes to sync contribution and proof messages using a previously registered processor
+// SubscribeSyncContributionAndProof subscribes to sync contribution and proof messages using a previously registered processor.
 func (g *BeaconchainGossipsub) SubscribeSyncContributionAndProof(ctx context.Context) error {
 	// Create a temporary processor to get the correct topic
 	tempProcessor := &syncContributionProcessor{forkDigest: g.forkDigest}
@@ -342,7 +342,7 @@ func (g *BeaconchainGossipsub) SubscribeSyncContributionAndProof(ctx context.Con
 	return pubsub.SubscribeWithProcessor(g.Gossipsub, ctx, processor)
 }
 
-// SubscribeBlsToExecutionChange subscribes to BLS to execution change messages using a previously registered processor
+// SubscribeBlsToExecutionChange subscribes to BLS to execution change messages using a previously registered processor.
 func (g *BeaconchainGossipsub) SubscribeBlsToExecutionChange(ctx context.Context) error {
 	// Create a temporary processor to get the correct topic
 	tempProcessor := &blsToExecutionProcessor{forkDigest: g.forkDigest}

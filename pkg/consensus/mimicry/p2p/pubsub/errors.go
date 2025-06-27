@@ -65,7 +65,7 @@ var (
 	ErrAlreadyRegistered      = errors.New("already registered")
 )
 
-// IsAlreadyRegisteredError checks if the error indicates a processor is already registered
+// IsAlreadyRegisteredError checks if the error indicates a processor is already registered.
 func IsAlreadyRegisteredError(err error) bool {
 	if err == nil {
 		return false

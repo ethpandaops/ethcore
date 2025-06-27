@@ -43,6 +43,7 @@ func (p *syncContributionProcessor) Subscribe(ctx context.Context) error {
 	if p.gossipsub == nil {
 		return fmt.Errorf("gossipsub reference not set")
 	}
+
 	return p.gossipsub.SubscribeToProcessorTopic(ctx, p.Topic())
 }
 
@@ -50,6 +51,7 @@ func (p *syncContributionProcessor) Unsubscribe(ctx context.Context) error {
 	if p.gossipsub == nil {
 		return fmt.Errorf("gossipsub reference not set")
 	}
+
 	return p.gossipsub.Unsubscribe(p.Topic())
 }
 
@@ -58,6 +60,7 @@ func (p *syncContributionProcessor) Decode(ctx context.Context, data []byte) (*p
 	if err := p.encoder.DecodeGossip(data, contrib); err != nil {
 		return nil, fmt.Errorf("failed to decode sync contribution and proof: %w", err)
 	}
+
 	return contrib, nil
 }
 

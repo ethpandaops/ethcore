@@ -38,6 +38,7 @@ func (p *proposerSlashingProcessor) Subscribe(ctx context.Context) error {
 	if p.gossipsub == nil {
 		return fmt.Errorf("gossipsub reference not set")
 	}
+
 	return p.gossipsub.SubscribeToProcessorTopic(ctx, p.Topic())
 }
 
@@ -45,6 +46,7 @@ func (p *proposerSlashingProcessor) Unsubscribe(ctx context.Context) error {
 	if p.gossipsub == nil {
 		return fmt.Errorf("gossipsub reference not set")
 	}
+
 	return p.gossipsub.Unsubscribe(p.Topic())
 }
 
@@ -53,6 +55,7 @@ func (p *proposerSlashingProcessor) Decode(ctx context.Context, data []byte) (*p
 	if err := p.encoder.DecodeGossip(data, slashing); err != nil {
 		return nil, fmt.Errorf("failed to decode proposer slashing: %w", err)
 	}
+
 	return slashing, nil
 }
 
