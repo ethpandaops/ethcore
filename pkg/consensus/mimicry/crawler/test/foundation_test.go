@@ -106,24 +106,13 @@ func SetupKurtosisEnvironment(t *testing.T, config *NetworkConfig, logger *logru
 	// Enable debug logs for tests.
 	opts = append(opts, ethereum.WithGlobalLogLevel("debug"))
 
-	// For now, use prysm/lighthouse/teku.
-	// TODO(@matty): Work is needed to ensure crawling works with other clients, struggling with Nimbus/Lodestar.
+	// Load it up with some CL's.
 	opts = append(opts, ethereum.WithParticipants([]epgconfig.ParticipantConfig{
-		{
-			ELType: client.Geth,
-			CLType: client.Lighthouse,
-			Count:  1,
-		},
-		{
-			ELType: client.Geth,
-			CLType: client.Prysm,
-			Count:  1,
-		},
-		{
-			ELType: client.Geth,
-			CLType: client.Teku,
-			Count:  1,
-		},
+		{ELType: client.Geth, CLType: client.Lighthouse, Count: 2},
+		{ELType: client.Geth, CLType: client.Teku, Count: 1},
+		{ELType: client.Geth, CLType: client.Prysm, Count: 2},
+		{ELType: client.Geth, CLType: client.Lodestar, Count: 1},
+		{ELType: client.Geth, CLType: client.Grandine, Count: 1},
 	}))
 
 	// Create the network
