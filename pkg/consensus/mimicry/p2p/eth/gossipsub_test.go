@@ -2,7 +2,6 @@ package eth
 
 import (
 	"context"
-	"io"
 	"strconv"
 	"testing"
 
@@ -10,109 +9,11 @@ import (
 	pb "github.com/OffchainLabs/prysm/v6/proto/prysm/v1alpha1"
 	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
-	fastssz "github.com/prysmaticlabs/fastssz"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
-// Mock types for testing
-type mockPubsub struct {
-	mock.Mock
-}
-
-func (m *mockPubsub) Subscribe(ctx context.Context, topic string, handler pubsub.MessageHandler) error {
-	args := m.Called(ctx, topic, handler)
-	return args.Error(0)
-}
-
-func (m *mockPubsub) Unsubscribe(topic string) error {
-	args := m.Called(topic)
-	return args.Error(0)
-}
-
-func (m *mockPubsub) Publish(ctx context.Context, topic string, data []byte) error {
-	args := m.Called(ctx, topic, data)
-	return args.Error(0)
-}
-
-func (m *mockPubsub) RegisterValidator(topic string, validator pubsub.Validator) error {
-	args := m.Called(topic, validator)
-	return args.Error(0)
-}
-
-func (m *mockPubsub) IsSubscribed(topic string) bool {
-	args := m.Called(topic)
-	return args.Bool(0)
-}
-
-func (m *mockPubsub) GetSubscriptions() []string {
-	args := m.Called()
-	return args.Get(0).([]string)
-}
-
-func (m *mockPubsub) Start(ctx context.Context) error {
-	args := m.Called(ctx)
-	return args.Error(0)
-}
-
-func (m *mockPubsub) Stop() error {
-	args := m.Called()
-	return args.Error(0)
-}
-
-func (m *mockPubsub) IsStarted() bool {
-	args := m.Called()
-	return args.Bool(0)
-}
-
-type mockEncoder struct {
-	mock.Mock
-}
-
-func (m *mockEncoder) EncodeGossip(w io.Writer, msg fastssz.Marshaler) (int, error) {
-	args := m.Called(w, msg)
-	return args.Int(0), args.Error(1)
-}
-
-func (m *mockEncoder) DecodeGossip(data []byte, msg fastssz.Unmarshaler) error {
-	args := m.Called(data, msg)
-	return args.Error(0)
-}
-
-func (m *mockEncoder) EncodeWithMaxLength(w io.Writer, msg fastssz.Marshaler) (int, error) {
-	args := m.Called(w, msg)
-	return args.Int(0), args.Error(1)
-}
-
-func (m *mockEncoder) DecodeWithMaxLength(r io.Reader, msg fastssz.Unmarshaler) error {
-	args := m.Called(r, msg)
-	return args.Error(0)
-}
-
-func (m *mockEncoder) ProtocolSuffix() string {
-	args := m.Called()
-	return args.String(0)
-}
-
-// Test utilities - for integration testing where we mock the underlying pubsub calls
-func createMockGossipsub() (*Gossipsub, *mockPubsub, encoder.SszNetworkEncoder) {
-	logger := logrus.NewEntry(logrus.New())
-	mockPS := &mockPubsub{}
-	realEnc := encoder.SszNetworkEncoder{}
-	forkDigest := [4]byte{0x01, 0x02, 0x03, 0x04}
-
-	// Create gossipsub manually to allow mocking
-	g := &Gossipsub{
-		Gossipsub:  nil, // We'll mock the calls directly
-		forkDigest: forkDigest,
-		encoder:    realEnc,
-		log:        logger.WithField("component", "eth_gossipsub"),
-	}
-
-	return g, mockPS, realEnc
-}
 
 // For unit testing that doesn't need mocked pubsub calls
 func createTestGossipsub() *Gossipsub {
@@ -130,9 +31,6 @@ func createTestForkDigest() [4]byte {
 	return [4]byte{0x01, 0x02, 0x03, 0x04}
 }
 
-func createTestPeerID() peer.ID {
-	return peer.ID("test-peer-12345")
-}
 
 // TestEthereumGossipsub tests the constructor and basic wrapper functionality
 func TestEthereumGossipsub(t *testing.T) {

@@ -4,7 +4,6 @@ import (
 	"context"
 
 	pb "github.com/OffchainLabs/prysm/v6/proto/prysm/v1alpha1"
-	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
 )
 
@@ -84,39 +83,6 @@ type GlobalTopicValidators struct {
 	BlsToExecutionChange     func(*pb.SignedBLSToExecutionChange) error
 }
 
-// Event wrapper functions that convert generic events to typed events
-
-// WrapMessageReceivedAsBeaconBlock wraps a generic message received callback as a beacon block callback
-func WrapMessageReceivedAsBeaconBlock(callback pubsub.MessageReceivedCallback, handler BeaconBlockHandler) pubsub.MessageReceivedCallback {
-	return func(topic string, from peer.ID) {
-		callback(topic, from)
-	}
-}
-
-// WrapMessageReceivedAsAttestation wraps a generic message received callback as an attestation callback
-func WrapMessageReceivedAsAttestation(callback pubsub.MessageReceivedCallback, handler AttestationHandler) pubsub.MessageReceivedCallback {
-	return func(topic string, from peer.ID) {
-		callback(topic, from)
-	}
-}
-
-// WrapValidationFailedAsBeaconBlock wraps a generic validation failed callback for beacon blocks
-func WrapValidationFailedAsBeaconBlock(callback pubsub.ValidationFailedCallback) func(block *pb.SignedBeaconBlock, from peer.ID, err error) {
-	return func(block *pb.SignedBeaconBlock, from peer.ID, err error) {
-		// Extract topic from block context if needed
-		topic := BeaconBlockTopicName
-		callback(topic, from, err)
-	}
-}
-
-// WrapValidationFailedAsAttestation wraps a generic validation failed callback for attestations
-func WrapValidationFailedAsAttestation(callback pubsub.ValidationFailedCallback, subnet uint64) func(att *pb.Attestation, from peer.ID, err error) {
-	return func(att *pb.Attestation, from peer.ID, err error) {
-		// Extract topic from attestation context
-		topic := AttestationSubnetTopicTemplate + string(rune(subnet))
-		callback(topic, from, err)
-	}
-}
 
 // Message type detection helpers
 
