@@ -48,7 +48,7 @@ func (e *Error) Topic() string {
 	return e.topic
 }
 
-// Predefined error variables for common error conditions
+// Predefined error variables for common error conditions.
 var (
 	ErrNotStarted             = errors.New("pubsub not started")
 	ErrAlreadyStarted         = errors.New("pubsub already started")

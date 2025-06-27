@@ -4,9 +4,9 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 )
 
-// Event names for the gossipsub event system
+// Event names for the gossipsub event system.
 var (
-	// Lifecycle events
+	// Lifecycle events.
 	PubsubStartedEvent = "pubsub:started"
 	PubsubStoppedEvent = "pubsub:stopped"
 
