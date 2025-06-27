@@ -125,14 +125,7 @@ ethcore/
 
 ```bash
 # Run all tests
-go test ./...
-
-# Run tests with race detection
-go test -race ./...
-
-# Run tests with coverage
-go test -coverprofile=coverage.out ./...
-go tool cover -html=coverage.out
+make test
 ```
 
 ### Linting

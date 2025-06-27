@@ -15,6 +15,8 @@ var testFoundation *kurtosis.TestFoundation
 // TestMain is the entry point for all tests in this package.
 // It sets up the shared Kurtosis network and ensures proper cleanup.
 func TestMain(m *testing.M) {
+	fmt.Printf("TestMain - Ethereum!!!")
+
 	// Acquire global test lock to prevent concurrent Kurtosis networks
 	kurtosis.AcquireTestLock()
 	defer kurtosis.ReleaseTestLock()
@@ -25,8 +27,12 @@ func TestMain(m *testing.M) {
 
 	// Start with default configuration
 	defaultConfig := kurtosis.DefaultNetworkConfig()
+
 	// Override name for ethereum tests
 	defaultConfig.Name = "ethcore-ethereum-test"
+
+	// Use port offset 0 for ethereum tests (ports 32000-32999, 33000-33999)
+	defaultConfig.PortOffset = 0
 
 	// Get configuration from environment
 	envConfig, err := kurtosis.ConfigFromEnvironment()

@@ -54,6 +54,7 @@ func TestBeaconNode_SingleNode(t *testing.T) {
 
 		// Set up beacon options
 		opts := epbeacon.DefaultOptions()
+		opts = opts.DisablePrometheusMetrics()
 		opts.HealthCheck.Interval.Duration = time.Second * 3
 		opts.HealthCheck.SuccessfulResponses = 1
 
@@ -160,6 +161,7 @@ func TestBeaconNode_MultipleNodes(t *testing.T) {
 			}
 
 			opts := epbeacon.DefaultOptions()
+			opts = opts.DisablePrometheusMetrics()
 			opts.HealthCheck.Interval.Duration = time.Second * 2
 			opts.HealthCheck.SuccessfulResponses = 1
 

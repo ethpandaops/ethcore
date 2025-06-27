@@ -139,6 +139,7 @@ func setupNodeTracking(t *testing.T, tf *kurtosis.TestFoundation, network networ
 	for _, client := range consensusClients {
 		// Create a beacon node client to fetch identity
 		opts := beacon.DefaultOptions()
+		opts = opts.DisablePrometheusMetrics()
 		opts.HealthCheck.Interval.Duration = 250 * time.Millisecond
 
 		beaconNode := beacon.NewNode(
@@ -266,6 +267,7 @@ func feedENRsToCrawler(t *testing.T, tf *kurtosis.TestFoundation, network networ
 		for _, client := range consensusClients {
 			// Create a beacon node client to fetch identity
 			opts := beacon.DefaultOptions()
+			opts = opts.DisablePrometheusMetrics()
 			opts.HealthCheck.Interval.Duration = 250 * time.Millisecond
 
 			beaconNode := beacon.NewNode(

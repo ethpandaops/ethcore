@@ -1,0 +1,10 @@
+.PHONY: test clean
+
+test: clean
+	@echo "Running tests..."
+	@go test -v -race -cover -coverprofile=coverage.txt -coverpkg=./... -timeout 10m ./... && echo "Tests completed successfully"
+
+clean:
+	@if command -v kurtosis >/dev/null 2>&1; then \
+		kurtosis enclave rm ethcore-ethereum-test ethcore-crawler-test --force 2>/dev/null || true; \
+	fi

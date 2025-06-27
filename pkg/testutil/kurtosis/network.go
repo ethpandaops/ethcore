@@ -108,6 +108,10 @@ func setupKurtosisNetwork(ctx context.Context, config *NetworkConfig) (*TestFoun
 
 	logger.WithField("name", config.Name).Info("Setting up Ethereum network")
 
+	// Add a small delay to help prevent race conditions when multiple tests start
+	// This works in conjunction with the file lock
+	time.Sleep(500 * time.Millisecond)
+
 	// Configure network options
 	var opts []ethereum.RunOption
 
@@ -116,10 +120,10 @@ func setupKurtosisNetwork(ctx context.Context, config *NetworkConfig) (*TestFoun
 		opts = append(opts, ethereum.WithOrphanOnExit())
 	}
 
-	// Always try to reuse existing network if available to avoid conflicts
+	// Set the enclave name.
 	if config.Name != "" {
-		opts = append(opts, ethereum.WithReuse(config.Name))
-		logger.WithField("name", config.Name).Info("Attempting to reuse existing network")
+		opts = append(opts, ethereum.WithEnclaveName(config.Name))
+		logger.WithField("name", config.Name).Info("Creating/reusing network with specific enclave name")
 	}
 
 	// Add timeout option
@@ -226,6 +230,7 @@ func waitForGenesis(ctx context.Context, tf *TestFoundation, epgNetwork network.
 	}
 
 	opts := beacon.DefaultOptions()
+	opts = opts.DisablePrometheusMetrics()
 	opts.HealthCheck.Interval.Duration = 250 * time.Millisecond
 
 	tempBeacon, err := ethcoreEthereum.NewBeaconNode(
@@ -322,6 +327,7 @@ func initializeBeaconClients(ctx context.Context, tf *TestFoundation, epgNetwork
 
 		// Create beacon options
 		opts := beacon.DefaultOptions()
+		opts = opts.DisablePrometheusMetrics()
 		opts.HealthCheck.Interval.Duration = 250 * time.Millisecond
 
 		// Create the beacon node using ethcore's ethereum package
