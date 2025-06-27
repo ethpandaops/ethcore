@@ -11,7 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// Gossipsub wraps the generic pubsub implementation with Ethereum-specific functionality
+// Gossipsub wraps the generic pubsub implementation with Ethereum-specific functionality.
 type Gossipsub struct {
 	*pubsub.Gossipsub
 	forkDigest [4]byte
@@ -19,7 +19,7 @@ type Gossipsub struct {
 	log        logrus.FieldLogger
 }
 
-// NewGossipsub creates an Ethereum-aware gossipsub instance
+// NewGossipsub creates an Ethereum-aware gossipsub instance.
 func NewGossipsub(log logrus.FieldLogger, ps *pubsub.Gossipsub, forkDigest [4]byte, enc encoder.SszNetworkEncoder) *Gossipsub {
 	return &Gossipsub{
 		Gossipsub:  ps,
@@ -31,7 +31,7 @@ func NewGossipsub(log logrus.FieldLogger, ps *pubsub.Gossipsub, forkDigest [4]by
 
 // Global topic subscriptions
 
-// SubscribeBeaconBlock subscribes to beacon block messages
+// SubscribeBeaconBlock subscribes to beacon block messages.
 func (g *Gossipsub) SubscribeBeaconBlock(ctx context.Context, handler BeaconBlockHandler) error {
 	topic := BeaconBlockTopic(g.forkDigest)
 

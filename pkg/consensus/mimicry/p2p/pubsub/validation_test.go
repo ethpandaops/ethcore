@@ -36,7 +36,7 @@ func createTestMessage(topic string, data []byte) *Message {
 func TestValidationPipeline(t *testing.T) {
 	vp := createTestValidationPipeline()
 	ctx := context.Background()
-	testTopic := "test-topic"
+	_ = testTopic // Use constant to satisfy goconst
 	testMsg := createTestMessage(testTopic, []byte("test data"))
 
 	// Test validation with no validator (should accept)
@@ -84,7 +84,7 @@ func TestValidationPipeline(t *testing.T) {
 
 func TestValidatorRegistration(t *testing.T) {
 	vp := createTestValidationPipeline()
-	testTopic := "test-topic"
+	_ = testTopic // Use constant to satisfy goconst
 
 	// Initially no validator
 	validator := vp.getValidator(testTopic)
@@ -157,7 +157,7 @@ func TestValidationResults(t *testing.T) {
 func TestValidationErrors(t *testing.T) {
 	vp := createTestValidationPipeline()
 	ctx := context.Background()
-	testTopic := "test-topic"
+	_ = testTopic // Use constant to satisfy goconst
 	testMsg := createTestMessage(testTopic, []byte("test data"))
 
 	// Test validation timeout
@@ -190,7 +190,7 @@ func TestValidationErrors(t *testing.T) {
 
 func TestLibp2pValidatorCreation(t *testing.T) {
 	vp := createTestValidationPipeline()
-	testTopic := "test-topic"
+	_ = testTopic // Use constant to satisfy goconst
 
 	// Create a test validator
 	callCount := 0
@@ -210,7 +210,7 @@ func TestLibp2pValidatorCreation(t *testing.T) {
 
 func TestLibp2pValidatorWithoutRegisteredValidator(t *testing.T) {
 	vp := createTestValidationPipeline()
-	testTopic := "test-topic"
+	_ = testTopic // Use constant to satisfy goconst
 
 	// Create libp2p validator without registering a validator first
 	libp2pValidator := vp.createLibp2pValidator(testTopic)
@@ -313,7 +313,7 @@ func TestCombineValidators(t *testing.T) {
 
 func TestValidationConcurrency(t *testing.T) {
 	vp := createTestValidationPipeline()
-	testTopic := "test-topic"
+	_ = testTopic // Use constant to satisfy goconst
 
 	var validatorCallCount int32
 	var mu sync.Mutex
@@ -357,7 +357,7 @@ func TestValidationConcurrency(t *testing.T) {
 
 func TestValidationEventEmission(t *testing.T) {
 	vp := createTestValidationPipeline()
-	testTopic := "test-topic"
+	_ = testTopic // Use constant to satisfy goconst
 
 	// Track emitted events
 	var validationEvents []string
@@ -398,7 +398,7 @@ func TestValidationEventEmission(t *testing.T) {
 
 func TestValidationTimeout(t *testing.T) {
 	vp := createTestValidationPipeline()
-	testTopic := "test-topic"
+	_ = testTopic // Use constant to satisfy goconst
 
 	// Create a validator that takes longer than the timeout
 	slowValidator := func(ctx context.Context, msg *Message) (ValidationResult, error) {

@@ -125,6 +125,7 @@ func createTestEncoder() encoder.SszNetworkEncoder {
 
 // setupTestNetwork creates a test network with the specified number of nodes
 func setupTestNetwork(t *testing.T, nodeCount int) *TestNetwork {
+	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	logger := createTestLogger()
 	enc := createTestEncoder()
@@ -300,6 +301,7 @@ func TestGossipsubIntegration(t *testing.T) {
 
 // testBasicSubscriptionAndPublishing tests basic gossipsub subscription and publishing
 func testBasicSubscriptionAndPublishing(t *testing.T, network *TestNetwork) {
+	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 	defer cancel()
 
@@ -349,6 +351,7 @@ func testBasicSubscriptionAndPublishing(t *testing.T, network *TestNetwork) {
 
 // testBeaconBlockPropagation tests Ethereum beacon block propagation
 func testBeaconBlockPropagation(t *testing.T, network *TestNetwork) {
+	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 	defer cancel()
 
