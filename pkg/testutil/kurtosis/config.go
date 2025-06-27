@@ -136,6 +136,11 @@ func MergeConfigs(base, override *NetworkConfig) *NetworkConfig {
 		result.participants = override.participants
 	}
 
+	// Override port offset if not zero
+	if override.PortOffset != 0 {
+		result.PortOffset = override.PortOffset
+	}
+
 	return &result
 }
 

@@ -15,6 +15,10 @@ var testFoundation *kurtosis.TestFoundation
 // TestMain is the entry point for all tests in this package.
 // It sets up the shared Kurtosis network and ensures proper cleanup.
 func TestMain(m *testing.M) {
+	// Acquire global test lock to prevent concurrent Kurtosis networks
+	kurtosis.AcquireTestLock()
+	defer kurtosis.ReleaseTestLock()
+
 	// Initialize logger for setup/teardown
 	logger := logrus.New()
 	logger.SetLevel(logrus.InfoLevel)
@@ -57,9 +61,10 @@ func TestMain(m *testing.M) {
 	// Run tests
 	exitCode := m.Run()
 
-	// Cleanup is handled by individual tests through testing.T.Cleanup()
-	if config.KeepAlive {
-		logger.Info("TestMain: Keeping test network alive (KeepAlive=true)")
+	// Cleanup the network if it was created
+	logger.Info("TestMain: Cleaning up test network")
+	if err := kurtosis.ForceCleanupNetwork(config.Name); err != nil {
+		logger.WithError(err).Warn("Failed to cleanup network")
 	}
 
 	// Exit with test result code

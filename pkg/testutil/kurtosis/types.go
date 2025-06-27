@@ -61,6 +61,10 @@ type NetworkConfig struct {
 
 	// participants stores the number of participants in the network
 	participants int
+
+	// PortOffset specifies the port offset for avoiding conflicts between test packages
+	// For example, if PortOffset is 1000, EL ports start at 33000 and CL ports at 34000
+	PortOffset int
 }
 
 // NetworkManager defines the interface for managing Kurtosis test networks.

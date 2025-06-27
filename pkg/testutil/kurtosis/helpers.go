@@ -295,14 +295,6 @@ func GetBeaconClientByType(foundation *TestFoundation, epgNetwork network.Networ
 	return "", errors.Errorf("no beacon client found with type %q", clientType)
 }
 
-// GetHostIPForContainers is a deprecated alias for GetNATExitIP.
-// This function is provided for backwards compatibility with existing tests.
-//
-// Deprecated: Use GetNATExitIP instead.
-func GetHostIPForContainers() string {
-	return GetNATExitIP()
-}
-
 // GetEPGNetwork returns the ethereum-package-go network from the foundation.
 // It performs a type assertion to convert from interface{} to network.Network.
 // Returns nil if the foundation or network is not properly initialized.

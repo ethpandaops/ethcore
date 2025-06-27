@@ -52,23 +52,22 @@ func GetNetwork(t *testing.T, config *NetworkConfig) (*TestFoundation, error) {
 
 		managed.refCount++
 
-		// Return a copy of the existing TestFoundation
-		// Note: BeaconClients will be reinitialized for each test
+		// Store the EPG network in the test foundation
 		tf := &TestFoundation{
 			Config:        config,
 			Network:       managed.foundation.Network,
+			EPGNetwork:    managed.network,
 			Logger:        logrus.New(),
 			NAT:           managed.foundation.NAT,
-			BeaconClients: []string{},
+			BeaconClients: managed.foundation.BeaconClients,
 		}
 
-		// Initialize beacon clients for this test instance
-		ctx, cancel := context.WithTimeout(context.Background(), config.Timeout)
-		defer cancel()
-
-		if err := initializeBeaconClients(ctx, tf, managed.network); err != nil {
-			return nil, errors.Wrap(err, "failed to initialize beacon clients")
-		}
+		// Register cleanup for this test instance
+		t.Cleanup(func() {
+			if err := cleanupNetwork(t, config); err != nil {
+				t.Logf("Failed to cleanup network %s: %v", config.Name, err)
+			}
+		})
 
 		return tf, nil
 	}
@@ -126,10 +125,33 @@ func setupKurtosisNetwork(ctx context.Context, config *NetworkConfig) (*TestFoun
 	// Add timeout option
 	opts = append(opts, ethereum.WithTimeout(config.Timeout))
 
-	// Configure NAT exit IP using helper function from helpers.go
+	// Configure port publisher with NAT exit IP and port offsets
 	natIP := GetNATExitIP()
 	logger.WithField("nat_ip", natIP).Info("Setting NAT exit IP")
-	opts = append(opts, ethereum.WithNATExitIP(natIP))
+
+	// Calculate port ranges based on port offset
+	// Default: EL starts at 32000, CL starts at 33000
+	// With offset: EL starts at 32000 + offset, CL starts at 33000 + offset
+	elPortStart := 32000 + config.PortOffset
+	clPortStart := 33000 + config.PortOffset
+
+	logger.WithFields(logrus.Fields{
+		"el_port_start": elPortStart,
+		"cl_port_start": clPortStart,
+		"port_offset":   config.PortOffset,
+	}).Info("Configuring port ranges")
+
+	opts = append(opts, ethereum.WithPortPublisher(&epgconfig.PortPublisherConfig{
+		NatExitIP: natIP,
+		EL: &epgconfig.PortPublisherComponent{
+			Enabled:         true,
+			PublicPortStart: elPortStart,
+		},
+		CL: &epgconfig.PortPublisherComponent{
+			Enabled:         true,
+			PublicPortStart: clPortStart,
+		},
+	}))
 
 	// Enable debug logs for tests if configured
 	if config.TestNet {
@@ -366,24 +388,9 @@ func cleanupNetwork(t *testing.T, config *NetworkConfig) error {
 	// Decrease reference count
 	managed.refCount--
 
-	// Only cleanup if no more references and not keeping alive
-	if managed.refCount <= 0 && !config.KeepAlive {
-		t.Logf("Cleaning up network: %s", config.Name)
-
-		ctx, cancel := context.WithTimeout(context.Background(), config.Timeout)
-		defer cancel()
-
-		if err := managed.network.Cleanup(ctx); err != nil {
-			return errors.Wrapf(err, "failed to cleanup network %s", config.Name)
-		}
-
-		// Remove from instances
-		delete(defaultManager.instances, config.Name)
-		t.Logf("Successfully cleaned up network: %s", config.Name)
-	} else {
-		t.Logf("Keeping network %s alive (refCount: %d, keepAlive: %v)",
-			config.Name, managed.refCount, config.KeepAlive)
-	}
+	// Keep the network alive for other tests in the same package
+	// The network will be cleaned up by ForceCleanupNetwork in TestMain
+	t.Logf("Test completed, network %s still has refCount: %d", config.Name, managed.refCount)
 
 	return nil
 }
@@ -442,4 +449,28 @@ func createParticipantConfig(config *NetworkConfig) []epgconfig.ParticipantConfi
 	}
 
 	return participants
+}
+
+// ForceCleanupNetwork forcefully cleans up a network by name.
+// This is useful in TestMain to ensure cleanup even if tests fail.
+func ForceCleanupNetwork(networkName string) error {
+	defaultManager.mu.Lock()
+	defer defaultManager.mu.Unlock()
+
+	// Check if we have this network in our instances
+	if managed, exists := defaultManager.instances[networkName]; exists {
+		if managed.network != nil {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+
+			if err := managed.network.Cleanup(ctx); err != nil {
+				return errors.Wrapf(err, "failed to cleanup network %s", networkName)
+			}
+		}
+
+		// Remove from instances
+		delete(defaultManager.instances, networkName)
+	}
+
+	return nil
 }

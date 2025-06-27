@@ -2,6 +2,7 @@ package crawler_test
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"sync"
 	"testing"
@@ -146,7 +147,7 @@ func setupNodeTracking(t *testing.T, tf *kurtosis.TestFoundation, network networ
 				Name: client.Name(),
 				Addr: client.BeaconAPIURL(),
 			},
-			"testing",
+			fmt.Sprintf("crawler-test-%s", client.Name()),
 			*opts,
 		)
 
@@ -273,7 +274,7 @@ func feedENRsToCrawler(t *testing.T, tf *kurtosis.TestFoundation, network networ
 					Name: client.Name(),
 					Addr: client.BeaconAPIURL(),
 				},
-				"testing",
+				fmt.Sprintf("crawler-test-%s", client.Name()),
 				*opts,
 			)
 
@@ -300,6 +301,7 @@ func feedENRsToCrawler(t *testing.T, tf *kurtosis.TestFoundation, network networ
 
 			if complete, ok := successful[client.Name()]; ok && complete {
 				logger.Infof("Already have status/metadata for participant: %s", client.Name())
+
 				continue
 			}
 
