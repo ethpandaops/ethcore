@@ -22,7 +22,7 @@ func createTestHandlerRegistry() *handlerRegistry {
 
 func TestHandlerRegistry(t *testing.T) {
 	hr := createTestHandlerRegistry()
-	testTopic := "test-topic"
+	// Use testTopic constant
 
 	// Initially no handler
 	handler := hr.get(testTopic)
@@ -57,7 +57,7 @@ func TestHandlerRegistry(t *testing.T) {
 
 func TestHandlerRegistryNilHandler(t *testing.T) {
 	hr := createTestHandlerRegistry()
-	testTopic := "test-topic"
+	// Use testTopic constant
 
 	// Register nil handler (should be ignored)
 	hr.register(testTopic, nil)
@@ -69,7 +69,7 @@ func TestHandlerRegistryNilHandler(t *testing.T) {
 
 func TestMessageHandling(t *testing.T) {
 	hr := createTestHandlerRegistry()
-	testTopic := "test-topic"
+	// Use testTopic constant
 	testData := []byte("test message")
 
 	// Test processing message without handler
@@ -107,7 +107,7 @@ func TestMessageHandling(t *testing.T) {
 
 func TestHandlerErrors(t *testing.T) {
 	hr := createTestHandlerRegistry()
-	testTopic := "test-topic"
+	// Use testTopic constant
 	testMsg := createTestMessage(testTopic, []byte("test"))
 
 	// Test handler that panics
@@ -200,7 +200,7 @@ func TestConcurrentHandlers(t *testing.T) {
 }
 
 func TestHandlerUtilities(t *testing.T) {
-	testTopic := "test-topic"
+	// Use testTopic constant
 	testData := []byte("test message")
 	testMsg := createTestMessage(testTopic, testData)
 
@@ -319,7 +319,7 @@ func TestHandlerUtilities(t *testing.T) {
 
 func TestHandlerEventEmission(t *testing.T) {
 	hr := createTestHandlerRegistry()
-	testTopic := "test-topic"
+	// Use testTopic constant
 	testMsg := createTestMessage(testTopic, []byte("test"))
 
 	// Track emitted events
@@ -379,7 +379,7 @@ func TestHandlerEventEmission(t *testing.T) {
 
 func TestHandlerMetrics(t *testing.T) {
 	hr := createTestHandlerRegistry()
-	testTopic := "test-topic"
+	// Use testTopic constant
 	testMsg := createTestMessage(testTopic, []byte("test"))
 
 	// Test with metrics
@@ -433,7 +433,7 @@ func TestSafeMessageProcessing(t *testing.T) {
 
 func TestHandlerTimeout(t *testing.T) {
 	hr := createTestHandlerRegistry()
-	testTopic := "test-topic"
+	// Use testTopic constant
 	testMsg := createTestMessage(testTopic, []byte("test"))
 
 	// Create a handler that takes longer than the timeout

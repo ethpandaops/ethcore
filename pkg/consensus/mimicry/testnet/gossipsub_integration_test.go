@@ -404,6 +404,7 @@ func testBeaconBlockPropagation(t *testing.T, network *TestNetwork) {
 
 // testAttestationPropagation tests attestation propagation on subnets
 func testAttestationPropagation(t *testing.T, network *TestNetwork) {
+	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 	defer cancel()
 
@@ -455,6 +456,7 @@ func testAttestationPropagation(t *testing.T, network *TestNetwork) {
 
 // testMultipleTopicHandling tests handling multiple topics simultaneously
 func testMultipleTopicHandling(t *testing.T, network *TestNetwork) {
+	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 	defer cancel()
 
@@ -580,6 +582,7 @@ func testMultipleTopicHandling(t *testing.T, network *TestNetwork) {
 
 // testMessageValidation tests message validation functionality
 func testMessageValidation(t *testing.T, network *TestNetwork) {
+	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 	defer cancel()
 

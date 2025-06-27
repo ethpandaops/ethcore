@@ -39,7 +39,7 @@ func (g *Gossipsub) SubscribeBeaconBlock(ctx context.Context, handler BeaconBloc
 	return g.Subscribe(ctx, topic, msgHandler)
 }
 
-// SubscribeBeaconAggregateAndProof subscribes to aggregate and proof messages
+// SubscribeBeaconAggregateAndProof subscribes to aggregate and proof messages.
 func (g *Gossipsub) SubscribeBeaconAggregateAndProof(ctx context.Context, handler BeaconAggregateAndProofHandler) error {
 	topic := BeaconAggregateAndProofTopic(g.forkDigest)
 
@@ -47,7 +47,7 @@ func (g *Gossipsub) SubscribeBeaconAggregateAndProof(ctx context.Context, handle
 	return g.Subscribe(ctx, topic, msgHandler)
 }
 
-// SubscribeVoluntaryExit subscribes to voluntary exit messages
+// SubscribeVoluntaryExit subscribes to voluntary exit messages.
 func (g *Gossipsub) SubscribeVoluntaryExit(ctx context.Context, handler VoluntaryExitHandler) error {
 	topic := VoluntaryExitTopic(g.forkDigest)
 
@@ -55,7 +55,7 @@ func (g *Gossipsub) SubscribeVoluntaryExit(ctx context.Context, handler Voluntar
 	return g.Subscribe(ctx, topic, msgHandler)
 }
 
-// SubscribeProposerSlashing subscribes to proposer slashing messages
+// SubscribeProposerSlashing subscribes to proposer slashing messages.
 func (g *Gossipsub) SubscribeProposerSlashing(ctx context.Context, handler ProposerSlashingHandler) error {
 	topic := ProposerSlashingTopic(g.forkDigest)
 
