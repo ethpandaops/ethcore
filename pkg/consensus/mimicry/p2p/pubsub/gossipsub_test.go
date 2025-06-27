@@ -562,8 +562,8 @@ func BenchmarkPublish(b *testing.B) {
 	g := createTestGossipsub(&testing.T{})
 	ctx := context.Background()
 
-	err = g.Start(ctx)
-	require.NoError(t, err)
+	err := g.Start(ctx)
+	require.NoError(b, err)
 	defer func() { _ = g.Stop() }()
 
 	testTopic := "benchmark-topic"
@@ -581,8 +581,8 @@ func BenchmarkSubscribe(b *testing.B) {
 	g := createTestGossipsub(&testing.T{})
 	ctx := context.Background()
 
-	err = g.Start(ctx)
-	require.NoError(t, err)
+	err := g.Start(ctx)
+	require.NoError(b, err)
 	defer func() { _ = g.Stop() }()
 
 	handler := func(ctx context.Context, msg *Message) error { return nil }
