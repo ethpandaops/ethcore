@@ -259,7 +259,7 @@ func (g *Gossipsub) RegisterBeaconBlockValidator(validator BeaconBlockValidator)
 	return g.RegisterValidator(topic, pubsubValidator)
 }
 
-// RegisterAttestationValidator registers a validator for attestation messages on a specific subnet
+// RegisterAttestationValidator registers a validator for attestation messages on a specific subnet.
 func (g *Gossipsub) RegisterAttestationValidator(subnet uint64, validator AttestationValidator) error {
 	if subnet >= AttestationSubnetCount {
 		return fmt.Errorf("invalid attestation subnet: %d", subnet)
@@ -273,7 +273,7 @@ func (g *Gossipsub) RegisterAttestationValidator(subnet uint64, validator Attest
 
 // Helper methods for creating typed handlers and validators
 
-// createBeaconBlockHandler creates a pubsub message handler for beacon blocks
+// createBeaconBlockHandler creates a pubsub message handler for beacon blocks.
 func (g *Gossipsub) createBeaconBlockHandler(handler BeaconBlockHandler) pubsub.MessageHandler {
 	return func(ctx context.Context, msg *pubsub.Message) error {
 		block := &pb.SignedBeaconBlock{}
@@ -285,7 +285,7 @@ func (g *Gossipsub) createBeaconBlockHandler(handler BeaconBlockHandler) pubsub.
 	}
 }
 
-// createAggregateAndProofHandler creates a pubsub message handler for aggregate and proof
+// createAggregateAndProofHandler creates a pubsub message handler for aggregate and proof.
 func (g *Gossipsub) createAggregateAndProofHandler(handler BeaconAggregateAndProofHandler) pubsub.MessageHandler {
 	return func(ctx context.Context, msg *pubsub.Message) error {
 		aggProof := &pb.AggregateAttestationAndProof{}
