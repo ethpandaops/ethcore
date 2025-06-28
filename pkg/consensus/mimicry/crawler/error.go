@@ -11,14 +11,11 @@ type CrawlError struct {
 }
 
 var (
-	ErrCrawlTooSoon                 = newCrawlError("too soon")
-	ErrCrawlFailedToConnect         = newCrawlError("failed to connect")
-	ErrCrawlENRForkDigest           = newCrawlError("wrong enr fork digest")
-	ErrCrawlStatusForkDigest        = newCrawlError("wrong fork digest in status message")
-	ErrCrawlFailedToRequestStatus   = newCrawlError("failed to request status")
-	ErrCrawlFailedToRequestMetadata = newCrawlError("failed to request metadata")
-	ErrCrawlFailedToCrawl           = newCrawlError("failed to crawl")
-	ErrCrawlIdentifyTimeout         = newCrawlError("identify protocol timeout")
+	ErrCrawlTooSoon               = newCrawlError("too soon")
+	ErrCrawlENRForkDigest         = newCrawlError("wrong enr fork digest")
+	ErrCrawlStatusForkDigest      = newCrawlError("wrong fork digest in status message")
+	ErrCrawlFailedToRequestStatus = newCrawlError("failed to request status")
+	ErrCrawlIdentifyTimeout       = newCrawlError("identify protocol timeout")
 )
 
 func newCrawlError(msg string) *CrawlError {
@@ -36,32 +33,5 @@ func (e *CrawlError) Add(msg string) *CrawlError {
 }
 
 func (e *CrawlError) Unwrap() error {
-	return errors.New(e.Msg)
-}
-
-type StatusError struct {
-	Msg  string
-	Type string
-}
-
-var (
-	ErrStatusForkDigest = newStatusError("wrong fork digest in status message")
-)
-
-func newStatusError(msg string) *StatusError {
-	return &StatusError{Msg: msg, Type: msg}
-}
-
-func (e *StatusError) Error() string {
-	return e.Msg
-}
-
-func (e *StatusError) Add(msg string) *StatusError {
-	e.Msg = fmt.Sprintf("%s: %s", e.Msg, msg)
-
-	return e
-}
-
-func (e *StatusError) Unwrap() error {
 	return errors.New(e.Msg)
 }

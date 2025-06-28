@@ -2,7 +2,9 @@ package crawler
 
 import (
 	"fmt"
+	"time"
 
+	"github.com/jellydator/ttlcache/v3"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 )
@@ -53,6 +55,8 @@ func (n *Crawler) emitMetadataReceived(peerID peer.ID, metadata *common.MetaData
 }
 
 func (n *Crawler) emitSuccessfulCrawl(peerID peer.ID, status *common.Status, metadata *common.MetaData) {
+	// Add the peer to the duplicate cache to prevent re-crawling too soon
+	n.duplicateCache.GetNodesCache().Set(peerID.String(), time.Now(), ttlcache.DefaultTTL)
 	n.broker.Emit(OnSuccessfulCrawl, peerID, status, metadata)
 }
 

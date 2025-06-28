@@ -67,15 +67,15 @@ func Test_RunKurtosisTests(t *testing.T) {
 
 	// Run all the network tests
 	t.Run("list-network-participants", func(t *testing.T) {
-		ListParticipants(t, foundation, epgNetwork)
+		listParticipants(t, epgNetwork)
 	})
 	t.Run("discover-crawlable-nodes", func(t *testing.T) {
-		AllDiscoverableNodes(t, foundation, epgNetwork, crawlerConfig, logger)
+		allDiscoverableNodes(t, foundation, epgNetwork, crawlerConfig, logger)
 	})
 }
 
-// ListParticipants lists all participants in the network environment.
-func ListParticipants(t *testing.T, tf *kurtosis.TestFoundation, network network.Network) {
+// listParticipants lists all participants in the network environment.
+func listParticipants(t *testing.T, network network.Network) {
 	t.Helper()
 
 	// List all consensus clients
@@ -93,8 +93,8 @@ func ListParticipants(t *testing.T, tf *kurtosis.TestFoundation, network network
 	}
 }
 
-// AllDiscoverableNodes tests that all nodes are discoverable.
-func AllDiscoverableNodes(t *testing.T, tf *kurtosis.TestFoundation, network network.Network, config *TestCrawlerConfig, logger *logrus.Logger) {
+// allDiscoverableNodes tests that all nodes are discoverable.
+func allDiscoverableNodes(t *testing.T, tf *kurtosis.TestFoundation, network network.Network, config *TestCrawlerConfig, logger *logrus.Logger) {
 	t.Helper()
 
 	// Get all our peer IDs
