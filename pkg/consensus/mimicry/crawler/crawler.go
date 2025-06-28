@@ -330,7 +330,9 @@ func (c *Crawler) nodeIsOnOurNetwork(node *enode.Node) error {
 	status := c.GetStatus()
 
 	if !bytes.Equal(forkEntry.CurrentForkDigest, status.ForkDigest[:]) {
-		return ErrCrawlENRForkDigest.Add(fmt.Sprintf("theirs 0x%s != ours %s", hex.EncodeToString(forkEntry.CurrentForkDigest), status.ForkDigest.String()))
+		err := ErrCrawlENRForkDigest.WithDetails(fmt.Sprintf("theirs 0x%s != ours %s", hex.EncodeToString(forkEntry.CurrentForkDigest), status.ForkDigest.String()))
+
+		return &err
 	}
 
 	return nil
@@ -338,7 +340,7 @@ func (c *Crawler) nodeIsOnOurNetwork(node *enode.Node) error {
 
 func (c *Crawler) ConnectToPeer(ctx context.Context, p peer.AddrInfo, n *enode.Node) error {
 	if err := c.nodeIsOnOurNetwork(n); err != nil {
-		c.emitFailedCrawl(p.ID, *newCrawlError(err.Error()))
+		c.emitFailedCrawl(p.ID, newCrawlError(err.Error()))
 
 		return nil
 	}
@@ -348,7 +350,7 @@ func (c *Crawler) ConnectToPeer(ctx context.Context, p peer.AddrInfo, n *enode.N
 			"peer": p.ID,
 		}).Debug("We've already connected to this peer previously")
 
-		c.emitFailedCrawl(p.ID, *ErrCrawlTooSoon)
+		c.emitFailedCrawl(p.ID, ErrCrawlTooSoon)
 
 		return nil
 	}

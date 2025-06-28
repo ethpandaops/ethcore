@@ -147,7 +147,7 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 	if !identifyCompleted && agentVersion == unknown {
 		logCtx.Error("Failed to complete identify protocol - cannot determine client type")
 
-		c.emitFailedCrawl(conn.RemotePeer(), *ErrCrawlIdentifyTimeout)
+		c.emitFailedCrawl(conn.RemotePeer(), ErrCrawlIdentifyTimeout)
 
 		return
 	}
@@ -189,7 +189,7 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 	if err != nil {
 		logCtx.WithError(err).Error("Failed to request status from peer after retries")
 
-		c.emitFailedCrawl(conn.RemotePeer(), *ErrCrawlFailedToRequestStatus)
+		c.emitFailedCrawl(conn.RemotePeer(), ErrCrawlFailedToRequestStatus)
 
 		return
 	}
@@ -200,7 +200,7 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 		// They're on a different fork
 		goodbyeReason = eth.GoodbyeReasonIrrelevantNetwork
 
-		c.emitFailedCrawl(conn.RemotePeer(), *ErrCrawlStatusForkDigest.Add(fmt.Sprintf("ours %s != theirs %s", ourStatus.ForkDigest, status.ForkDigest)))
+		c.emitFailedCrawl(conn.RemotePeer(), ErrCrawlStatusForkDigest.WithDetails(fmt.Sprintf("ours %s != theirs %s", ourStatus.ForkDigest, status.ForkDigest)))
 
 		return
 	}
