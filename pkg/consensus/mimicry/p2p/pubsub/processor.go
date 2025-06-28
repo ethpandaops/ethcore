@@ -288,7 +288,7 @@ func NewSelfSubscribingProcessor[T any](processor Processor[T], gossipsub *Gossi
 	}
 }
 
-// Subscribe handles subscription using the typed SubscribeWithProcessor method.
+// Subscribe handles subscription using the typed RegisterWithProcessor method.
 func (sp *SelfSubscribingProcessor[T]) Subscribe(ctx context.Context) error {
 	sp.mu.Lock()
 	defer sp.mu.Unlock()
@@ -297,12 +297,12 @@ func (sp *SelfSubscribingProcessor[T]) Subscribe(ctx context.Context) error {
 		return fmt.Errorf("already subscribed to topic %s", sp.Topic())
 	}
 
-	err := SubscribeWithProcessor(sp.gossipsub, ctx, sp.Processor)
+	err := RegisterWithProcessor(sp.gossipsub, ctx, sp.Processor)
 	if err != nil {
 		return fmt.Errorf("failed to subscribe: %w", err)
 	}
 
-	// Note: SubscribeWithProcessor doesn't return the subscription
+	// Note: RegisterWithProcessor doesn't return the subscription
 	// We would need to retrieve it from the gossipsub if needed
 	sp.log.Info("Subscribed to topic")
 

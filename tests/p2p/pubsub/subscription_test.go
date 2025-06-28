@@ -1,10 +1,11 @@
 package pubsub_test
 
 import (
-	ethpubsub "github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub"
 	"sync"
 	"testing"
 	"time"
+
+	ethpubsub "github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub"
 
 	"github.com/chuckpreslar/emission"
 	"github.com/sirupsen/logrus"
@@ -138,8 +139,8 @@ func TestEmitterIntegration(t *testing.T) {
 }
 
 func TestSubscriptionHelperFunctions(t *testing.T) {
-	// Test SubscribeWithProcessor function behavior
-	t.Run("SubscribeWithProcessor requires started gossipsub", func(t *testing.T) {
+	// Test RegisterWithProcessor function behavior
+	t.Run("RegisterWithProcessor requires started gossipsub", func(t *testing.T) {
 		// This test would require a real Gossipsub instance
 		t.Skip("Requires full Gossipsub setup")
 	})

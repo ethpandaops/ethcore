@@ -402,7 +402,7 @@ func testBasicSubscriptionAndPublishing(t *testing.T) {
 
 	// Subscribe all nodes except the first one
 	for i, processor := range processors {
-		err := pubsub.SubscribeWithProcessor(network.gossipsubs[i+1], ctx, processor)
+		err := pubsub.RegisterWithProcessor(network.gossipsubs[i+1], ctx, processor)
 		require.NoError(t, err)
 	}
 
@@ -911,7 +911,7 @@ func testConcurrentOperations(t *testing.T) {
 
 	// Subscribe all nodes
 	for i, processor := range processors {
-		err := pubsub.SubscribeWithProcessor(network.gossipsubs[i], ctx, processor)
+		err := pubsub.RegisterWithProcessor(network.gossipsubs[i], ctx, processor)
 		require.NoError(t, err)
 	}
 
@@ -1031,7 +1031,7 @@ func testHighVolumeMessagePropagation(t *testing.T) {
 
 	// Subscribe nodes
 	for i, processor := range processors {
-		err := pubsub.SubscribeWithProcessor(network.gossipsubs[i+1], ctx, processor)
+		err := pubsub.RegisterWithProcessor(network.gossipsubs[i+1], ctx, processor)
 		require.NoError(t, err)
 	}
 
@@ -1134,7 +1134,7 @@ func testLatencyMeasurement(t *testing.T) {
 
 	// Subscribe nodes
 	for i, processor := range processors {
-		err := pubsub.SubscribeWithProcessor(network.gossipsubs[i+1], ctx, processor)
+		err := pubsub.RegisterWithProcessor(network.gossipsubs[i+1], ctx, processor)
 		require.NoError(t, err)
 	}
 
@@ -1238,7 +1238,7 @@ func testThroughputMeasurement(t *testing.T) {
 
 	// Subscribe nodes
 	for i, processor := range processors {
-		err := pubsub.SubscribeWithProcessor(network.gossipsubs[i+1], ctx, processor)
+		err := pubsub.RegisterWithProcessor(network.gossipsubs[i+1], ctx, processor)
 		require.NoError(t, err)
 	}
 
@@ -1351,7 +1351,7 @@ func testConcurrentSubscriptions(t *testing.T) {
 	for nodeIdx := 0; nodeIdx < len(network.gossipsubs); nodeIdx++ {
 		for topicIdx := 0; topicIdx < topicCount; topicIdx++ {
 			processor := allProcessors[nodeIdx][topicIdx]
-			err := pubsub.SubscribeWithProcessor(network.gossipsubs[nodeIdx], ctx, processor)
+			err := pubsub.RegisterWithProcessor(network.gossipsubs[nodeIdx], ctx, processor)
 			require.NoError(t, err)
 		}
 	}
@@ -1445,7 +1445,7 @@ func testLargeMessageHandling(t *testing.T) {
 
 	// Subscribe nodes
 	for i, processor := range processors {
-		err := pubsub.SubscribeWithProcessor(network.gossipsubs[i+1], ctx, processor)
+		err := pubsub.RegisterWithProcessor(network.gossipsubs[i+1], ctx, processor)
 		require.NoError(t, err)
 	}
 

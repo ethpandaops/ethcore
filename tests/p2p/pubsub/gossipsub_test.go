@@ -1,10 +1,11 @@
 package pubsub_test
 
 import (
-	ethpubsub "github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub"
 	"context"
 	"testing"
 	"time"
+
+	ethpubsub "github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub"
 
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -130,7 +131,7 @@ func TestGossipsub_SubscriptionWithProcessor(t *testing.T) {
 	defer func() { _ = g.Stop() }()
 
 	// Subscribe with processor
-	err = ethpubsub.SubscribeWithProcessor(g, ctx, processor)
+	err = ethpubsub.RegisterWithProcessor(g, ctx, processor)
 	require.NoError(t, err)
 
 	// Verify subscription
@@ -235,7 +236,7 @@ func TestGossipsub_GetStats(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { _ = g2.Stop() }()
 
-	err = ethpubsub.SubscribeWithProcessor(g2, ctx, processor2)
+	err = ethpubsub.RegisterWithProcessor(g2, ctx, processor2)
 	require.NoError(t, err)
 
 	stats = g2.GetStats()

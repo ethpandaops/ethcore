@@ -366,8 +366,8 @@ func RegisterMultiProcessor[T any](g *Gossipsub, name string, processor MultiPro
 	return nil
 }
 
-// SubscribeWithProcessor subscribes to a topic using a processor for type-safe message handling.
-func SubscribeWithProcessor[T any](g *Gossipsub, ctx context.Context, processor Processor[T]) error {
+// RegisterWithProcessor subscribes to a topic using a processor for type-safe message handling.
+func RegisterWithProcessor[T any](g *Gossipsub, ctx context.Context, processor Processor[T]) error {
 	if !g.IsStarted() {
 		return NewTopicError(ErrNotStarted, processor.Topic(), "subscribe_with_processor")
 	}
@@ -486,7 +486,7 @@ func SubscribeMultiWithProcessor[T any](g *Gossipsub, ctx context.Context, multi
 		}
 
 		// Use the existing single-topic subscription logic
-		if err := SubscribeWithProcessor(g, ctx, wrapper); err != nil {
+		if err := RegisterWithProcessor(g, ctx, wrapper); err != nil {
 			rollback()
 
 			return NewError(fmt.Errorf("failed to subscribe to topic %s: %w", topic, err), "subscribe_multi_with_processor")
@@ -713,9 +713,9 @@ func (g *Gossipsub) SubscribeToProcessorTopic(ctx context.Context, topic string)
 	}
 
 	// Direct subscription through processor interface is not supported due to Go's type system limitations
-	// Processors must be subscribed using the typed SubscribeWithProcessor[T] method
+	// Processors must be subscribed using the typed RegisterWithProcessor[T] method
 	return NewTopicError(
-		fmt.Errorf("direct processor subscription not supported - use SubscribeWithProcessor[T] with the typed processor"),
+		fmt.Errorf("direct processor subscription not supported - use RegisterWithProcessor[T] with the typed processor"),
 		topic,
 		"subscribe_processor_topic",
 	)

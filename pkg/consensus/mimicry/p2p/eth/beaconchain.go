@@ -223,7 +223,7 @@ func (g *BeaconchainGossipsub) SubscribeBeaconBlock(ctx context.Context) error {
 		return fmt.Errorf("invalid processor type for beacon block")
 	}
 
-	return pubsub.SubscribeWithProcessor(g.Gossipsub, ctx, processor)
+	return pubsub.RegisterWithProcessor(g.Gossipsub, ctx, processor)
 }
 
 // SubscribeAttestation subscribes to attestation messages for previously registered subnets.
@@ -257,7 +257,7 @@ func (g *BeaconchainGossipsub) SubscribeAggregateAndProof(ctx context.Context) e
 		return fmt.Errorf("invalid processor type for aggregate and proof")
 	}
 
-	return pubsub.SubscribeWithProcessor(g.Gossipsub, ctx, processor)
+	return pubsub.RegisterWithProcessor(g.Gossipsub, ctx, processor)
 }
 
 // SubscribeSyncCommittee subscribes to sync committee messages for previously registered subnets.
@@ -291,7 +291,7 @@ func (g *BeaconchainGossipsub) SubscribeVoluntaryExit(ctx context.Context) error
 		return fmt.Errorf("invalid processor type for voluntary exit")
 	}
 
-	return pubsub.SubscribeWithProcessor(g.Gossipsub, ctx, processor)
+	return pubsub.RegisterWithProcessor(g.Gossipsub, ctx, processor)
 }
 
 // SubscribeProposerSlashing subscribes to proposer slashing messages using a previously registered processor.
@@ -310,7 +310,7 @@ func (g *BeaconchainGossipsub) SubscribeProposerSlashing(ctx context.Context) er
 		return fmt.Errorf("invalid processor type for proposer slashing")
 	}
 
-	return pubsub.SubscribeWithProcessor(g.Gossipsub, ctx, processor)
+	return pubsub.RegisterWithProcessor(g.Gossipsub, ctx, processor)
 }
 
 // SubscribeAttesterSlashing subscribes to attester slashing messages using a previously registered processor.
@@ -329,7 +329,7 @@ func (g *BeaconchainGossipsub) SubscribeAttesterSlashing(ctx context.Context) er
 		return fmt.Errorf("invalid processor type for attester slashing")
 	}
 
-	return pubsub.SubscribeWithProcessor(g.Gossipsub, ctx, processor)
+	return pubsub.RegisterWithProcessor(g.Gossipsub, ctx, processor)
 }
 
 // SubscribeSyncContributionAndProof subscribes to sync contribution and proof messages using a previously registered processor.
@@ -348,7 +348,7 @@ func (g *BeaconchainGossipsub) SubscribeSyncContributionAndProof(ctx context.Con
 		return fmt.Errorf("invalid processor type for sync contribution and proof")
 	}
 
-	return pubsub.SubscribeWithProcessor(g.Gossipsub, ctx, processor)
+	return pubsub.RegisterWithProcessor(g.Gossipsub, ctx, processor)
 }
 
 // SubscribeBlsToExecutionChange subscribes to BLS to execution change messages using a previously registered processor.
@@ -367,5 +367,5 @@ func (g *BeaconchainGossipsub) SubscribeBlsToExecutionChange(ctx context.Context
 		return fmt.Errorf("invalid processor type for BLS to execution change")
 	}
 
-	return pubsub.SubscribeWithProcessor(g.Gossipsub, ctx, processor)
+	return pubsub.RegisterWithProcessor(g.Gossipsub, ctx, processor)
 }
