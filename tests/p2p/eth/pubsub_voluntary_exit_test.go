@@ -19,35 +19,35 @@ import (
 
 func TestVoluntaryExitProcessorTopic(t *testing.T) {
 	forkDigest := [4]byte{0x01, 0x02, 0x03, 0x04}
-	processor := &voluntaryExitProcessor{
-		forkDigest: forkDigest,
+	processor := &eth.VoluntaryExitProcessor{
+		ForkDigest: forkDigest,
 	}
 
-	expected := VoluntaryExitTopic(forkDigest[:])
+	expected := eth.VoluntaryExitTopic(forkDigest[:])
 	assert.Equal(t, expected, processor.Topic())
 }
 
 func TestVoluntaryExitProcessorAllPossibleTopics(t *testing.T) {
 	forkDigest := [4]byte{0x01, 0x02, 0x03, 0x04}
-	processor := &voluntaryExitProcessor{
-		forkDigest: forkDigest,
+	processor := &eth.VoluntaryExitProcessor{
+		ForkDigest: forkDigest,
 	}
 
 	topics := processor.AllPossibleTopics()
 	assert.Len(t, topics, 1)
-	assert.Equal(t, VoluntaryExitTopic(forkDigest[:]), topics[0])
+	assert.Equal(t, eth.VoluntaryExitTopic(forkDigest[:]), topics[0])
 }
 
 func TestVoluntaryExitProcessorGetTopicScoreParams(t *testing.T) {
-	processor := &voluntaryExitProcessor{}
-	// voluntaryExitProcessor always returns nil for score params
+	processor := &eth.VoluntaryExitProcessor{}
+	// eth.VoluntaryExitProcessor always returns nil for score params
 	assert.Nil(t, processor.GetTopicScoreParams())
 }
 
 func TestVoluntaryExitProcessorDecode(t *testing.T) {
-	processor := &voluntaryExitProcessor{
-		encoder: encoder.SszNetworkEncoder{},
-		log:     logrus.New(),
+	processor := &eth.VoluntaryExitProcessor{
+		Encoder: encoder.SszNetworkEncoder{},
+		Log:     logrus.New(),
 	}
 
 	// Create a test voluntary exit
@@ -61,7 +61,7 @@ func TestVoluntaryExitProcessorDecode(t *testing.T) {
 
 	// Encode the voluntary exit
 	var buf bytes.Buffer
-	_, err := processor.encoder.EncodeGossip(&buf, voluntaryExit)
+	_, err := processor.Encoder.EncodeGossip(&buf, voluntaryExit)
 	require.NoError(t, err)
 	encoded := buf.Bytes()
 
@@ -124,9 +124,9 @@ func TestVoluntaryExitProcessorValidate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			processor := &voluntaryExitProcessor{
-				validator: tt.setupValidator(),
-				log:       logrus.New(),
+			processor := &eth.VoluntaryExitProcessor{
+				Validator: tt.setupValidator(),
+				Log:       logrus.New(),
 			}
 
 			voluntaryExit := &pb.SignedVoluntaryExit{
@@ -182,9 +182,9 @@ func TestVoluntaryExitProcessorProcess(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			processor := &voluntaryExitProcessor{
-				handler: tt.setupHandler(),
-				log:     logrus.New(),
+			processor := &eth.VoluntaryExitProcessor{
+				Handler: tt.setupHandler(),
+				Log:     logrus.New(),
 			}
 
 			voluntaryExit := &pb.SignedVoluntaryExit{
@@ -208,10 +208,10 @@ func TestVoluntaryExitProcessorProcess(t *testing.T) {
 
 func TestVoluntaryExitProcessorSubscribeUnsubscribe(t *testing.T) {
 	mockGS := &pubsub.Gossipsub{}
-	processor := &voluntaryExitProcessor{
-		gossipsub:  mockGS,
-		forkDigest: [4]byte{0x01, 0x02, 0x03, 0x04},
-		log:        logrus.New(),
+	processor := &eth.VoluntaryExitProcessor{
+		Gossipsub:  mockGS,
+		ForkDigest: [4]byte{0x01, 0x02, 0x03, 0x04},
+		Log:        logrus.New(),
 	}
 
 	// Subscribe should return error due to gossipsub.SubscribeToProcessorTopic not implemented
@@ -223,7 +223,7 @@ func TestVoluntaryExitProcessorSubscribeUnsubscribe(t *testing.T) {
 	assert.Error(t, err)
 
 	// Test with nil gossipsub
-	processor.gossipsub = nil
+	processor.Gossipsub = nil
 	err = processor.Subscribe(context.Background())
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "gossipsub reference not set")
@@ -235,10 +235,10 @@ func TestVoluntaryExitProcessorSubscribeUnsubscribe(t *testing.T) {
 
 func TestVoluntaryExitProcessorWithNilFields(t *testing.T) {
 	// Test that the processor handles nil fields gracefully
-	processor := &voluntaryExitProcessor{
-		encoder: encoder.SszNetworkEncoder{},
-		log:     logrus.New(),
-		handler: func(ctx context.Context, exit *pb.SignedVoluntaryExit, from peer.ID) error {
+	processor := &eth.VoluntaryExitProcessor{
+		Encoder: encoder.SszNetworkEncoder{},
+		Log:     logrus.New(),
+		Handler: func(ctx context.Context, exit *pb.SignedVoluntaryExit, from peer.ID) error {
 			// Verify exit is not nil
 			assert.NotNil(t, exit)
 			return nil
@@ -259,6 +259,6 @@ func TestVoluntaryExitProcessorWithNilFields(t *testing.T) {
 
 func TestVoluntaryExitTopicFormat(t *testing.T) {
 	forkDigest := [4]byte{0x01, 0x02, 0x03, 0x04}
-	topic := VoluntaryExitTopic(forkDigest[:])
+	topic := eth.VoluntaryExitTopic(forkDigest[:])
 	assert.Equal(t, "/eth2/01020304/voluntary_exit/ssz_snappy", topic)
 }

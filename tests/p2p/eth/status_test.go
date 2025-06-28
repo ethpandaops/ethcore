@@ -24,8 +24,8 @@ func TestPeerStatus(t *testing.T) {
 		HeadSlot:       3200,
 	}
 
-	// Create PeerStatus
-	peerStatus := PeerStatus{
+	// Create eth.PeerStatus
+	peerStatus := eth.PeerStatus{
 		PeerID: peerID,
 		Status: status,
 	}
@@ -40,7 +40,7 @@ func TestPeerStatus(t *testing.T) {
 
 func TestPeerStatusNil(t *testing.T) {
 	// Test with nil status
-	peerStatus := PeerStatus{
+	peerStatus := eth.PeerStatus{
 		PeerID: "",
 		Status: nil,
 	}
@@ -61,12 +61,12 @@ func TestPeerStatusMultiple(t *testing.T) {
 		{"12D3KooWHCJbJKGDfCgHSoCuK9q4STyRnVveqLoXAPBbXHTZx9Cv", 102, 3264},
 	}
 
-	statuses := make([]PeerStatus, len(peers))
+	statuses := make([]eth.PeerStatus, len(peers))
 	for i, p := range peers {
 		peerID, err := peer.Decode(p.id)
 		require.NoError(t, err)
 
-		statuses[i] = PeerStatus{
+		statuses[i] = eth.PeerStatus{
 			PeerID: peerID,
 			Status: &common.Status{
 				ForkDigest:     [4]byte{0x01, 0x02, 0x03, 0x04},

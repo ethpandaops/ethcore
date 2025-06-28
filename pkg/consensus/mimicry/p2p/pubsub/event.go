@@ -32,7 +32,7 @@ var (
 	PeerScoreUpdatedEvent = "pubsub:peer:score:updated"
 )
 
-// Event callback function types
+// Event callback function types.
 type PubsubStartedCallback func()
 type PubsubStoppedCallback func()
 type TopicSubscribedCallback func(topic string)
@@ -49,7 +49,7 @@ type PeerJoinedTopicCallback func(topic string, peerID peer.ID)
 type PeerLeftTopicCallback func(topic string, peerID peer.ID)
 type PeerScoreUpdatedCallback func(peerID peer.ID, score float64)
 
-// Event registration methods for Gossipsub
+// Event registration methods for Gossipsub.
 func (g *Gossipsub) OnPubsubStarted(callback PubsubStartedCallback) {
 	g.emitter.On(PubsubStartedEvent, callback)
 }
@@ -110,7 +110,7 @@ func (g *Gossipsub) OnPeerScoreUpdated(callback PeerScoreUpdatedCallback) {
 	g.emitter.On(PeerScoreUpdatedEvent, callback)
 }
 
-// Internal emission methods
+// Internal emission methods.
 func (g *Gossipsub) emitPubsubStarted() {
 	g.emitter.Emit(PubsubStartedEvent)
 }

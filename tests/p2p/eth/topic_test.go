@@ -33,7 +33,7 @@ func TestVoluntaryExitTopic(t *testing.T) {
 	forkDigest := [4]byte{0x00, 0x00, 0x00, 0x03}
 	expected := "/eth2/00000003/voluntary_exit/ssz_snappy"
 
-	result := VoluntaryExitTopic(forkDigest[:])
+	result := eth.VoluntaryExitTopic(forkDigest[:])
 	assert.Equal(t, expected, result)
 }
 
@@ -41,7 +41,7 @@ func TestProposerSlashingTopic(t *testing.T) {
 	forkDigest := [4]byte{0x00, 0x00, 0x00, 0x04}
 	expected := "/eth2/00000004/proposer_slashing/ssz_snappy"
 
-	result := ProposerSlashingTopic(forkDigest[:])
+	result := eth.ProposerSlashingTopic(forkDigest[:])
 	assert.Equal(t, expected, result)
 }
 
@@ -49,7 +49,7 @@ func TestAttesterSlashingTopic(t *testing.T) {
 	forkDigest := [4]byte{0x00, 0x00, 0x00, 0x05}
 	expected := "/eth2/00000005/attester_slashing/ssz_snappy"
 
-	result := AttesterSlashingTopic(forkDigest)
+	result := eth.AttesterSlashingTopic(forkDigest)
 	assert.Equal(t, expected, result)
 }
 
@@ -57,7 +57,7 @@ func TestSyncContributionAndProofTopic(t *testing.T) {
 	forkDigest := [4]byte{0x00, 0x00, 0x00, 0x06}
 	expected := "/eth2/00000006/sync_committee_contribution_and_proof/ssz_snappy"
 
-	result := SyncContributionAndProofTopic(forkDigest)
+	result := eth.SyncContributionAndProofTopic(forkDigest)
 	assert.Equal(t, expected, result)
 }
 
@@ -65,7 +65,7 @@ func TestBlsToExecutionChangeTopic(t *testing.T) {
 	forkDigest := [4]byte{0x00, 0x00, 0x00, 0x07}
 	expected := "/eth2/00000007/bls_to_execution_change/ssz_snappy"
 
-	result := BlsToExecutionChangeTopic(forkDigest)
+	result := eth.BlsToExecutionChangeTopic(forkDigest)
 	assert.Equal(t, expected, result)
 }
 
@@ -84,7 +84,7 @@ func TestAttestationSubnetTopic(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf("subnet_%d", tt.subnet), func(t *testing.T) {
-			result := AttestationSubnetTopic(forkDigest, tt.subnet)
+			result := eth.AttestationSubnetTopic(forkDigest, tt.subnet)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -105,7 +105,7 @@ func TestSyncCommitteeSubnetTopic(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf("subnet_%d", tt.subnet), func(t *testing.T) {
-			result := SyncCommitteeSubnetTopic(forkDigest, tt.subnet)
+			result := eth.SyncCommitteeSubnetTopic(forkDigest, tt.subnet)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -113,35 +113,35 @@ func TestSyncCommitteeSubnetTopic(t *testing.T) {
 
 func TestSubnetConstants(t *testing.T) {
 	// Test that constants have expected values
-	assert.Equal(t, 64, AttestationSubnetCount)
-	assert.Equal(t, 4, SyncCommitteeSubnetCount)
+	assert.Equal(t, 64, eth.AttestationSubnetCount)
+	assert.Equal(t, 4, eth.SyncCommitteeSubnetCount)
 }
 
 func TestTopicTemplates(t *testing.T) {
 	// Test that template strings are correct
-	assert.Equal(t, "beacon_attestation_%d", AttestationSubnetTopicTemplate)
-	assert.Equal(t, "sync_committee_%d", SyncCommitteeSubnetTopicTemplate)
+	assert.Equal(t, "beacon_attestation_%d", eth.AttestationSubnetTopicTemplate)
+	assert.Equal(t, "sync_committee_%d", eth.SyncCommitteeSubnetTopicTemplate)
 }
 
 func TestForkDigestFormatting(t *testing.T) {
 	tests := []struct {
 		name       string
-		forkDigest [4]byte
+		ForkDigest [4]byte
 		expected   string
 	}{
 		{
 			name:       "all zeros",
-			forkDigest: [4]byte{0x00, 0x00, 0x00, 0x00},
+			ForkDigest: [4]byte{0x00, 0x00, 0x00, 0x00},
 			expected:   "00000000",
 		},
 		{
 			name:       "all ones",
-			forkDigest: [4]byte{0xff, 0xff, 0xff, 0xff},
+			ForkDigest: [4]byte{0xff, 0xff, 0xff, 0xff},
 			expected:   "ffffffff",
 		},
 		{
 			name:       "mixed values",
-			forkDigest: [4]byte{0xab, 0xcd, 0xef, 0x12},
+			ForkDigest: [4]byte{0xab, 0xcd, 0xef, 0x12},
 			expected:   "abcdef12",
 		},
 	}
@@ -149,7 +149,7 @@ func TestForkDigestFormatting(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Test with a known topic function
-			result := BeaconBlockTopic(tt.forkDigest)
+			result := eth.BeaconBlockTopic(tt.ForkDigest)
 			expected := fmt.Sprintf("/eth2/%s/beacon_block/ssz_snappy", tt.expected)
 			assert.Equal(t, expected, result)
 		})
@@ -161,23 +161,23 @@ func TestAllPossibleTopics(t *testing.T) {
 
 	// Test that we can generate all possible topics without panic
 	topics := []string{
-		BeaconBlockTopic(forkDigest),
+		eth.BeaconBlockTopic(forkDigest),
 		eth.BeaconAggregateAndProofTopic(forkDigest),
-		VoluntaryExitTopic(forkDigest[:]),
-		ProposerSlashingTopic(forkDigest[:]),
-		AttesterSlashingTopic(forkDigest),
-		SyncContributionAndProofTopic(forkDigest),
-		BlsToExecutionChangeTopic(forkDigest),
+		eth.VoluntaryExitTopic(forkDigest[:]),
+		eth.ProposerSlashingTopic(forkDigest[:]),
+		eth.AttesterSlashingTopic(forkDigest),
+		eth.SyncContributionAndProofTopic(forkDigest),
+		eth.BlsToExecutionChangeTopic(forkDigest),
 	}
 
 	// Add all attestation subnet topics
-	for i := uint64(0); i < AttestationSubnetCount; i++ {
-		topics = append(topics, AttestationSubnetTopic(forkDigest, i))
+	for i := uint64(0); i < eth.AttestationSubnetCount; i++ {
+		topics = append(topics, eth.AttestationSubnetTopic(forkDigest, i))
 	}
 
 	// Add all sync committee subnet topics
-	for i := uint64(0); i < SyncCommitteeSubnetCount; i++ {
-		topics = append(topics, SyncCommitteeSubnetTopic(forkDigest, i))
+	for i := uint64(0); i < eth.SyncCommitteeSubnetCount; i++ {
+		topics = append(topics, eth.SyncCommitteeSubnetTopic(forkDigest, i))
 	}
 
 	// Verify all topics are unique

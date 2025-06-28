@@ -6,7 +6,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-// Metrics contains prometheus metrics for the pubsub system
+// Metrics contains prometheus metrics for the pubsub system.
 type Metrics struct {
 	// Message metrics
 	MessagesReceived  *prometheus.CounterVec
@@ -34,7 +34,7 @@ type Metrics struct {
 	PeersConnected prometheus.Gauge
 }
 
-// NewMetrics creates a new Metrics instance with the given namespace
+// NewMetrics creates a new Metrics instance with the given namespace.
 func NewMetrics(namespace string) *Metrics {
 	return &Metrics{
 		// Message metrics
@@ -171,7 +171,7 @@ func NewMetrics(namespace string) *Metrics {
 	}
 }
 
-// Register registers all metrics with the given prometheus registry
+// Register registers all metrics with the given prometheus registry.
 func (m *Metrics) Register(registry *prometheus.Registry) error {
 	collectors := []prometheus.Collector{
 		m.MessagesReceived,
@@ -200,7 +200,7 @@ func (m *Metrics) Register(registry *prometheus.Registry) error {
 	return nil
 }
 
-// Metric update methods
+// Metric update methods.
 func (m *Metrics) RecordMessageReceived(topic string) {
 	if m.MessagesReceived != nil {
 		m.MessagesReceived.WithLabelValues(topic).Inc()
@@ -213,6 +213,7 @@ func (m *Metrics) RecordMessagePublished(topic string, success bool) {
 		if !success {
 			status = "error"
 		}
+
 		m.MessagesPublished.WithLabelValues(topic, status).Inc()
 	}
 }
@@ -229,6 +230,7 @@ func (m *Metrics) RecordMessageHandled(topic string, success bool, duration time
 		if !success {
 			status = "error"
 		}
+
 		m.MessagesHandled.WithLabelValues(topic, status).Inc()
 	}
 

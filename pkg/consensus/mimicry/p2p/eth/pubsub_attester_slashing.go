@@ -11,72 +11,73 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// Attester slashing topic constants and functions
+// Attester slashing topic constants and functions.
 const (
 	AttesterSlashingTopicName = "attester_slashing"
 )
 
-// AttesterSlashingTopic constructs the attester slashing gossipsub topic name
+// AttesterSlashingTopic constructs the attester slashing gossipsub topic name.
 func AttesterSlashingTopic(forkDigest [4]byte) string {
 	return fmt.Sprintf(GossipsubTopicFormat, forkDigest, AttesterSlashingTopicName)
 }
 
-// attesterSlashingProcessor handles attester slashing messages
-type attesterSlashingProcessor struct {
-	forkDigest [4]byte
-	encoder    encoder.SszNetworkEncoder
-	handler    func(context.Context, *pb.AttesterSlashing, peer.ID) error
-	validator  func(context.Context, *pb.AttesterSlashing) (pubsub.ValidationResult, error)
-	gossipsub  *pubsub.Gossipsub
-	log        logrus.FieldLogger
+// attesterSlashingProcessor handles attester slashing messages.
+type AttesterSlashingProcessor struct {
+	ForkDigest [4]byte
+	Encoder    encoder.SszNetworkEncoder
+	Handler    func(context.Context, *pb.AttesterSlashing, peer.ID) error
+	Validator  func(context.Context, *pb.AttesterSlashing) (pubsub.ValidationResult, error)
+	Gossipsub  *pubsub.Gossipsub
+	Log        logrus.FieldLogger
 }
 
-func (p *attesterSlashingProcessor) Topic() string {
-	return AttesterSlashingTopic(p.forkDigest)
+func (p *AttesterSlashingProcessor) Topic() string {
+	return AttesterSlashingTopic(p.ForkDigest)
 }
 
-func (p *attesterSlashingProcessor) AllPossibleTopics() []string {
+func (p *AttesterSlashingProcessor) AllPossibleTopics() []string {
 	return []string{p.Topic()}
 }
 
-func (p *attesterSlashingProcessor) Subscribe(ctx context.Context) error {
-	if p.gossipsub == nil {
+func (p *AttesterSlashingProcessor) Subscribe(ctx context.Context) error {
+	if p.Gossipsub == nil {
 		return fmt.Errorf("gossipsub reference not set")
 	}
 
-	return p.gossipsub.SubscribeToProcessorTopic(ctx, p.Topic())
+	return p.Gossipsub.SubscribeToProcessorTopic(ctx, p.Topic())
 }
 
-func (p *attesterSlashingProcessor) Unsubscribe(ctx context.Context) error {
-	if p.gossipsub == nil {
+func (p *AttesterSlashingProcessor) Unsubscribe(ctx context.Context) error {
+	if p.Gossipsub == nil {
 		return fmt.Errorf("gossipsub reference not set")
 	}
 
-	return p.gossipsub.Unsubscribe(p.Topic())
+	return p.Gossipsub.Unsubscribe(p.Topic())
 }
 
-func (p *attesterSlashingProcessor) Decode(ctx context.Context, data []byte) (*pb.AttesterSlashing, error) {
+func (p *AttesterSlashingProcessor) Decode(ctx context.Context, data []byte) (*pb.AttesterSlashing, error) {
 	slashing := &pb.AttesterSlashing{}
-	if err := p.encoder.DecodeGossip(data, slashing); err != nil {
+	if err := p.Encoder.DecodeGossip(data, slashing); err != nil {
 		return nil, fmt.Errorf("failed to decode attester slashing: %w", err)
 	}
 
 	return slashing, nil
 }
 
-func (p *attesterSlashingProcessor) Validate(ctx context.Context, slashing *pb.AttesterSlashing, from string) (pubsub.ValidationResult, error) {
-	// Defer all validation to external validator function
-	if p.validator != nil {
-		return p.validator(ctx, slashing)
+func (p *AttesterSlashingProcessor) Validate(ctx context.Context, slashing *pb.AttesterSlashing, from string) (pubsub.ValidationResult, error) {
+	// Defer all validation to external Validator function
+	if p.Validator != nil {
+		return p.Validator(ctx, slashing)
 	}
 
 	// Default to accept if no validator provided
 	return pubsub.ValidationAccept, nil
 }
 
-func (p *attesterSlashingProcessor) Process(ctx context.Context, slashing *pb.AttesterSlashing, from string) error {
-	if p.handler == nil {
-		p.log.Debug("No handler provided, attester slashing received but not processed")
+func (p *AttesterSlashingProcessor) Process(ctx context.Context, slashing *pb.AttesterSlashing, from string) error {
+	if p.Handler == nil {
+		p.Log.Debug("No handler provided, attester slashing received but not processed")
+
 		return nil
 	}
 
@@ -85,14 +86,14 @@ func (p *attesterSlashingProcessor) Process(ctx context.Context, slashing *pb.At
 		return fmt.Errorf("invalid peer ID: %w", err)
 	}
 
-	return p.handler(ctx, slashing, peerID)
+	return p.Handler(ctx, slashing, peerID)
 }
 
-func (p *attesterSlashingProcessor) GetTopicScoreParams() *pubsub.TopicScoreParams {
+func (p *AttesterSlashingProcessor) GetTopicScoreParams() *pubsub.TopicScoreParams {
 	// Return nil to use default/no scoring for now
 	// Users can override this by providing their own processor implementation
 	return nil
 }
 
-// Compile-time check that attesterSlashingProcessor implements pubsub.Processor
-var _ pubsub.Processor[*pb.AttesterSlashing] = (*attesterSlashingProcessor)(nil)
+// Compile-time check that attesterSlashingProcessor implements pubsub.Processor.
+var _ pubsub.Processor[*pb.AttesterSlashing] = (*AttesterSlashingProcessor)(nil)

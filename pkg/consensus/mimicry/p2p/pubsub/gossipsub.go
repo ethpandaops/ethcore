@@ -13,7 +13,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// Gossipsub provides a processor-based gossipsub implementation
+// Gossipsub provides a processor-based gossipsub implementation.
 type Gossipsub struct {
 	log     logrus.FieldLogger
 	host    host.Host
@@ -40,14 +40,16 @@ type Gossipsub struct {
 	startMu sync.Mutex
 }
 
-// NewGossipsub creates a new Gossipsub instance with the given configuration
+// NewGossipsub creates a new Gossipsub instance with the given configuration.
 func NewGossipsub(log logrus.FieldLogger, host host.Host, config *Config) (*Gossipsub, error) {
 	if log == nil {
 		return nil, fmt.Errorf("logger cannot be nil")
 	}
+
 	if host == nil {
 		return nil, fmt.Errorf("host cannot be nil")
 	}
+
 	if config == nil {
 		config = DefaultConfig()
 	}
@@ -74,7 +76,7 @@ func NewGossipsub(log logrus.FieldLogger, host host.Host, config *Config) (*Goss
 	return g, nil
 }
 
-// Start initializes and starts the gossipsub service
+// Start initializes and starts the gossipsub service.
 func (g *Gossipsub) Start(ctx context.Context) error {
 	g.startMu.Lock()
 	defer g.startMu.Unlock()
@@ -106,7 +108,7 @@ func (g *Gossipsub) Start(ctx context.Context) error {
 	return nil
 }
 
-// Stop gracefully shuts down the gossipsub service
+// Stop gracefully shuts down the gossipsub service.
 func (g *Gossipsub) Stop() error {
 	g.startMu.Lock()
 	defer g.startMu.Unlock()
@@ -127,6 +129,7 @@ func (g *Gossipsub) Stop() error {
 			}
 		}
 	}
+
 	g.processorSubs = make(map[string]interface{})
 	g.procMutex.Unlock()
 
@@ -149,14 +152,15 @@ func (g *Gossipsub) Stop() error {
 	return nil
 }
 
-// IsStarted returns whether the gossipsub service is currently running
+// IsStarted returns whether the gossipsub service is currently running.
 func (g *Gossipsub) IsStarted() bool {
 	g.startMu.Lock()
 	defer g.startMu.Unlock()
+
 	return g.started
 }
 
-// GetStats returns current runtime statistics
+// GetStats returns current runtime statistics.
 func (g *Gossipsub) GetStats() *Stats {
 	if !g.IsStarted() {
 		return &Stats{}
@@ -183,7 +187,7 @@ func (g *Gossipsub) GetStats() *Stats {
 	}
 }
 
-// initializePubsub creates and configures the libp2p pubsub instance
+// initializePubsub creates and configures the libp2p pubsub instance.
 func (g *Gossipsub) initializePubsub(ctx context.Context) error {
 	options := g.createPubsubOptions()
 
@@ -193,10 +197,11 @@ func (g *Gossipsub) initializePubsub(ctx context.Context) error {
 	}
 
 	g.pubsub = ps
+
 	return nil
 }
 
-// createPubsubOptions builds libp2p pubsub options from the configuration
+// createPubsubOptions builds libp2p pubsub options from the configuration.
 func (g *Gossipsub) createPubsubOptions() []pubsub.Option {
 	options := []pubsub.Option{
 		pubsub.WithMessageSigning(true),
@@ -243,7 +248,7 @@ func (g *Gossipsub) createPubsubOptions() []pubsub.Option {
 	return options
 }
 
-// buildTopicScoreMap converts registered processor scoring to libp2p format
+// buildTopicScoreMap converts registered processor scoring to libp2p format.
 func (g *Gossipsub) buildTopicScoreMap() map[string]*pubsub.TopicScoreParams {
 	g.regMutex.RLock()
 	defer g.regMutex.RUnlock()
@@ -301,8 +306,8 @@ func (g *Gossipsub) buildTopicScoreMap() map[string]*pubsub.TopicScoreParams {
 	return topicScores
 }
 
-// RegisterProcessor registers a single-topic processor for later subscription
-// Must be called before Start()
+// RegisterProcessor registers a single-topic processor for later subscription.
+// Must be called before Start().
 func RegisterProcessor[T any](g *Gossipsub, processor Processor[T]) error {
 	if g.IsStarted() {
 		return NewError(fmt.Errorf("cannot register processors after gossipsub has started"), "register_processor")
@@ -330,8 +335,8 @@ func RegisterProcessor[T any](g *Gossipsub, processor Processor[T]) error {
 	return nil
 }
 
-// RegisterMultiProcessor registers a multi-topic processor for later subscription
-// Must be called before Start()
+// RegisterMultiProcessor registers a multi-topic processor for later subscription.
+// Must be called before Start().
 func RegisterMultiProcessor[T any](g *Gossipsub, name string, processor MultiProcessor[T]) error {
 	if g.IsStarted() {
 		return NewError(fmt.Errorf("cannot register processors after gossipsub has started"), "register_multi_processor")
@@ -361,7 +366,7 @@ func RegisterMultiProcessor[T any](g *Gossipsub, name string, processor MultiPro
 	return nil
 }
 
-// SubscribeWithProcessor subscribes to a topic using a processor for type-safe message handling
+// SubscribeWithProcessor subscribes to a topic using a processor for type-safe message handling.
 func SubscribeWithProcessor[T any](g *Gossipsub, ctx context.Context, processor Processor[T]) error {
 	if !g.IsStarted() {
 		return NewTopicError(ErrNotStarted, processor.Topic(), "subscribe_with_processor")
@@ -390,6 +395,7 @@ func SubscribeWithProcessor[T any](g *Gossipsub, ctx context.Context, processor 
 	topicHandle, err := g.topicManager.joinTopic(topic)
 	if err != nil {
 		g.emitSubscriptionError(topic, err)
+
 		return NewTopicError(err, topic, "subscribe_with_processor")
 	}
 
@@ -397,6 +403,7 @@ func SubscribeWithProcessor[T any](g *Gossipsub, ctx context.Context, processor 
 	sub, err := topicHandle.Subscribe()
 	if err != nil {
 		g.emitSubscriptionError(topic, err)
+
 		return NewTopicError(err, topic, "subscribe_with_processor")
 	}
 
@@ -409,6 +416,7 @@ func SubscribeWithProcessor[T any](g *Gossipsub, ctx context.Context, processor 
 	if err := g.pubsub.RegisterTopicValidator(topic, validator); err != nil {
 		sub.Cancel()
 		g.emitSubscriptionError(topic, err)
+
 		return NewTopicError(err, topic, "subscribe_with_processor")
 	}
 
@@ -419,8 +427,10 @@ func SubscribeWithProcessor[T any](g *Gossipsub, ctx context.Context, processor 
 		if unregErr := g.pubsub.UnregisterTopicValidator(topic); unregErr != nil {
 			g.log.WithError(unregErr).WithField("topic", topic).Warn("Failed to unregister validator during cleanup")
 		}
+
 		sub.Cancel()
 		g.emitSubscriptionError(topic, err)
+
 		return NewTopicError(err, topic, "subscribe_with_processor")
 	}
 
@@ -438,7 +448,7 @@ func SubscribeWithProcessor[T any](g *Gossipsub, ctx context.Context, processor 
 	return nil
 }
 
-// SubscribeMultiWithProcessor subscribes to multiple topics using a MultiProcessor
+// SubscribeMultiWithProcessor subscribes to multiple topics using a MultiProcessor.
 func SubscribeMultiWithProcessor[T any](g *Gossipsub, ctx context.Context, multiProcessor MultiProcessor[T]) error {
 	if !g.IsStarted() {
 		return NewError(ErrNotStarted, "subscribe_multi_with_processor")
@@ -478,6 +488,7 @@ func SubscribeMultiWithProcessor[T any](g *Gossipsub, ctx context.Context, multi
 		// Use the existing single-topic subscription logic
 		if err := SubscribeWithProcessor(g, ctx, wrapper); err != nil {
 			rollback()
+
 			return NewError(fmt.Errorf("failed to subscribe to topic %s: %w", topic, err), "subscribe_multi_with_processor")
 		}
 
@@ -489,7 +500,7 @@ func SubscribeMultiWithProcessor[T any](g *Gossipsub, ctx context.Context, multi
 	return nil
 }
 
-// Unsubscribe unsubscribes from a topic
+// Unsubscribe unsubscribes from a topic.
 func (g *Gossipsub) Unsubscribe(topic string) error {
 	if !g.IsStarted() {
 		return NewTopicError(ErrNotStarted, topic, "unsubscribe")
@@ -514,6 +525,7 @@ func (g *Gossipsub) Unsubscribe(topic string) error {
 				g.log.WithError(err).WithField("topic", topic).Warn("Error stopping processor subscription during unsubscribe")
 			}
 		}
+
 		delete(g.processorSubs, topic)
 	}
 	g.procMutex.Unlock()
@@ -537,7 +549,7 @@ func (g *Gossipsub) Unsubscribe(topic string) error {
 	return nil
 }
 
-// GetSubscriptions returns a list of currently subscribed topics
+// GetSubscriptions returns a list of currently subscribed topics.
 func (g *Gossipsub) GetSubscriptions() []string {
 	if !g.IsStarted() {
 		return nil
@@ -555,7 +567,7 @@ func (g *Gossipsub) GetSubscriptions() []string {
 	return topics
 }
 
-// IsSubscribed returns whether we are subscribed to a topic
+// IsSubscribed returns whether we are subscribed to a topic.
 func (g *Gossipsub) IsSubscribed(topic string) bool {
 	if !g.IsStarted() {
 		return false
@@ -569,12 +581,12 @@ func (g *Gossipsub) IsSubscribed(topic string) bool {
 	return exists
 }
 
-// Publish publishes data to a topic
+// Publish publishes data to a topic.
 func (g *Gossipsub) Publish(ctx context.Context, topic string, data []byte) error {
 	return g.PublishWithTimeout(ctx, topic, data, g.config.PublishTimeout)
 }
 
-// PublishWithTimeout publishes data to a topic with a custom timeout
+// PublishWithTimeout publishes data to a topic with a custom timeout.
 func (g *Gossipsub) PublishWithTimeout(ctx context.Context, topic string, data []byte, timeout time.Duration) error {
 	if !g.IsStarted() {
 		return NewTopicError(ErrNotStarted, topic, "publish")
@@ -608,6 +620,7 @@ func (g *Gossipsub) PublishWithTimeout(ctx context.Context, topic string, data [
 		}
 
 		g.emitPublishError(topic, err)
+
 		return NewTopicError(err, topic, "publish")
 	}
 
@@ -626,6 +639,7 @@ func (g *Gossipsub) PublishWithTimeout(ctx context.Context, topic string, data [
 		}
 
 		g.emitPublishError(topic, err)
+
 		return NewTopicError(err, topic, "publish")
 	}
 
@@ -635,10 +649,11 @@ func (g *Gossipsub) PublishWithTimeout(ctx context.Context, topic string, data [
 	}).Debug("Message published successfully")
 
 	g.emitMessagePublished(topic)
+
 	return nil
 }
 
-// GetTopicPeers returns the peer IDs of peers subscribed to a topic
+// GetTopicPeers returns the peer IDs of peers subscribed to a topic.
 func (g *Gossipsub) GetTopicPeers(topic string) []peer.ID {
 	if !g.IsStarted() {
 		return nil
@@ -653,7 +668,7 @@ func (g *Gossipsub) GetTopicPeers(topic string) []peer.ID {
 	return topicHandle.ListPeers()
 }
 
-// GetAllTopics returns all topics with active subscriptions or that we've joined
+// GetAllTopics returns all topics with active subscriptions or that we've joined.
 func (g *Gossipsub) GetAllTopics() []string {
 	if !g.IsStarted() {
 		return nil
@@ -662,26 +677,27 @@ func (g *Gossipsub) GetAllTopics() []string {
 	return g.topicManager.getTopicNames()
 }
 
-// GetRegisteredProcessor retrieves a registered single-topic processor by topic
+// GetRegisteredProcessor retrieves a registered single-topic processor by topic.
 func (g *Gossipsub) GetRegisteredProcessor(topic string) (interface{}, bool) {
 	g.regMutex.RLock()
 	defer g.regMutex.RUnlock()
 
 	processor, exists := g.registeredProcessors[topic]
+
 	return processor, exists
 }
 
-// GetRegisteredMultiProcessor retrieves a registered multi-topic processor by name
+// GetRegisteredMultiProcessor retrieves a registered multi-topic processor by name.
 func (g *Gossipsub) GetRegisteredMultiProcessor(name string) (interface{}, bool) {
 	g.regMutex.RLock()
 	defer g.regMutex.RUnlock()
 
 	processor, exists := g.registeredMultiProcessors[name]
+
 	return processor, exists
 }
 
-// SubscribeToProcessorTopic handles subscription for a registered processor
-// This is called by processors during their Subscribe() method
+// This is called by processors during their Subscribe() method.
 func (g *Gossipsub) SubscribeToProcessorTopic(ctx context.Context, topic string) error {
 	if !g.IsStarted() {
 		return NewTopicError(ErrNotStarted, topic, "subscribe_processor_topic")
@@ -705,8 +721,7 @@ func (g *Gossipsub) SubscribeToProcessorTopic(ctx context.Context, topic string)
 	)
 }
 
-// SubscribeToMultiProcessorTopics handles subscription for a registered multi-processor
-// This is called by multi-processors during their Subscribe() method
+// This is called by multi-processors during their Subscribe() method.
 func (g *Gossipsub) SubscribeToMultiProcessorTopics(ctx context.Context, name string, subnets []uint64) error {
 	if !g.IsStarted() {
 		return NewError(ErrNotStarted, "subscribe_multi_processor_topics")

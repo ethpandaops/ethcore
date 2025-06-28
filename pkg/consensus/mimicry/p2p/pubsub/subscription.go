@@ -12,7 +12,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// ProcessorSubscription manages a subscription with a processor for a specific topic type
+// ProcessorSubscription manages a subscription with a processor for a specific topic type.
 type ProcessorSubscription[T any] struct {
 	processor    Processor[T]
 	subscription *pubsub.Subscription
@@ -29,7 +29,7 @@ type ProcessorSubscription[T any] struct {
 	mu      sync.RWMutex
 }
 
-// newProcessorSubscription creates a new processor-based subscription
+// newProcessorSubscription creates a new processor-based subscription.
 func newProcessorSubscription[T any](
 	processor Processor[T],
 	subscription *pubsub.Subscription,
@@ -53,7 +53,7 @@ func newProcessorSubscription[T any](
 	}
 }
 
-// Start begins processing messages for this subscription
+// Start begins processing messages for this subscription.
 func (ps *ProcessorSubscription[T]) Start() error {
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
@@ -75,10 +75,11 @@ func (ps *ProcessorSubscription[T]) Start() error {
 	ps.started = true
 
 	ps.log.Info("Processor subscription started")
+
 	return nil
 }
 
-// Stop halts message processing gracefully
+// Stop halts message processing gracefully.
 func (ps *ProcessorSubscription[T]) Stop() error {
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
@@ -89,6 +90,7 @@ func (ps *ProcessorSubscription[T]) Stop() error {
 
 	if !ps.started {
 		ps.stopped = true
+
 		return nil
 	}
 
@@ -103,10 +105,11 @@ func (ps *ProcessorSubscription[T]) Stop() error {
 	ps.stopped = true
 
 	ps.log.Info("Processor subscription stopped")
+
 	return nil
 }
 
-// processLoop handles incoming messages in a goroutine
+// processLoop handles incoming messages in a goroutine.
 func (ps *ProcessorSubscription[T]) processLoop() {
 	defer ps.wg.Done()
 
@@ -116,6 +119,7 @@ func (ps *ProcessorSubscription[T]) processLoop() {
 		select {
 		case <-ps.ctx.Done():
 			ps.log.Debug("Processing loop terminated by context cancellation")
+
 			return
 		default:
 			// Get next message from subscription
@@ -124,6 +128,7 @@ func (ps *ProcessorSubscription[T]) processLoop() {
 				if ps.ctx.Err() != nil {
 					// Context was cancelled, this is expected
 					ps.log.Debug("Message subscription closed due to context cancellation")
+
 					return
 				}
 
@@ -135,13 +140,12 @@ func (ps *ProcessorSubscription[T]) processLoop() {
 			// Handle the message
 			if err := ps.handleMessage(ps.ctx, msg); err != nil {
 				ps.log.WithError(err).Error("Failed to handle message")
-				// Continue processing despite error
 			}
 		}
 	}
 }
 
-// handleMessage processes individual messages
+// handleMessage processes individual messages.
 func (ps *ProcessorSubscription[T]) handleMessage(ctx context.Context, msg *pubsub.Message) error {
 	start := time.Now()
 
@@ -241,7 +245,7 @@ func (ps *ProcessorSubscription[T]) handleMessage(ctx context.Context, msg *pubs
 	return nil
 }
 
-// createValidator creates a libp2p pubsub validator function for this processor
+// createValidator creates a libp2p pubsub validator function for this processor.
 func (ps *ProcessorSubscription[T]) createValidator() pubsub.ValidatorEx {
 	return func(ctx context.Context, peerID peer.ID, msg *pubsub.Message) pubsub.ValidationResult {
 		start := time.Now()
@@ -316,7 +320,7 @@ func (ps *ProcessorSubscription[T]) createValidator() pubsub.ValidatorEx {
 	}
 }
 
-// Metrics returns current processing metrics
+// Metrics returns current processing metrics.
 func (ps *ProcessorSubscription[T]) Metrics() ProcessorStats {
 	if ps.metrics == nil {
 		return ProcessorStats{}
@@ -325,21 +329,23 @@ func (ps *ProcessorSubscription[T]) Metrics() ProcessorStats {
 	return ps.metrics.GetStats()
 }
 
-// Topic returns the topic this subscription handles
+// Topic returns the topic this subscription handles.
 func (ps *ProcessorSubscription[T]) Topic() string {
 	return ps.processor.Topic()
 }
 
-// IsStarted returns whether the subscription is currently started
+// IsStarted returns whether the subscription is currently started.
 func (ps *ProcessorSubscription[T]) IsStarted() bool {
 	ps.mu.RLock()
 	defer ps.mu.RUnlock()
+
 	return ps.started && !ps.stopped
 }
 
-// IsStopped returns whether the subscription has been stopped
+// IsStopped returns whether the subscription has been stopped.
 func (ps *ProcessorSubscription[T]) IsStopped() bool {
 	ps.mu.RLock()
 	defer ps.mu.RUnlock()
+
 	return ps.stopped
 }

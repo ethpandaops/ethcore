@@ -19,47 +19,47 @@ import (
 
 func TestAttestationProcessorTopics(t *testing.T) {
 	forkDigest := [4]byte{0x01, 0x02, 0x03, 0x04}
-	processor := &attestationProcessor{
-		forkDigest: forkDigest,
-		subnets:    []uint64{10, 20, 30},
+	processor := &eth.AttestationProcessor{
+		ForkDigest: forkDigest,
+		Subnets: []uint64{10, 20, 30},
 	}
 
 	topics := processor.Topics()
 	assert.Len(t, topics, 3)
-	assert.Equal(t, AttestationSubnetTopic(forkDigest, 10), topics[0])
-	assert.Equal(t, AttestationSubnetTopic(forkDigest, 20), topics[1])
-	assert.Equal(t, AttestationSubnetTopic(forkDigest, 30), topics[2])
+	assert.Equal(t, eth.AttestationSubnetTopic(forkDigest, 10), topics[0])
+	assert.Equal(t, eth.AttestationSubnetTopic(forkDigest, 20), topics[1])
+	assert.Equal(t, eth.AttestationSubnetTopic(forkDigest, 30), topics[2])
 }
 
 func TestAttestationProcessorAllPossibleTopics(t *testing.T) {
 	forkDigest := [4]byte{0x01, 0x02, 0x03, 0x04}
-	processor := &attestationProcessor{
-		forkDigest: forkDigest,
+	processor := &eth.AttestationProcessor{
+		ForkDigest: forkDigest,
 	}
 
 	topics := processor.AllPossibleTopics()
-	assert.Len(t, topics, AttestationSubnetCount)
+	assert.Len(t, topics, eth.AttestationSubnetCount)
 
 	// Verify all topics are unique and properly formatted
 	seen := make(map[string]bool)
 	for i, topic := range topics {
-		assert.Equal(t, AttestationSubnetTopic(forkDigest, uint64(i)), topic)
+		assert.Equal(t, eth.AttestationSubnetTopic(forkDigest, uint64(i)), topic)
 		assert.False(t, seen[topic])
 		seen[topic] = true
 	}
 }
 
 func TestAttestationProcessorGetTopicScoreParams(t *testing.T) {
-	processor := &attestationProcessor{}
-	// attestationProcessor always returns nil for score params
+	processor := &eth.AttestationProcessor{}
+	// eth.AttestationProcessor always returns nil for score params
 	params := processor.GetTopicScoreParams("any_topic")
 	assert.Nil(t, params)
 }
 
 func TestAttestationProcessorDecode(t *testing.T) {
-	processor := &attestationProcessor{
-		encoder: encoder.SszNetworkEncoder{},
-		log:     logrus.New(),
+	processor := &eth.AttestationProcessor{
+		Encoder: encoder.SszNetworkEncoder{},
+		Log:     logrus.New(),
 	}
 
 	// Create a test attestation
@@ -83,7 +83,7 @@ func TestAttestationProcessorDecode(t *testing.T) {
 
 	// Encode the attestation
 	var buf bytes.Buffer
-	_, err := processor.encoder.EncodeGossip(&buf, attestation)
+	_, err := processor.Encoder.EncodeGossip(&buf, attestation)
 	require.NoError(t, err)
 	encoded := buf.Bytes()
 
@@ -115,7 +115,7 @@ func TestAttestationProcessorValidate(t *testing.T) {
 					return pubsub.ValidationAccept, nil
 				}
 			},
-			subnets:        []uint64{10, 20},
+			subnets: []uint64{10, 20},
 			topic:          "/eth2/01020304/beacon_attestation_10/ssz_snappy",
 			expectedResult: pubsub.ValidationAccept,
 			expectError:    false,
@@ -127,7 +127,7 @@ func TestAttestationProcessorValidate(t *testing.T) {
 					return pubsub.ValidationReject, nil
 				}
 			},
-			subnets:        []uint64{10},
+			subnets: []uint64{10},
 			topic:          "/eth2/01020304/beacon_attestation_10/ssz_snappy",
 			expectedResult: pubsub.ValidationReject,
 			expectError:    false,
@@ -139,7 +139,7 @@ func TestAttestationProcessorValidate(t *testing.T) {
 					return pubsub.ValidationReject, errors.New("validation failed")
 				}
 			},
-			subnets:        []uint64{10},
+			subnets: []uint64{10},
 			topic:          "/eth2/01020304/beacon_attestation_10/ssz_snappy",
 			expectedResult: pubsub.ValidationReject,
 			expectError:    true,
@@ -147,7 +147,7 @@ func TestAttestationProcessorValidate(t *testing.T) {
 		{
 			name:           "no validator",
 			setupValidator: func() func(context.Context, *pb.Attestation, uint64) (pubsub.ValidationResult, error) { return nil },
-			subnets:        []uint64{10},
+			subnets: []uint64{10},
 			topic:          "/eth2/01020304/beacon_attestation_10/ssz_snappy",
 			expectedResult: pubsub.ValidationAccept,
 			expectError:    false,
@@ -159,7 +159,7 @@ func TestAttestationProcessorValidate(t *testing.T) {
 					return pubsub.ValidationAccept, nil
 				}
 			},
-			subnets:        []uint64{10},
+			subnets: []uint64{10},
 			topic:          "/eth2/01020304/beacon_attestation_999/ssz_snappy",
 			expectedResult: pubsub.ValidationReject,
 			expectError:    true,
@@ -168,11 +168,11 @@ func TestAttestationProcessorValidate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			processor := &attestationProcessor{
-				validator:  tt.setupValidator(),
-				log:        logrus.New(),
-				subnets:    tt.subnets,
-				forkDigest: [4]byte{0x01, 0x02, 0x03, 0x04},
+			processor := &eth.AttestationProcessor{
+				Validator:  tt.setupValidator(),
+				Log:        logrus.New(),
+				Subnets:    tt.subnets,
+				ForkDigest: [4]byte{0x01, 0x02, 0x03, 0x04},
 			}
 
 			attestation := &pb.Attestation{
@@ -221,7 +221,7 @@ func TestAttestationProcessorProcess(t *testing.T) {
 					return nil
 				}
 			},
-			subnets:     []uint64{10, 20, 30},
+			subnets: []uint64{10, 20, 30},
 			topic:       "/eth2/01020304/beacon_attestation_20/ssz_snappy",
 			expectError: false,
 		},
@@ -232,14 +232,14 @@ func TestAttestationProcessorProcess(t *testing.T) {
 					return errors.New("processing failed")
 				}
 			},
-			subnets:     []uint64{10},
+			subnets: []uint64{10},
 			topic:       "/eth2/01020304/beacon_attestation_10/ssz_snappy",
 			expectError: true,
 		},
 		{
 			name:         "no handler",
 			setupHandler: func() func(context.Context, *pb.Attestation, uint64, peer.ID) error { return nil },
-			subnets:      []uint64{10},
+			subnets: []uint64{10},
 			topic:        "/eth2/01020304/beacon_attestation_10/ssz_snappy",
 			expectError:  false,
 		},
@@ -250,7 +250,7 @@ func TestAttestationProcessorProcess(t *testing.T) {
 					return nil
 				}
 			},
-			subnets:     []uint64{10},
+			subnets: []uint64{10},
 			topic:       "/eth2/01020304/beacon_attestation_999/ssz_snappy",
 			expectError: true,
 		},
@@ -258,11 +258,11 @@ func TestAttestationProcessorProcess(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			processor := &attestationProcessor{
-				handler:    tt.setupHandler(),
-				log:        logrus.New(),
-				subnets:    tt.subnets,
-				forkDigest: [4]byte{0x01, 0x02, 0x03, 0x04},
+			processor := &eth.AttestationProcessor{
+				Handler:    tt.setupHandler(),
+				Log:        logrus.New(),
+				Subnets:    tt.subnets,
+				ForkDigest: [4]byte{0x01, 0x02, 0x03, 0x04},
 			}
 
 			attestation := &pb.Attestation{
@@ -296,11 +296,11 @@ func TestAttestationProcessorProcess(t *testing.T) {
 
 func TestAttestationProcessorSubscribeUnsubscribe(t *testing.T) {
 	mockGS := &pubsub.Gossipsub{}
-	processor := &attestationProcessor{
-		gossipsub:  mockGS,
-		forkDigest: [4]byte{0x01, 0x02, 0x03, 0x04},
-		log:        logrus.New(),
-		subnets:    []uint64{},
+	processor := &eth.AttestationProcessor{
+		Gossipsub:  mockGS,
+		ForkDigest: [4]byte{0x01, 0x02, 0x03, 0x04},
+		Log:        logrus.New(),
+		Subnets: []uint64{},
 	}
 
 	// Test subscribe with subnets
@@ -308,31 +308,31 @@ func TestAttestationProcessorSubscribeUnsubscribe(t *testing.T) {
 	assert.Error(t, err) // Will error because gossipsub.SubscribeToMultiProcessorTopics is not implemented
 
 	// Test with no gossipsub
-	processor.gossipsub = nil
+	processor.Gossipsub = nil
 	err = processor.Subscribe(context.Background(), []uint64{1})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "gossipsub reference not set")
 
 	// Restore gossipsub for unsubscribe test
-	processor.gossipsub = mockGS
-	processor.subnets = []uint64{1, 2, 3}
+	processor.Gossipsub = mockGS
+	processor.Subnets = []uint64{1, 2, 3}
 
 	// Test unsubscribe
 	err = processor.Unsubscribe(context.Background(), []uint64{1, 2})
 	assert.NoError(t, err) // Unsubscribe returns nil even if gossipsub.Unsubscribe fails (it just logs errors)
 
 	// Test unsubscribe with no gossipsub
-	processor.gossipsub = nil
+	processor.Gossipsub = nil
 	err = processor.Unsubscribe(context.Background(), []uint64{1})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "gossipsub reference not set")
 }
 
 func TestAttestationProcessorTopicIndex(t *testing.T) {
-	processor := &attestationProcessor{
-		forkDigest: [4]byte{0x01, 0x02, 0x03, 0x04},
-		subnets:    []uint64{10, 20, 30},
-		log:        logrus.New(),
+	processor := &eth.AttestationProcessor{
+		ForkDigest: [4]byte{0x01, 0x02, 0x03, 0x04},
+		Subnets: []uint64{10, 20, 30},
+		Log:        logrus.New(),
 	}
 
 	tests := []struct {
@@ -387,8 +387,8 @@ func TestAttestationProcessorTopicIndex(t *testing.T) {
 }
 
 func TestAttestationProcessorGetActiveSubnets(t *testing.T) {
-	processor := &attestationProcessor{
-		subnets: []uint64{10, 20, 30},
+	processor := &eth.AttestationProcessor{
+		Subnets: []uint64{10, 20, 30},
 	}
 
 	active := processor.GetActiveSubnets()
@@ -396,10 +396,10 @@ func TestAttestationProcessorGetActiveSubnets(t *testing.T) {
 
 	// Verify it's a copy
 	active[0] = 999
-	assert.Equal(t, uint64(10), processor.subnets[0])
+	assert.Equal(t, uint64(10), processor.Subnets[0])
 }
 
 func TestAttestationSubnetConstants(t *testing.T) {
-	assert.Equal(t, 64, AttestationSubnetCount)
-	assert.Equal(t, "beacon_attestation_%d", AttestationSubnetTopicTemplate)
+	assert.Equal(t, 64, eth.AttestationSubnetCount)
+	assert.Equal(t, "beacon_attestation_%d", eth.AttestationSubnetTopicTemplate)
 }

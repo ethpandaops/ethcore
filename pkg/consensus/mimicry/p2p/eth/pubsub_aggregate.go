@@ -11,72 +11,72 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// Aggregate and proof topic constants and functions
+// Aggregate and proof topic constants and functions.
 const (
 	BeaconAggregateAndProofTopicName = "beacon_aggregate_and_proof"
 )
 
-// BeaconAggregateAndProofTopic constructs the aggregate and proof gossipsub topic name
+// BeaconAggregateAndProofTopic constructs the aggregate and proof gossipsub topic name.
 func BeaconAggregateAndProofTopic(forkDigest [4]byte) string {
 	return fmt.Sprintf(GossipsubTopicFormat, forkDigest, BeaconAggregateAndProofTopicName)
 }
 
-// aggregateProcessor handles aggregate and proof messages
-type aggregateProcessor struct {
-	forkDigest [4]byte
-	encoder    encoder.SszNetworkEncoder
-	handler    func(context.Context, *pb.AggregateAttestationAndProof, peer.ID) error
-	validator  func(context.Context, *pb.AggregateAttestationAndProof) (pubsub.ValidationResult, error)
-	gossipsub  *pubsub.Gossipsub
-	log        logrus.FieldLogger
+// AggregateProcessor handles aggregate and proof messages.
+type AggregateProcessor struct {
+	ForkDigest [4]byte
+	Encoder    encoder.SszNetworkEncoder
+	Handler    func(context.Context, *pb.AggregateAttestationAndProof, peer.ID) error
+	Validator  func(context.Context, *pb.AggregateAttestationAndProof) (pubsub.ValidationResult, error)
+	Gossipsub  *pubsub.Gossipsub
+	Log        logrus.FieldLogger
 }
 
-func (p *aggregateProcessor) Topic() string {
-	return BeaconAggregateAndProofTopic(p.forkDigest)
+func (p *AggregateProcessor) Topic() string {
+	return BeaconAggregateAndProofTopic(p.ForkDigest)
 }
 
-func (p *aggregateProcessor) AllPossibleTopics() []string {
+func (p *AggregateProcessor) AllPossibleTopics() []string {
 	return []string{p.Topic()}
 }
 
-func (p *aggregateProcessor) Subscribe(ctx context.Context) error {
-	if p.gossipsub == nil {
+func (p *AggregateProcessor) Subscribe(ctx context.Context) error {
+	if p.Gossipsub == nil {
 		return fmt.Errorf("gossipsub reference not set")
 	}
 
-	return p.gossipsub.SubscribeToProcessorTopic(ctx, p.Topic())
+	return p.Gossipsub.SubscribeToProcessorTopic(ctx, p.Topic())
 }
 
-func (p *aggregateProcessor) Unsubscribe(ctx context.Context) error {
-	if p.gossipsub == nil {
+func (p *AggregateProcessor) Unsubscribe(ctx context.Context) error {
+	if p.Gossipsub == nil {
 		return fmt.Errorf("gossipsub reference not set")
 	}
 
-	return p.gossipsub.Unsubscribe(p.Topic())
+	return p.Gossipsub.Unsubscribe(p.Topic())
 }
 
-func (p *aggregateProcessor) Decode(ctx context.Context, data []byte) (*pb.AggregateAttestationAndProof, error) {
+func (p *AggregateProcessor) Decode(ctx context.Context, data []byte) (*pb.AggregateAttestationAndProof, error) {
 	aggProof := &pb.AggregateAttestationAndProof{}
-	if err := p.encoder.DecodeGossip(data, aggProof); err != nil {
+	if err := p.Encoder.DecodeGossip(data, aggProof); err != nil {
 		return nil, fmt.Errorf("failed to decode aggregate and proof: %w", err)
 	}
 
 	return aggProof, nil
 }
 
-func (p *aggregateProcessor) Validate(ctx context.Context, aggProof *pb.AggregateAttestationAndProof, from string) (pubsub.ValidationResult, error) {
-	// Defer all validation to external validator function
-	if p.validator != nil {
-		return p.validator(ctx, aggProof)
+func (p *AggregateProcessor) Validate(ctx context.Context, aggProof *pb.AggregateAttestationAndProof, from string) (pubsub.ValidationResult, error) {
+	// Defer all validation to external Validator function
+	if p.Validator != nil {
+		return p.Validator(ctx, aggProof)
 	}
 
 	// Default to accept if no validator provided
 	return pubsub.ValidationAccept, nil
 }
 
-func (p *aggregateProcessor) Process(ctx context.Context, aggProof *pb.AggregateAttestationAndProof, from string) error {
-	if p.handler == nil {
-		p.log.Debug("No handler provided, aggregate proof received but not processed")
+func (p *AggregateProcessor) Process(ctx context.Context, aggProof *pb.AggregateAttestationAndProof, from string) error {
+	if p.Handler == nil {
+		p.Log.Debug("No handler provided, aggregate proof received but not processed")
 
 		return nil
 	}
@@ -86,14 +86,14 @@ func (p *aggregateProcessor) Process(ctx context.Context, aggProof *pb.Aggregate
 		return fmt.Errorf("invalid peer ID: %w", err)
 	}
 
-	return p.handler(ctx, aggProof, peerID)
+	return p.Handler(ctx, aggProof, peerID)
 }
 
-func (p *aggregateProcessor) GetTopicScoreParams() *pubsub.TopicScoreParams {
+func (p *AggregateProcessor) GetTopicScoreParams() *pubsub.TopicScoreParams {
 	// Return nil to use default/no scoring for now
 	// Users can override this by providing their own processor implementation
 	return nil
 }
 
-// Compile-time check that aggregateProcessor implements pubsub.Processor
-var _ pubsub.Processor[*pb.AggregateAttestationAndProof] = (*aggregateProcessor)(nil)
+// Compile-time check that aggregateProcessor implements pubsub.Processor.
+var _ pubsub.Processor[*pb.AggregateAttestationAndProof] = (*AggregateProcessor)(nil)

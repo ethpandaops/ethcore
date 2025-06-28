@@ -6,19 +6,19 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 )
 
-// ValidationResult represents the outcome of message validation
+// ValidationResult represents the outcome of message validation.
 type ValidationResult int
 
 const (
-	// ValidationAccept indicates the message should be accepted and propagated
+	// ValidationAccept indicates the message should be accepted and propagated.
 	ValidationAccept ValidationResult = iota
-	// ValidationReject indicates the message should be rejected and not propagated
+	// ValidationReject indicates the message should be rejected and not propagated.
 	ValidationReject
-	// ValidationIgnore indicates the message should be ignored (not propagated, but not rejected)
+	// ValidationIgnore indicates the message should be ignored (not propagated, but not rejected).
 	ValidationIgnore
 )
 
-// String returns a string representation of the validation result
+// String returns a string representation of the validation result.
 func (v ValidationResult) String() string {
 	switch v {
 	case ValidationAccept:
@@ -32,7 +32,7 @@ func (v ValidationResult) String() string {
 	}
 }
 
-// Message represents a generic pubsub message with metadata
+// Message represents a generic pubsub message with metadata.
 type Message struct {
 	// Topic is the topic this message was received on
 	Topic string
@@ -46,8 +46,7 @@ type Message struct {
 	Sequence uint64
 }
 
-// TopicScoreParams allows configuration of topic-specific scoring parameters
-// These parameters are used by the gossipsub protocol to score peers based on their behavior
+// These parameters are used by the gossipsub protocol to score peers based on their behavior.
 type TopicScoreParams struct {
 	// TopicWeight is the weight of the topic in the overall score
 	TopicWeight float64
@@ -69,7 +68,7 @@ type TopicScoreParams struct {
 	InvalidMessageDeliveriesDecay float64
 }
 
-// DefaultTopicScoreParams returns default topic scoring parameters suitable for Ethereum
+// DefaultTopicScoreParams returns default topic scoring parameters suitable for Ethereum.
 func DefaultTopicScoreParams() *TopicScoreParams {
 	return &TopicScoreParams{
 		TopicWeight:                    0.5,
@@ -84,7 +83,7 @@ func DefaultTopicScoreParams() *TopicScoreParams {
 	}
 }
 
-// PeerScoreSnapshot represents a peer's current score across all topics
+// PeerScoreSnapshot represents a peer's current score across all topics.
 type PeerScoreSnapshot struct {
 	// PeerID is the peer's identifier
 	PeerID peer.ID
@@ -100,7 +99,7 @@ type PeerScoreSnapshot struct {
 	Behavioural float64
 }
 
-// TopicInfo contains information about a topic's current state
+// TopicInfo contains information about a topic's current state.
 type TopicInfo struct {
 	// Name is the topic name
 	Name string
@@ -112,7 +111,7 @@ type TopicInfo struct {
 	LastMessageTime time.Time
 }
 
-// PeerInfo contains information about a peer's pubsub state
+// PeerInfo contains information about a peer's pubsub state.
 type PeerInfo struct {
 	// ID is the peer's identifier
 	ID peer.ID
@@ -124,7 +123,7 @@ type PeerInfo struct {
 	Connected bool
 }
 
-// Stats contains runtime statistics for the pubsub system
+// Stats contains runtime statistics for the pubsub system.
 type Stats struct {
 	// TotalMessages is the total number of messages processed
 	TotalMessages uint64

@@ -11,72 +11,73 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// Sync contribution and proof topic constants and functions
+// Sync contribution and proof topic constants and functions.
 const (
 	SyncContributionAndProofTopicName = "sync_committee_contribution_and_proof"
 )
 
-// SyncContributionAndProofTopic constructs the sync contribution and proof gossipsub topic name
+// SyncContributionAndProofTopic constructs the sync contribution and proof gossipsub topic name.
 func SyncContributionAndProofTopic(forkDigest [4]byte) string {
 	return fmt.Sprintf(GossipsubTopicFormat, forkDigest, SyncContributionAndProofTopicName)
 }
 
-// syncContributionProcessor handles sync contribution and proof messages
-type syncContributionProcessor struct {
-	forkDigest [4]byte
-	encoder    encoder.SszNetworkEncoder
-	handler    func(context.Context, *pb.SignedContributionAndProof, peer.ID) error
-	validator  func(context.Context, *pb.SignedContributionAndProof) (pubsub.ValidationResult, error)
-	gossipsub  *pubsub.Gossipsub
-	log        logrus.FieldLogger
+// syncContributionProcessor handles sync contribution and proof messages.
+type SyncContributionProcessor struct {
+	ForkDigest [4]byte
+	Encoder    encoder.SszNetworkEncoder
+	Handler    func(context.Context, *pb.SignedContributionAndProof, peer.ID) error
+	Validator  func(context.Context, *pb.SignedContributionAndProof) (pubsub.ValidationResult, error)
+	Gossipsub  *pubsub.Gossipsub
+	Log        logrus.FieldLogger
 }
 
-func (p *syncContributionProcessor) Topic() string {
-	return SyncContributionAndProofTopic(p.forkDigest)
+func (p *SyncContributionProcessor) Topic() string {
+	return SyncContributionAndProofTopic(p.ForkDigest)
 }
 
-func (p *syncContributionProcessor) AllPossibleTopics() []string {
+func (p *SyncContributionProcessor) AllPossibleTopics() []string {
 	return []string{p.Topic()}
 }
 
-func (p *syncContributionProcessor) Subscribe(ctx context.Context) error {
-	if p.gossipsub == nil {
+func (p *SyncContributionProcessor) Subscribe(ctx context.Context) error {
+	if p.Gossipsub == nil {
 		return fmt.Errorf("gossipsub reference not set")
 	}
 
-	return p.gossipsub.SubscribeToProcessorTopic(ctx, p.Topic())
+	return p.Gossipsub.SubscribeToProcessorTopic(ctx, p.Topic())
 }
 
-func (p *syncContributionProcessor) Unsubscribe(ctx context.Context) error {
-	if p.gossipsub == nil {
+func (p *SyncContributionProcessor) Unsubscribe(ctx context.Context) error {
+	if p.Gossipsub == nil {
 		return fmt.Errorf("gossipsub reference not set")
 	}
 
-	return p.gossipsub.Unsubscribe(p.Topic())
+	return p.Gossipsub.Unsubscribe(p.Topic())
 }
 
-func (p *syncContributionProcessor) Decode(ctx context.Context, data []byte) (*pb.SignedContributionAndProof, error) {
+func (p *SyncContributionProcessor) Decode(ctx context.Context, data []byte) (*pb.SignedContributionAndProof, error) {
 	contrib := &pb.SignedContributionAndProof{}
-	if err := p.encoder.DecodeGossip(data, contrib); err != nil {
+	if err := p.Encoder.DecodeGossip(data, contrib); err != nil {
 		return nil, fmt.Errorf("failed to decode sync contribution and proof: %w", err)
 	}
 
 	return contrib, nil
 }
 
-func (p *syncContributionProcessor) Validate(ctx context.Context, contrib *pb.SignedContributionAndProof, from string) (pubsub.ValidationResult, error) {
-	// Defer all validation to external validator function
-	if p.validator != nil {
-		return p.validator(ctx, contrib)
+func (p *SyncContributionProcessor) Validate(ctx context.Context, contrib *pb.SignedContributionAndProof, from string) (pubsub.ValidationResult, error) {
+	// Defer all validation to external Validator function
+	if p.Validator != nil {
+		return p.Validator(ctx, contrib)
 	}
 
 	// Default to accept if no validator provided
 	return pubsub.ValidationAccept, nil
 }
 
-func (p *syncContributionProcessor) Process(ctx context.Context, contrib *pb.SignedContributionAndProof, from string) error {
-	if p.handler == nil {
-		p.log.Debug("No handler provided, sync contribution received but not processed")
+func (p *SyncContributionProcessor) Process(ctx context.Context, contrib *pb.SignedContributionAndProof, from string) error {
+	if p.Handler == nil {
+		p.Log.Debug("No handler provided, sync contribution received but not processed")
+
 		return nil
 	}
 
@@ -85,14 +86,14 @@ func (p *syncContributionProcessor) Process(ctx context.Context, contrib *pb.Sig
 		return fmt.Errorf("invalid peer ID: %w", err)
 	}
 
-	return p.handler(ctx, contrib, peerID)
+	return p.Handler(ctx, contrib, peerID)
 }
 
-func (p *syncContributionProcessor) GetTopicScoreParams() *pubsub.TopicScoreParams {
+func (p *SyncContributionProcessor) GetTopicScoreParams() *pubsub.TopicScoreParams {
 	// Return nil to use default/no scoring for now
 	// Users can override this by providing their own processor implementation
 	return nil
 }
 
-// Compile-time check that syncContributionProcessor implements pubsub.Processor
-var _ pubsub.Processor[*pb.SignedContributionAndProof] = (*syncContributionProcessor)(nil)
+// Compile-time check that syncContributionProcessor implements pubsub.Processor.
+var _ pubsub.Processor[*pb.SignedContributionAndProof] = (*SyncContributionProcessor)(nil)

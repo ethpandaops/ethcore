@@ -13,82 +13,81 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// Attestation topic constants and functions
+// Attestation topic constants and functions.
 const (
-	// Subnet topic template (requires subnet ID)
+	// Subnet topic template (requires subnet ID).
 	AttestationSubnetTopicTemplate = "beacon_attestation_%d"
 
-	// Network constants
+	// Network constants.
 	AttestationSubnetCount = 64
 )
 
-// AttestationSubnetTopic constructs an attestation subnet gossipsub topic name
+// AttestationSubnetTopic constructs an attestation subnet gossipsub topic name.
 func AttestationSubnetTopic(forkDigest [4]byte, subnet uint64) string {
 	name := fmt.Sprintf(AttestationSubnetTopicTemplate, subnet)
 
 	return fmt.Sprintf(GossipsubTopicFormat, forkDigest, name)
 }
 
-// attestationProcessor handles attestation messages across subnets
-type attestationProcessor struct {
-	forkDigest [4]byte
-	encoder    encoder.SszNetworkEncoder
-	subnets    []uint64 // currently active subnets
-	handler    func(context.Context, *pb.Attestation, uint64, peer.ID) error
-	validator  func(context.Context, *pb.Attestation, uint64) (pubsub.ValidationResult, error)
-	gossipsub  *pubsub.Gossipsub // Reference to gossipsub for subscription management
-	log        logrus.FieldLogger
+// attestationProcessor handles attestation messages across subnets.
+type AttestationProcessor struct {
+	ForkDigest [4]byte
+	Encoder    encoder.SszNetworkEncoder
+	Subnets    []uint64 // currently active subnets
+	Handler    func(context.Context, *pb.Attestation, uint64, peer.ID) error
+	Validator  func(context.Context, *pb.Attestation, uint64) (pubsub.ValidationResult, error)
+	Gossipsub  *pubsub.Gossipsub // Reference to gossipsub for subscription management
+	Log        logrus.FieldLogger
 }
 
-func (p *attestationProcessor) Topics() []string {
-	topics := make([]string, len(p.subnets))
-	for i, subnet := range p.subnets {
-		topics[i] = AttestationSubnetTopic(p.forkDigest, subnet)
+func (p *AttestationProcessor) Topics() []string {
+	topics := make([]string, len(p.Subnets))
+	for i, subnet := range p.Subnets {
+		topics[i] = AttestationSubnetTopic(p.ForkDigest, subnet)
 	}
 
 	return topics
 }
 
-func (p *attestationProcessor) AllPossibleTopics() []string {
+func (p *AttestationProcessor) AllPossibleTopics() []string {
 	// Return all 64 possible attestation subnet topics
 	topics := make([]string, 64)
 	for i := uint64(0); i < 64; i++ {
-		topics[i] = AttestationSubnetTopic(p.forkDigest, i)
+		topics[i] = AttestationSubnetTopic(p.ForkDigest, i)
 	}
 
 	return topics
 }
 
-func (p *attestationProcessor) Subscribe(ctx context.Context, subnets []uint64) error {
-	if p.gossipsub == nil {
+func (p *AttestationProcessor) Subscribe(ctx context.Context, subnets []uint64) error {
+	if p.Gossipsub == nil {
 		return fmt.Errorf("gossipsub reference not set")
 	}
 
 	// Update our active subnets
-	p.subnets = subnets
+	p.Subnets = subnets
 
 	// Delegate to gossipsub for subscription management
-	return p.gossipsub.SubscribeToMultiProcessorTopics(ctx, "attestation", subnets)
+	return p.Gossipsub.SubscribeToMultiProcessorTopics(ctx, "attestation", subnets)
 }
 
-func (p *attestationProcessor) Unsubscribe(ctx context.Context, subnets []uint64) error {
-	if p.gossipsub == nil {
+func (p *AttestationProcessor) Unsubscribe(ctx context.Context, subnets []uint64) error {
+	if p.Gossipsub == nil {
 		return fmt.Errorf("gossipsub reference not set")
 	}
 
 	// Remove specified subnets from our active list
 	activeMap := make(map[uint64]bool)
-	for _, subnet := range p.subnets {
+	for _, subnet := range p.Subnets {
 		activeMap[subnet] = true
 	}
 
 	// Unsubscribe from each subnet topic
 	for _, subnet := range subnets {
 		if activeMap[subnet] {
-			topic := AttestationSubnetTopic(p.forkDigest, subnet)
-			if err := p.gossipsub.Unsubscribe(topic); err != nil {
-				p.log.WithError(err).WithField("subnet", subnet).Error("Failed to unsubscribe from attestation subnet")
-				// Continue unsubscribing from other subnets even if one fails
+			topic := AttestationSubnetTopic(p.ForkDigest, subnet)
+			if err := p.Gossipsub.Unsubscribe(topic); err != nil {
+				p.Log.WithError(err).WithField("subnet", subnet).Error("Failed to unsubscribe from attestation subnet")
 			}
 
 			delete(activeMap, subnet)
@@ -101,16 +100,16 @@ func (p *attestationProcessor) Unsubscribe(ctx context.Context, subnets []uint64
 		newSubnets = append(newSubnets, subnet)
 	}
 
-	p.subnets = newSubnets
+	p.Subnets = newSubnets
 
 	return nil
 }
 
-func (p *attestationProcessor) GetActiveSubnets() []uint64 {
-	return append([]uint64(nil), p.subnets...) // return copy
+func (p *AttestationProcessor) GetActiveSubnets() []uint64 {
+	return append([]uint64(nil), p.Subnets...) // return copy
 }
 
-func (p *attestationProcessor) TopicIndex(topic string) (int, error) {
+func (p *AttestationProcessor) TopicIndex(topic string) (int, error) {
 	// Extract subnet from topic using regex
 	re := regexp.MustCompile(`beacon_attestation_(\d+)`)
 	matches := re.FindStringSubmatch(topic)
@@ -125,7 +124,7 @@ func (p *attestationProcessor) TopicIndex(topic string) (int, error) {
 	}
 
 	// Find index in our subnet list
-	for i, s := range p.subnets {
+	for i, s := range p.Subnets {
 		if s == subnet {
 			return i, nil
 		}
@@ -134,35 +133,35 @@ func (p *attestationProcessor) TopicIndex(topic string) (int, error) {
 	return -1, fmt.Errorf("subnet %d not found in processor list", subnet)
 }
 
-func (p *attestationProcessor) Decode(ctx context.Context, topic string, data []byte) (*pb.Attestation, error) {
+func (p *AttestationProcessor) Decode(ctx context.Context, topic string, data []byte) (*pb.Attestation, error) {
 	att := &pb.Attestation{}
-	if err := p.encoder.DecodeGossip(data, att); err != nil {
+	if err := p.Encoder.DecodeGossip(data, att); err != nil {
 		return nil, fmt.Errorf("failed to decode attestation: %w", err)
 	}
 
 	return att, nil
 }
 
-func (p *attestationProcessor) Validate(ctx context.Context, topic string, att *pb.Attestation, from string) (pubsub.ValidationResult, error) {
+func (p *AttestationProcessor) Validate(ctx context.Context, topic string, att *pb.Attestation, from string) (pubsub.ValidationResult, error) {
 	index, err := p.TopicIndex(topic)
 	if err != nil {
 		return pubsub.ValidationReject, fmt.Errorf("invalid topic index: %w", err)
 	}
 
-	subnet := p.subnets[index]
+	subnet := p.Subnets[index]
 
-	// Defer all validation to external validator function
-	if p.validator != nil {
-		return p.validator(ctx, att, subnet)
+	// Defer all validation to external Validator function
+	if p.Validator != nil {
+		return p.Validator(ctx, att, subnet)
 	}
 
 	// Default to accept if no validator provided
 	return pubsub.ValidationAccept, nil
 }
 
-func (p *attestationProcessor) Process(ctx context.Context, topic string, att *pb.Attestation, from string) error {
-	if p.handler == nil {
-		p.log.Debug("No handler provided, attestation received but not processed")
+func (p *AttestationProcessor) Process(ctx context.Context, topic string, att *pb.Attestation, from string) error {
+	if p.Handler == nil {
+		p.Log.Debug("No handler provided, attestation received but not processed")
 
 		return nil
 	}
@@ -172,21 +171,21 @@ func (p *attestationProcessor) Process(ctx context.Context, topic string, att *p
 		return fmt.Errorf("invalid topic index: %w", err)
 	}
 
-	subnet := p.subnets[index]
+	subnet := p.Subnets[index]
 
 	peerID, err := peer.Decode(from)
 	if err != nil {
 		return fmt.Errorf("invalid peer ID: %w", err)
 	}
 
-	return p.handler(ctx, att, subnet, peerID)
+	return p.Handler(ctx, att, subnet, peerID)
 }
 
-func (p *attestationProcessor) GetTopicScoreParams(topic string) *pubsub.TopicScoreParams {
+func (p *AttestationProcessor) GetTopicScoreParams(topic string) *pubsub.TopicScoreParams {
 	// Return nil to use default/no scoring for now
 	// Users can override this by providing their own processor implementation
 	return nil
 }
 
-// Compile-time check that attestationProcessor implements pubsub.MultiProcessor
-var _ pubsub.MultiProcessor[*pb.Attestation] = (*attestationProcessor)(nil)
+// Compile-time check that attestationProcessor implements pubsub.MultiProcessor.
+var _ pubsub.MultiProcessor[*pb.Attestation] = (*AttestationProcessor)(nil)

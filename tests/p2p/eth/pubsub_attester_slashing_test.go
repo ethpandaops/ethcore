@@ -19,35 +19,35 @@ import (
 
 func TestAttesterSlashingProcessorTopic(t *testing.T) {
 	forkDigest := [4]byte{0x01, 0x02, 0x03, 0x04}
-	processor := &attesterSlashingProcessor{
-		forkDigest: forkDigest,
+	processor := &eth.AttesterSlashingProcessor{
+		ForkDigest: forkDigest,
 	}
 
-	expected := AttesterSlashingTopic(forkDigest)
+	expected := eth.AttesterSlashingTopic(forkDigest)
 	assert.Equal(t, expected, processor.Topic())
 }
 
 func TestAttesterSlashingProcessorAllPossibleTopics(t *testing.T) {
 	forkDigest := [4]byte{0x01, 0x02, 0x03, 0x04}
-	processor := &attesterSlashingProcessor{
-		forkDigest: forkDigest,
+	processor := &eth.AttesterSlashingProcessor{
+		ForkDigest: forkDigest,
 	}
 
 	topics := processor.AllPossibleTopics()
 	assert.Len(t, topics, 1)
-	assert.Equal(t, AttesterSlashingTopic(forkDigest), topics[0])
+	assert.Equal(t, eth.AttesterSlashingTopic(forkDigest), topics[0])
 }
 
 func TestAttesterSlashingProcessorGetTopicScoreParams(t *testing.T) {
-	processor := &attesterSlashingProcessor{}
-	// attesterSlashingProcessor always returns nil for score params
+	processor := &eth.AttesterSlashingProcessor{}
+	// eth.AttesterSlashingProcessor always returns nil for score params
 	assert.Nil(t, processor.GetTopicScoreParams())
 }
 
 func TestAttesterSlashingProcessorDecode(t *testing.T) {
-	processor := &attesterSlashingProcessor{
-		encoder: encoder.SszNetworkEncoder{},
-		log:     logrus.New(),
+	processor := &eth.AttesterSlashingProcessor{
+		Encoder: encoder.SszNetworkEncoder{},
+		Log:     logrus.New(),
 	}
 
 	// Create a test attester slashing
@@ -90,7 +90,7 @@ func TestAttesterSlashingProcessorDecode(t *testing.T) {
 
 	// Encode the attester slashing
 	var buf bytes.Buffer
-	_, err := processor.encoder.EncodeGossip(&buf, attesterSlashing)
+	_, err := processor.Encoder.EncodeGossip(&buf, attesterSlashing)
 	require.NoError(t, err)
 	encoded := buf.Bytes()
 
@@ -153,9 +153,9 @@ func TestAttesterSlashingProcessorValidate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			processor := &attesterSlashingProcessor{
-				validator: tt.setupValidator(),
-				log:       logrus.New(),
+			processor := &eth.AttesterSlashingProcessor{
+				Validator: tt.setupValidator(),
+				Log:       logrus.New(),
 			}
 
 			attesterSlashing := &pb.AttesterSlashing{
@@ -240,9 +240,9 @@ func TestAttesterSlashingProcessorProcess(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			processor := &attesterSlashingProcessor{
-				handler: tt.setupHandler(),
-				log:     logrus.New(),
+			processor := &eth.AttesterSlashingProcessor{
+				Handler: tt.setupHandler(),
+				Log:     logrus.New(),
 			}
 
 			attesterSlashing := &pb.AttesterSlashing{
@@ -295,10 +295,10 @@ func TestAttesterSlashingProcessorProcess(t *testing.T) {
 
 func TestAttesterSlashingProcessorSubscribeUnsubscribe(t *testing.T) {
 	mockGS := &pubsub.Gossipsub{}
-	processor := &attesterSlashingProcessor{
-		gossipsub:  mockGS,
-		forkDigest: [4]byte{0x01, 0x02, 0x03, 0x04},
-		log:        logrus.New(),
+	processor := &eth.AttesterSlashingProcessor{
+		Gossipsub:  mockGS,
+		ForkDigest: [4]byte{0x01, 0x02, 0x03, 0x04},
+		Log:        logrus.New(),
 	}
 
 	// Subscribe should return error due to gossipsub.SubscribeToProcessorTopic not implemented
@@ -310,7 +310,7 @@ func TestAttesterSlashingProcessorSubscribeUnsubscribe(t *testing.T) {
 	assert.Error(t, err)
 
 	// Test with nil gossipsub
-	processor.gossipsub = nil
+	processor.Gossipsub = nil
 	err = processor.Subscribe(context.Background())
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "gossipsub reference not set")
@@ -322,10 +322,10 @@ func TestAttesterSlashingProcessorSubscribeUnsubscribe(t *testing.T) {
 
 func TestAttesterSlashingProcessorWithNilFields(t *testing.T) {
 	// Test that the processor handles nil fields gracefully
-	processor := &attesterSlashingProcessor{
-		encoder: encoder.SszNetworkEncoder{},
-		log:     logrus.New(),
-		handler: func(ctx context.Context, slashing *pb.AttesterSlashing, from peer.ID) error {
+	processor := &eth.AttesterSlashingProcessor{
+		Encoder: encoder.SszNetworkEncoder{},
+		Log:     logrus.New(),
+		Handler: func(ctx context.Context, slashing *pb.AttesterSlashing, from peer.ID) error {
 			// Verify slashing is not nil
 			assert.NotNil(t, slashing)
 			return nil
@@ -375,9 +375,9 @@ func TestAttesterSlashingProcessorWithNilFields(t *testing.T) {
 
 func TestAttesterSlashingTopicFormat(t *testing.T) {
 	forkDigest := [4]byte{0x01, 0x02, 0x03, 0x04}
-	topic := AttesterSlashingTopic(forkDigest)
+	topic := eth.AttesterSlashingTopic(forkDigest)
 	assert.Equal(t, "/eth2/01020304/attester_slashing/ssz_snappy", topic)
 
 	// Test the constant
-	assert.Equal(t, "attester_slashing", AttesterSlashingTopicName)
+	assert.Equal(t, "attester_slashing", eth.AttesterSlashingTopicName)
 }

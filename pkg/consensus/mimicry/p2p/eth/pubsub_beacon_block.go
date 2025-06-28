@@ -11,73 +11,74 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// Beacon block topic constants and functions
+// Beacon block topic constants and functions.
 const (
 	BeaconBlockTopicName = "beacon_block"
 )
 
-// BeaconBlockTopic constructs the beacon block gossipsub topic name
+// BeaconBlockTopic constructs the beacon block gossipsub topic name.
 func BeaconBlockTopic(forkDigest [4]byte) string {
 	return fmt.Sprintf(GossipsubTopicFormat, forkDigest, BeaconBlockTopicName)
 }
 
-// beaconBlockProcessor handles beacon block messages
-type beaconBlockProcessor struct {
-	forkDigest  [4]byte
-	encoder     encoder.SszNetworkEncoder
-	handler     func(context.Context, *pb.SignedBeaconBlock, peer.ID) error
-	validator   func(context.Context, *pb.SignedBeaconBlock) (pubsub.ValidationResult, error)
-	scoreParams *pubsub.TopicScoreParams
-	gossipsub   *pubsub.Gossipsub // Reference to gossipsub for subscription management
-	log         logrus.FieldLogger
+// beaconBlockProcessor handles beacon block messages.
+type BeaconBlockProcessor struct {
+	ForkDigest  [4]byte
+	Encoder     encoder.SszNetworkEncoder
+	Handler     func(context.Context, *pb.SignedBeaconBlock, peer.ID) error
+	Validator   func(context.Context, *pb.SignedBeaconBlock) (pubsub.ValidationResult, error)
+	ScoreParams *pubsub.TopicScoreParams
+	Gossipsub   *pubsub.Gossipsub // Reference to gossipsub for subscription management
+	Log         logrus.FieldLogger
 }
 
-func (p *beaconBlockProcessor) Topic() string {
-	return BeaconBlockTopic(p.forkDigest)
+func (p *BeaconBlockProcessor) Topic() string {
+	return BeaconBlockTopic(p.ForkDigest)
 }
 
-func (p *beaconBlockProcessor) AllPossibleTopics() []string {
+func (p *BeaconBlockProcessor) AllPossibleTopics() []string {
 	return []string{p.Topic()}
 }
 
-func (p *beaconBlockProcessor) Subscribe(ctx context.Context) error {
-	if p.gossipsub == nil {
+func (p *BeaconBlockProcessor) Subscribe(ctx context.Context) error {
+	if p.Gossipsub == nil {
 		return fmt.Errorf("gossipsub reference not set")
 	}
 
-	return p.gossipsub.SubscribeToProcessorTopic(ctx, p.Topic())
+	return p.Gossipsub.SubscribeToProcessorTopic(ctx, p.Topic())
 }
 
-func (p *beaconBlockProcessor) Unsubscribe(ctx context.Context) error {
-	if p.gossipsub == nil {
+func (p *BeaconBlockProcessor) Unsubscribe(ctx context.Context) error {
+	if p.Gossipsub == nil {
 		return fmt.Errorf("gossipsub reference not set")
 	}
 
-	return p.gossipsub.Unsubscribe(p.Topic())
+	return p.Gossipsub.Unsubscribe(p.Topic())
 }
 
-func (p *beaconBlockProcessor) Decode(ctx context.Context, data []byte) (*pb.SignedBeaconBlock, error) {
+func (p *BeaconBlockProcessor) Decode(ctx context.Context, data []byte) (*pb.SignedBeaconBlock, error) {
 	block := &pb.SignedBeaconBlock{}
-	if err := p.encoder.DecodeGossip(data, block); err != nil {
+	if err := p.Encoder.DecodeGossip(data, block); err != nil {
 		return nil, fmt.Errorf("failed to decode beacon block: %w", err)
 	}
 
 	return block, nil
 }
 
-func (p *beaconBlockProcessor) Validate(ctx context.Context, block *pb.SignedBeaconBlock, from string) (pubsub.ValidationResult, error) {
-	// Defer all validation to external validator function
-	if p.validator != nil {
-		return p.validator(ctx, block)
+func (p *BeaconBlockProcessor) Validate(ctx context.Context, block *pb.SignedBeaconBlock, from string) (pubsub.ValidationResult, error) {
+	// Defer all validation to external Validator function
+	if p.Validator != nil {
+		return p.Validator(ctx, block)
 	}
 
 	// Default to accept if no validator provided
 	return pubsub.ValidationAccept, nil
 }
 
-func (p *beaconBlockProcessor) Process(ctx context.Context, block *pb.SignedBeaconBlock, from string) error {
-	if p.handler == nil {
-		p.log.Debug("No handler provided, message received but not processed")
+func (p *BeaconBlockProcessor) Process(ctx context.Context, block *pb.SignedBeaconBlock, from string) error {
+	if p.Handler == nil {
+		p.Log.Debug("No handler provided, message received but not processed")
+
 		return nil
 	}
 
@@ -86,13 +87,13 @@ func (p *beaconBlockProcessor) Process(ctx context.Context, block *pb.SignedBeac
 		return fmt.Errorf("invalid peer ID: %w", err)
 	}
 
-	return p.handler(ctx, block, peerID)
+	return p.Handler(ctx, block, peerID)
 }
 
-func (p *beaconBlockProcessor) GetTopicScoreParams() *pubsub.TopicScoreParams {
+func (p *BeaconBlockProcessor) GetTopicScoreParams() *pubsub.TopicScoreParams {
 	// Return the scoreParams provided by the user, or nil for default/no scoring
-	return p.scoreParams
+	return p.ScoreParams
 }
 
-// Compile-time check that beaconBlockProcessor implements pubsub.Processor
-var _ pubsub.Processor[*pb.SignedBeaconBlock] = (*beaconBlockProcessor)(nil)
+// Compile-time check that beaconBlockProcessor implements pubsub.Processor.
+var _ pubsub.Processor[*pb.SignedBeaconBlock] = (*BeaconBlockProcessor)(nil)

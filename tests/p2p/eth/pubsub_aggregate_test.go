@@ -19,8 +19,8 @@ import (
 
 func TestAggregateProcessorTopic(t *testing.T) {
 	forkDigest := [4]byte{0x01, 0x02, 0x03, 0x04}
-	processor := &aggregateProcessor{
-		forkDigest: forkDigest,
+	processor := &eth.AggregateProcessor{
+		ForkDigest: forkDigest,
 	}
 
 	expected := eth.BeaconAggregateAndProofTopic(forkDigest)
@@ -29,8 +29,8 @@ func TestAggregateProcessorTopic(t *testing.T) {
 
 func TestAggregateProcessorAllPossibleTopics(t *testing.T) {
 	forkDigest := [4]byte{0x01, 0x02, 0x03, 0x04}
-	processor := &aggregateProcessor{
-		forkDigest: forkDigest,
+	processor := &eth.AggregateProcessor{
+		ForkDigest: forkDigest,
 	}
 
 	topics := processor.AllPossibleTopics()
@@ -39,15 +39,15 @@ func TestAggregateProcessorAllPossibleTopics(t *testing.T) {
 }
 
 func TestAggregateProcessorGetTopicScoreParams(t *testing.T) {
-	processor := &aggregateProcessor{}
-	// aggregateProcessor always returns nil for score params
+	processor := &eth.AggregateProcessor{}
+	// eth.AggregateProcessor always returns nil for score params
 	assert.Nil(t, processor.GetTopicScoreParams())
 }
 
 func TestAggregateProcessorDecode(t *testing.T) {
-	processor := &aggregateProcessor{
-		encoder: encoder.SszNetworkEncoder{},
-		log:     logrus.New(),
+	processor := &eth.AggregateProcessor{
+		Encoder: encoder.SszNetworkEncoder{},
+		Log:     logrus.New(),
 	}
 
 	// Create a test aggregate and proof
@@ -75,7 +75,7 @@ func TestAggregateProcessorDecode(t *testing.T) {
 
 	// Encode the aggregate and proof
 	var buf bytes.Buffer
-	_, err := processor.encoder.EncodeGossip(&buf, aggregateAndProof)
+	_, err := processor.Encoder.EncodeGossip(&buf, aggregateAndProof)
 	require.NoError(t, err)
 	encoded := buf.Bytes()
 
@@ -140,9 +140,9 @@ func TestAggregateProcessorValidate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			processor := &aggregateProcessor{
-				validator: tt.setupValidator(),
-				log:       logrus.New(),
+			processor := &eth.AggregateProcessor{
+				Validator: tt.setupValidator(),
+				Log:       logrus.New(),
 			}
 
 			aggregateAndProof := &pb.AggregateAttestationAndProof{
@@ -212,9 +212,9 @@ func TestAggregateProcessorProcess(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			processor := &aggregateProcessor{
-				handler: tt.setupHandler(),
-				log:     logrus.New(),
+			processor := &eth.AggregateProcessor{
+				Handler: tt.setupHandler(),
+				Log:     logrus.New(),
 			}
 
 			aggregateAndProof := &pb.AggregateAttestationAndProof{
@@ -252,10 +252,10 @@ func TestAggregateProcessorProcess(t *testing.T) {
 
 func TestAggregateProcessorSubscribeUnsubscribe(t *testing.T) {
 	mockGS := &pubsub.Gossipsub{}
-	processor := &aggregateProcessor{
-		gossipsub:  mockGS,
-		forkDigest: [4]byte{0x01, 0x02, 0x03, 0x04},
-		log:        logrus.New(),
+	processor := &eth.AggregateProcessor{
+		Gossipsub:  mockGS,
+		ForkDigest: [4]byte{0x01, 0x02, 0x03, 0x04},
+		Log:        logrus.New(),
 	}
 
 	// Subscribe should return error due to gossipsub.SubscribeToProcessorTopic not implemented
@@ -267,7 +267,7 @@ func TestAggregateProcessorSubscribeUnsubscribe(t *testing.T) {
 	assert.Error(t, err)
 
 	// Test with nil gossipsub
-	processor.gossipsub = nil
+	processor.Gossipsub = nil
 	err = processor.Subscribe(context.Background())
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "gossipsub reference not set")
@@ -279,10 +279,10 @@ func TestAggregateProcessorSubscribeUnsubscribe(t *testing.T) {
 
 func TestAggregateProcessorWithNilFields(t *testing.T) {
 	// Test that the processor handles nil fields gracefully
-	processor := &aggregateProcessor{
-		encoder: encoder.SszNetworkEncoder{},
-		log:     logrus.New(),
-		handler: func(ctx context.Context, agg *pb.AggregateAttestationAndProof, from peer.ID) error {
+	processor := &eth.AggregateProcessor{
+		Encoder: encoder.SszNetworkEncoder{},
+		Log:     logrus.New(),
+		Handler: func(ctx context.Context, agg *pb.AggregateAttestationAndProof, from peer.ID) error {
 			// Verify aggregate is not nil
 			assert.NotNil(t, agg)
 			return nil
@@ -316,5 +316,5 @@ func TestAggregateProcessorWithNilFields(t *testing.T) {
 }
 
 func TestBeaconAggregateAndProofTopicName(t *testing.T) {
-	assert.Equal(t, "beacon_aggregate_and_proof", BeaconAggregateAndProofTopicName)
+	assert.Equal(t, "beacon_aggregate_and_proof", eth.BeaconAggregateAndProofTopicName)
 }
