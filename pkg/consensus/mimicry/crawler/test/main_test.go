@@ -15,7 +15,6 @@ var testFoundation *kurtosis.TestFoundation
 // TestMain is the entry point for all tests in this package.
 // It sets up the shared Kurtosis network and ensures proper cleanup.
 func TestMain(m *testing.M) {
-	fmt.Printf("TestMain - Crawler!!!")
 	// Acquire global test lock to prevent concurrent Kurtosis networks
 	kurtosis.AcquireTestLock()
 	defer kurtosis.ReleaseTestLock()
@@ -26,11 +25,10 @@ func TestMain(m *testing.M) {
 
 	// Start with default configuration
 	defaultConfig := kurtosis.DefaultNetworkConfig()
-	// Override name for crawler tests to avoid port conflicts
-	defaultConfig.Name = "ethcore-crawler-test"
-	// Use a different port offset to avoid conflicts with ethereum tests
-	// This gives us ports 34000-34999 (CL) and 33000-33999 (EL)
-	defaultConfig.PortOffset = 1000
+	// Use shared enclave name for all tests
+	defaultConfig.Name = "ethcore-test"
+	// Use same port offset since we're sharing the same enclave
+	defaultConfig.PortOffset = 0
 
 	// Get configuration from environment
 	envConfig, err := kurtosis.ConfigFromEnvironment()

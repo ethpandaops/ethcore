@@ -6,5 +6,5 @@ test: clean
 
 clean:
 	@if command -v kurtosis >/dev/null 2>&1; then \
-		kurtosis enclave rm ethcore-ethereum-test ethcore-crawler-test --force 2>/dev/null || true; \
+		kurtosis enclave rm ethcore-test --force 2>/dev/null || true; \
 	fi

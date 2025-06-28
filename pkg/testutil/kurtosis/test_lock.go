@@ -7,52 +7,76 @@ import (
 	"time"
 )
 
-// testLockFile is the path to the lock file.
-var testLockFile = filepath.Join(os.TempDir(), "ethcore-kurtosis-test.lock")
+// testLockDir is the path to the lock directory.
+var testLockDir = filepath.Join(os.TempDir(), "ethcore-kurtosis-test.lock")
 
-// AcquireTestLock acquires the global test lock for Kurtosis tests.
+// AcquireTestLock acquires the global test lock for Kurtosis tests using directory creation.
 // This should be called at the beginning of TestMain for test packages
 // that use Kurtosis networks.
-// It uses a file-based lock to work across different test processes.
+// Directory creation is atomic across processes.
 func AcquireTestLock() {
+	fmt.Printf("[PID %d] Attempting to acquire test lock at %s\n", os.Getpid(), testLockDir)
+
 	// Try to acquire the lock with a timeout
 	startTime := time.Now()
 	timeout := 5 * time.Minute
-
-	fmt.Printf("[PID %d] Attempting to acquire test lock at %s\n", os.Getpid(), testLockFile)
+	attempts := 0
 
 	for {
-		// Try to create the lock file exclusively
-		file, err := os.OpenFile(testLockFile, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
+		attempts++
+
+		// Try to create the lock directory exclusively
+		err := os.Mkdir(testLockDir, 0755)
 		if err == nil {
-			fmt.Printf("[PID %d] Successfully acquired test lock\n", os.Getpid())
+			// We got the lock!
+			fmt.Printf("[PID %d] Successfully acquired test lock after %d attempts\n", os.Getpid(), attempts)
 
-			_, werr := fmt.Fprintf(file, "PID: %d\n", os.Getpid())
-			if werr != nil {
-				fmt.Printf("[PID %d] Failed to write test lock\n", os.Getpid())
+			// Write our PID to a file in the directory
+			pidFile := filepath.Join(testLockDir, "pid")
+
+			f, _ := os.Create(pidFile)
+			if f != nil {
+				fmt.Fprintf(f, "PID: %d\nTime: %s\n", os.Getpid(), time.Now().Format(time.RFC3339))
+
+				f.Close()
 			}
-
-			file.Close()
 
 			return
 		}
 
-		// Check if we've timed out
-		if time.Since(startTime) > timeout {
-			panic(fmt.Sprintf("Failed to acquire test lock after %v - another test may be stuck", timeout))
-		}
+		// Check if directory already exists
+		if os.IsExist(err) {
+			// Check if the lock is stale
+			if info, statErr := os.Stat(testLockDir); statErr == nil {
+				age := time.Since(info.ModTime())
 
-		// Check if the lock file is stale (older than 5 minutes)
-		if info, err := os.Stat(testLockFile); err == nil {
-			if time.Since(info.ModTime()) > 5*time.Minute {
-				fmt.Printf("[PID %d] Lock file is stale, removing it\n", os.Getpid())
+				// Read PID file to see who owns it
+				if attempts == 1 || attempts%50 == 0 {
+					pidFile := filepath.Join(testLockDir, "pid")
+					if data, readErr := os.ReadFile(pidFile); readErr == nil {
+						fmt.Printf("[PID %d] Lock is held by another process: %s", os.Getpid(), string(data))
+					} else {
+						fmt.Printf("[PID %d] Lock directory exists (age: %v)\n", os.Getpid(), age)
+					}
+				}
 
-				// Lock file is stale, try to remove it
-				os.Remove(testLockFile)
+				// If lock is older than 2 minutes, consider it stale
+				if age > 2*time.Minute {
+					fmt.Printf("[PID %d] Lock is stale (age: %v), removing it\n", os.Getpid(), age)
+
+					os.RemoveAll(testLockDir)
+
+					continue
+				}
 			}
 		}
 
-		// Wait a bit before trying again
+		// Check if we've timed out
+		if time.Since(startTime) > timeout {
+			panic(fmt.Sprintf("[PID %d] Failed to acquire test lock after %v", os.Getpid(), timeout))
+		}
+
+		// Wait before trying again
 		time.Sleep(100 * time.Millisecond)
 	}
 }
@@ -61,5 +85,7 @@ func AcquireTestLock() {
 // This should be called at the end of TestMain (or in a defer).
 func ReleaseTestLock() {
 	fmt.Printf("[PID %d] Releasing test lock\n", os.Getpid())
-	os.Remove(testLockFile)
+
+	// Remove the lock directory
+	os.RemoveAll(testLockDir)
 }
