@@ -244,13 +244,18 @@ func waitForGenesis(ctx context.Context, tf *TestFoundation, epgNetwork network.
 		return errors.Wrap(err, "failed to create temporary beacon node")
 	}
 
-	// Start the beacon node
-	beaconCtx, beaconCancel := context.WithCancel(ctx)
-	defer beaconCancel()
-
+	// Start the beacon node with a background context
+	// We'll stop it manually when we're done
 	go func() {
-		if err := tempBeacon.Start(beaconCtx); err != nil {
+		if err := tempBeacon.Start(context.Background()); err != nil {
 			tf.Logger.WithError(err).Warn("Temporary beacon node error during genesis check")
+		}
+	}()
+
+	// Ensure we stop the beacon node when done
+	defer func() {
+		if err := tempBeacon.Stop(context.Background()); err != nil {
+			tf.Logger.WithError(err).Warn("Failed to stop temporary beacon node")
 		}
 	}()
 
@@ -342,11 +347,9 @@ func initializeBeaconClients(ctx context.Context, tf *TestFoundation, epgNetwork
 			return errors.Wrapf(err, "failed to create beacon node for %s", consensusClient.Name())
 		}
 
-		// Start the beacon node
-		nodeCtx, nodeCancel := context.WithCancel(ctx)
-		defer nodeCancel()
-
-		if err := beaconNode.Start(nodeCtx); err != nil {
+		// Start the beacon node with a background context
+		// We don't want to cancel this when the initialization completes
+		if err := beaconNode.Start(context.Background()); err != nil {
 			return errors.Wrapf(err, "failed to start beacon node %s", consensusClient.Name())
 		}
 
