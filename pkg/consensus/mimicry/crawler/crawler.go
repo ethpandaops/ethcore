@@ -18,7 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/enr"
 	"github.com/ethpandaops/beacon/pkg/beacon"
-	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/cache"
+	"github.com/ethpandaops/ethcore/pkg/cache"
 	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/host"
 	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p"
 	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/eth"
@@ -57,7 +57,7 @@ type Crawler struct {
 	discovery          discovery.NodeFinder
 	statusMu           sync.Mutex
 	statusFromPeerChan chan eth.PeerStatus
-	duplicateCache     cache.DuplicateCache
+	duplicateCache     cache.DuplicateCache[string, time.Time]
 	metrics            *Metrics
 	peersToDial        chan *discovery.ConnectablePeer
 	OnReady            chan struct{}
@@ -79,7 +79,7 @@ func New(log logrus.FieldLogger, config *Config, userAgent, namespace string, f 
 		},
 		metrics:            NewMetrics(),
 		statusFromPeerChan: make(chan eth.PeerStatus, 10000),
-		duplicateCache:     cache.NewDuplicateCache(log, config.CooloffDuration),
+		duplicateCache:     cache.NewDuplicateCache[string, time.Time](log, config.CooloffDuration),
 		discovery:          f,
 		peersToDial:        make(chan *discovery.ConnectablePeer, 10000),
 		OnReady:            make(chan struct{}),
@@ -345,7 +345,7 @@ func (c *Crawler) ConnectToPeer(ctx context.Context, p peer.AddrInfo, n *enode.N
 		return nil
 	}
 
-	if c.duplicateCache.GetNodesCache().Get(p.ID.String()) != nil {
+	if c.duplicateCache.GetCache().Get(p.ID.String()) != nil {
 		c.log.WithFields(logrus.Fields{
 			"peer": p.ID,
 		}).Debug("We've already connected to this peer previously")

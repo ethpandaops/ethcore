@@ -56,7 +56,7 @@ func (n *Crawler) emitMetadataReceived(peerID peer.ID, metadata *common.MetaData
 
 func (n *Crawler) emitSuccessfulCrawl(peerID peer.ID, status *common.Status, metadata *common.MetaData) {
 	// Add the peer to the duplicate cache to prevent re-crawling too soon
-	n.duplicateCache.GetNodesCache().Set(peerID.String(), time.Now(), ttlcache.DefaultTTL)
+	n.duplicateCache.GetCache().Set(peerID.String(), time.Now(), ttlcache.DefaultTTL)
 	n.broker.Emit(OnSuccessfulCrawl, peerID, status, metadata)
 }
 
