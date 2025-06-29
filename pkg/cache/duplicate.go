@@ -2,7 +2,6 @@ package cache
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	"github.com/jellydator/ttlcache/v3"
@@ -44,7 +43,6 @@ type duplicateCache[K comparable, V any] struct {
 	log   logrus.FieldLogger
 
 	cancel context.CancelFunc
-	wg     sync.WaitGroup
 }
 
 // NewDuplicateCacheWithConfig creates a new generic DuplicateCache instance with a full configuration.
@@ -84,10 +82,7 @@ func NewDuplicateCache[K comparable, V any](log logrus.FieldLogger, ttl time.Dur
 func (d *duplicateCache[K, V]) Start(ctx context.Context) error {
 	_, d.cancel = context.WithCancel(ctx)
 
-	d.wg.Add(1)
-
 	go func() {
-		defer d.wg.Done()
 		d.log.Debug("Starting cache")
 		d.cache.Start()
 		d.log.Debug("Cache stopped")
@@ -107,7 +102,6 @@ func (d *duplicateCache[K, V]) Stop() error {
 	}
 
 	d.cache.Stop()
-	d.wg.Wait()
 
 	d.log.Info("Cache stopped")
 
