@@ -2,7 +2,7 @@
 
 test: clean
 	@echo "Running tests..."
-	@go test -v -race -cover -coverprofile=coverage.txt -coverpkg=./... -timeout 10m ./... && echo "Tests completed successfully"
+	@go test -v -race -p 1 -cover -coverprofile=coverage.txt -coverpkg=./... -timeout 10m ./... && echo "Tests completed successfully"
 
 clean:
 	@if command -v kurtosis >/dev/null 2>&1; then \
