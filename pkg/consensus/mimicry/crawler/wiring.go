@@ -96,8 +96,9 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 	// Wait for libp2p identify protocol to complete.
 	// The identify protocol exchanges peer information like agent version, protocols, etc.
 	// Without this wait, we may see "unknown" agent versions which makes it hard to crawl/map.
-	// We use a generous timeout to accommodate clients that take longer to initialize.
-	identifyTimeout := 60 * time.Second
+	// We use a generous timeout to accommodate clients that take longer to initialize
+	// in resource-constrained environments like test networks.
+	identifyTimeout := 120 * time.Second
 	identifyCtx, identifyCancel := context.WithTimeout(context.Background(), identifyTimeout)
 
 	defer identifyCancel()
@@ -147,7 +148,7 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 	if !identifyCompleted && agentVersion == unknown {
 		logCtx.Error("Failed to complete identify protocol - cannot determine client type")
 
-		c.emitFailedCrawl(conn.RemotePeer(), *ErrCrawlIdentifyTimeout)
+		c.emitFailedCrawl(conn.RemotePeer(), ErrCrawlIdentifyTimeout)
 
 		return
 	}
@@ -189,7 +190,7 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 	if err != nil {
 		logCtx.WithError(err).Error("Failed to request status from peer after retries")
 
-		c.emitFailedCrawl(conn.RemotePeer(), *ErrCrawlFailedToRequestStatus)
+		c.emitFailedCrawl(conn.RemotePeer(), ErrCrawlFailedToRequestStatus)
 
 		return
 	}
@@ -200,7 +201,7 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 		// They're on a different fork
 		goodbyeReason = eth.GoodbyeReasonIrrelevantNetwork
 
-		c.emitFailedCrawl(conn.RemotePeer(), *ErrCrawlStatusForkDigest.Add(fmt.Sprintf("ours %s != theirs %s", ourStatus.ForkDigest, status.ForkDigest)))
+		c.emitFailedCrawl(conn.RemotePeer(), ErrCrawlStatusForkDigest.WithDetails(fmt.Sprintf("ours %s != theirs %s", ourStatus.ForkDigest, status.ForkDigest)))
 
 		return
 	}
