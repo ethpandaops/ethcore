@@ -3,6 +3,7 @@ package kurtosis
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -470,7 +471,20 @@ func ForceCleanupNetwork(networkName string) error {
 			defer cancel()
 
 			if err := managed.network.Cleanup(ctx); err != nil {
-				return errors.Wrapf(err, "failed to cleanup network %s", networkName)
+				// Check if the error is because the enclave doesn't exist
+				// This can happen when multiple test packages try to clean up the same enclave
+				errStr := err.Error()
+				if strings.Contains(errStr, "Couldn't find enclave") ||
+					strings.Contains(errStr, "No enclave with identifier") ||
+					strings.Contains(errStr, "enclave not found") {
+					// Log but don't return error - enclave is already gone
+					logrus.WithFields(logrus.Fields{
+						"network": networkName,
+						"error":   err,
+					}).Debug("Enclave already removed, skipping cleanup")
+				} else {
+					return errors.Wrapf(err, "failed to cleanup network %s", networkName)
+				}
 			}
 		}
 

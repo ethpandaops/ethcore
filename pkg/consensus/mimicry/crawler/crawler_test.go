@@ -65,32 +65,9 @@ func Test_RunKurtosisTests(t *testing.T) {
 	epgNetwork := kurtosis.GetEPGNetwork(foundation)
 	require.NotNil(t, epgNetwork, "EPG network must be available")
 
-	// Run all the network tests
-	t.Run("list-network-participants", func(t *testing.T) {
-		listParticipants(t, epgNetwork)
-	})
 	t.Run("discover-crawlable-nodes", func(t *testing.T) {
 		allDiscoverableNodes(t, foundation, epgNetwork, crawlerConfig, logger)
 	})
-}
-
-// listParticipants lists all participants in the network environment.
-func listParticipants(t *testing.T, network network.Network) {
-	t.Helper()
-
-	// List all consensus clients
-	consensusClients := network.ConsensusClients().All()
-	executionClients := network.ExecutionClients().All()
-
-	t.Logf("Found %d consensus clients in network:", len(consensusClients))
-	for _, client := range consensusClients {
-		t.Logf("- %s (%s) - %s", client.Name(), client.Type(), client.BeaconAPIURL())
-	}
-
-	t.Logf("Found %d execution clients in network:", len(executionClients))
-	for _, client := range executionClients {
-		t.Logf("- %s (%s) - %s", client.Name(), client.Type(), client.RPCURL())
-	}
 }
 
 // allDiscoverableNodes tests that all nodes are discoverable.
@@ -306,6 +283,11 @@ func feedENRsToCrawler(t *testing.T, tf *kurtosis.TestFoundation, network networ
 
 				continue
 			}
+
+			// Give nodes extra time to initialize their P2P stack
+			// before they can properly handle identify protocol requests
+			logger.Infof("Waiting for node %s to initialize P2P stack", client.Name())
+			time.Sleep(5 * time.Second)
 
 			logger.Infof("Adding node %s's ENR to discovery pool (%s)", client.Name(), identity.ENR)
 
