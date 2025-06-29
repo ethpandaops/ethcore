@@ -18,7 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/enr"
 	"github.com/ethpandaops/beacon/pkg/beacon"
-	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/cache"
+	"github.com/ethpandaops/ethcore/pkg/cache"
 	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/host"
 	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p"
 	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/eth"
@@ -57,7 +57,7 @@ type Crawler struct {
 	discovery          discovery.NodeFinder
 	statusMu           sync.Mutex
 	statusFromPeerChan chan eth.PeerStatus
-	duplicateCache     *cache.DuplicateCache
+	duplicateCache     cache.DuplicateCache[string, time.Time]
 	metrics            *Metrics
 	peersToDial        chan *discovery.ConnectablePeer
 	OnReady            chan struct{}
@@ -79,7 +79,7 @@ func New(log logrus.FieldLogger, config *Config, userAgent, namespace string, f 
 		},
 		metrics:            NewMetrics(),
 		statusFromPeerChan: make(chan eth.PeerStatus, 10000),
-		duplicateCache:     cache.NewDuplicateCache(config.CooloffDuration),
+		duplicateCache:     cache.NewDuplicateCache[string, time.Time](log, config.CooloffDuration),
 		discovery:          f,
 		peersToDial:        make(chan *discovery.ConnectablePeer, 10000),
 		OnReady:            make(chan struct{}),
@@ -108,6 +108,7 @@ func (c *Crawler) Start(ctx context.Context) error {
 
 	// Create the beacon node
 	opts := beacon.DefaultOptions()
+	opts = opts.DisablePrometheusMetrics()
 
 	opts.HealthCheck.Interval.Duration = time.Second * 3
 	opts.HealthCheck.SuccessfulResponses = 1
@@ -115,7 +116,12 @@ func (c *Crawler) Start(ctx context.Context) error {
 	opts.BeaconSubscription.Enabled = true
 	opts.BeaconSubscription.Topics = []string{"head"}
 
-	b, err := ethereum.NewBeaconNode(ctx, "beacon_node", c.config.Beacon, c.log, "crawler", *opts)
+	b, err := ethereum.NewBeaconNode(
+		c.log,
+		"ethcore/crawler",
+		c.config.Beacon,
+		*opts,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to create upstream beacon node: %w", err)
 	}
@@ -233,7 +239,9 @@ func (c *Crawler) Start(ctx context.Context) error {
 }
 
 func (c *Crawler) Stop(ctx context.Context) error {
-	c.duplicateCache.Stop()
+	if err := c.duplicateCache.Stop(); err != nil {
+		c.log.WithError(err).Error("Failed to stop duplicate cache")
+	}
 
 	// Tell all our peers we're disconnecting
 	for _, p := range c.node.Peerstore().Peers() {
@@ -322,7 +330,9 @@ func (c *Crawler) nodeIsOnOurNetwork(node *enode.Node) error {
 	status := c.GetStatus()
 
 	if !bytes.Equal(forkEntry.CurrentForkDigest, status.ForkDigest[:]) {
-		return ErrCrawlENRForkDigest.Add(fmt.Sprintf("theirs 0x%s != ours %s", hex.EncodeToString(forkEntry.CurrentForkDigest), status.ForkDigest.String()))
+		err := ErrCrawlENRForkDigest.WithDetails(fmt.Sprintf("theirs 0x%s != ours %s", hex.EncodeToString(forkEntry.CurrentForkDigest), status.ForkDigest.String()))
+
+		return &err
 	}
 
 	return nil
@@ -330,17 +340,17 @@ func (c *Crawler) nodeIsOnOurNetwork(node *enode.Node) error {
 
 func (c *Crawler) ConnectToPeer(ctx context.Context, p peer.AddrInfo, n *enode.Node) error {
 	if err := c.nodeIsOnOurNetwork(n); err != nil {
-		c.emitFailedCrawl(p.ID, *newCrawlError(err.Error()))
+		c.emitFailedCrawl(p.ID, newCrawlError(err.Error()))
 
 		return nil
 	}
 
-	if c.duplicateCache.Nodes.Get(p.ID.String()) != nil {
+	if c.duplicateCache.GetCache().Get(p.ID.String()) != nil {
 		c.log.WithFields(logrus.Fields{
 			"peer": p.ID,
 		}).Debug("We've already connected to this peer previously")
 
-		c.emitFailedCrawl(p.ID, *ErrCrawlTooSoon)
+		c.emitFailedCrawl(p.ID, ErrCrawlTooSoon)
 
 		return nil
 	}
