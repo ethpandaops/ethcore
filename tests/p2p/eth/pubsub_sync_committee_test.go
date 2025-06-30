@@ -20,7 +20,7 @@ import (
 
 func TestSyncCommitteeProcessorTopics(t *testing.T) {
 	forkDigest := [4]byte{0x01, 0x02, 0x03, 0x04}
-	processor := &eth.SyncCommitteeProcessor{
+	processor := &eth.DefaultSyncCommitteeProcessor{
 		ForkDigest: forkDigest,
 		Subnets:    []uint64{0, 1, 2},
 	}
@@ -34,7 +34,7 @@ func TestSyncCommitteeProcessorTopics(t *testing.T) {
 
 func TestSyncCommitteeProcessorAllPossibleTopics(t *testing.T) {
 	forkDigest := [4]byte{0x01, 0x02, 0x03, 0x04}
-	processor := &eth.SyncCommitteeProcessor{
+	processor := &eth.DefaultSyncCommitteeProcessor{
 		ForkDigest: forkDigest,
 	}
 
@@ -51,7 +51,7 @@ func TestSyncCommitteeProcessorAllPossibleTopics(t *testing.T) {
 }
 
 func TestSyncCommitteeProcessorGetTopicScoreParams(t *testing.T) {
-	processor := &eth.SyncCommitteeProcessor{}
+	processor := &eth.DefaultSyncCommitteeProcessor{}
 	// eth.SyncCommitteeProcessor always returns nil for score params
 	params := processor.GetTopicScoreParams("any_topic")
 	assert.Nil(t, params)
@@ -59,7 +59,7 @@ func TestSyncCommitteeProcessorGetTopicScoreParams(t *testing.T) {
 
 //nolint:staticcheck // deprecated types still require testing.
 func TestSyncCommitteeProcessorDecode(t *testing.T) {
-	processor := &eth.SyncCommitteeProcessor{
+	processor := &eth.DefaultSyncCommitteeProcessor{
 		Encoder: encoder.SszNetworkEncoder{},
 		Log:     logrus.New(),
 	}
@@ -164,7 +164,7 @@ func TestSyncCommitteeProcessorValidate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			processor := &eth.SyncCommitteeProcessor{
+			processor := &eth.DefaultSyncCommitteeProcessor{
 				Validator:  tt.setupValidator(),
 				Log:        logrus.New(),
 				Subnets:    tt.subnets,
@@ -245,7 +245,7 @@ func TestSyncCommitteeProcessorProcess(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			processor := &eth.SyncCommitteeProcessor{
+			processor := &eth.DefaultSyncCommitteeProcessor{
 				Handler:    tt.setupHandler(),
 				Log:        logrus.New(),
 				Subnets:    tt.subnets,
@@ -270,42 +270,9 @@ func TestSyncCommitteeProcessorProcess(t *testing.T) {
 	}
 }
 
-func TestSyncCommitteeProcessorSubscribeUnsubscribe(t *testing.T) {
-	mockGS := &pubsub.Gossipsub{}
-	processor := &eth.SyncCommitteeProcessor{
-		Gossipsub:  mockGS,
-		ForkDigest: [4]byte{0x01, 0x02, 0x03, 0x04},
-		Log:        logrus.New(),
-		Subnets:    []uint64{},
-	}
-
-	// Test subscribe with subnets
-	err := processor.Subscribe(context.Background(), []uint64{0, 1})
-	assert.Error(t, err) // Will error because gossipsub.SubscribeToMultiProcessorTopics is not implemented
-
-	// Test with no gossipsub
-	processor.Gossipsub = nil
-	err = processor.Subscribe(context.Background(), []uint64{0})
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "gossipsub reference not set")
-
-	// Restore gossipsub for unsubscribe test
-	processor.Gossipsub = mockGS
-	processor.Subnets = []uint64{0, 1, 2}
-
-	// Test unsubscribe
-	err = processor.Unsubscribe(context.Background(), []uint64{0, 1})
-	assert.NoError(t, err) // Unsubscribe returns nil even if gossipsub.Unsubscribe fails (it just logs errors)
-
-	// Test unsubscribe with no gossipsub
-	processor.Gossipsub = nil
-	err = processor.Unsubscribe(context.Background(), []uint64{0})
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "gossipsub reference not set")
-}
 
 func TestSyncCommitteeProcessorTopicIndex(t *testing.T) {
-	processor := &eth.SyncCommitteeProcessor{
+	processor := &eth.DefaultSyncCommitteeProcessor{
 		ForkDigest: [4]byte{0x01, 0x02, 0x03, 0x04},
 		Subnets:    []uint64{0, 1, 3},
 		Log:        logrus.New(),
@@ -363,7 +330,7 @@ func TestSyncCommitteeProcessorTopicIndex(t *testing.T) {
 }
 
 func TestSyncCommitteeProcessorGetActiveSubnets(t *testing.T) {
-	processor := &eth.SyncCommitteeProcessor{
+	processor := &eth.DefaultSyncCommitteeProcessor{
 		Subnets: []uint64{0, 1, 3},
 	}
 

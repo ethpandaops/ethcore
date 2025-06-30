@@ -21,7 +21,7 @@ func TestSyncContributionProcessor(t *testing.T) {
 	logger := logrus.New()
 
 	t.Run("Topic", func(t *testing.T) {
-		processor := &eth.SyncContributionProcessor{
+		processor := &eth.DefaultSyncContributionProcessor{
 			ForkDigest: forkDigest,
 		}
 		
@@ -30,7 +30,7 @@ func TestSyncContributionProcessor(t *testing.T) {
 	})
 
 	t.Run("AllPossibleTopics", func(t *testing.T) {
-		processor := &eth.SyncContributionProcessor{
+		processor := &eth.DefaultSyncContributionProcessor{
 			ForkDigest: forkDigest,
 		}
 		
@@ -39,52 +39,9 @@ func TestSyncContributionProcessor(t *testing.T) {
 		assert.Equal(t, processor.Topic(), topics[0])
 	})
 
-	t.Run("Subscribe", func(t *testing.T) {
-		// Test with nil gossipsub
-		processor := &eth.SyncContributionProcessor{
-			ForkDigest: forkDigest,
-		}
-		
-		err := processor.Subscribe(context.Background())
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "gossipsub reference not set")
-
-		// Test with mock gossipsub
-		mockGossipsub := &mockGossipsub{
-			subscribedTopics: make(map[string]bool),
-		}
-		
-		processor.Gossipsub = mockGossipsub
-		err = processor.Subscribe(context.Background())
-		assert.NoError(t, err)
-		assert.True(t, mockGossipsub.subscribedTopics[processor.Topic()])
-	})
-
-	t.Run("Unsubscribe", func(t *testing.T) {
-		// Test with nil gossipsub
-		processor := &eth.SyncContributionProcessor{
-			ForkDigest: forkDigest,
-		}
-		
-		err := processor.Unsubscribe(context.Background())
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "gossipsub reference not set")
-
-		// Test with mock gossipsub
-		mockGossipsub := &mockGossipsub{
-			subscribedTopics: map[string]bool{
-				processor.Topic(): true,
-			},
-		}
-		
-		processor.Gossipsub = mockGossipsub
-		err = processor.Unsubscribe(context.Background())
-		assert.NoError(t, err)
-		assert.False(t, mockGossipsub.subscribedTopics[processor.Topic()])
-	})
 
 	t.Run("Decode", func(t *testing.T) {
-		processor := &eth.SyncContributionProcessor{
+		processor := &eth.DefaultSyncContributionProcessor{
 			ForkDigest: forkDigest,
 			Encoder:    encoder,
 		}
@@ -104,7 +61,7 @@ func TestSyncContributionProcessor(t *testing.T) {
 
 		// Encode
 		var buf bytes.Buffer
-		_, err = encoder.EncodeGossip(&buf, contrib)
+		_, err := encoder.EncodeGossip(&buf, contrib)
 		require.NoError(t, err)
 		encoded := buf.Bytes()
 
@@ -132,7 +89,7 @@ func TestSyncContributionProcessor(t *testing.T) {
 		}
 
 		// Test without validator
-		processor := &eth.SyncContributionProcessor{
+		processor := &eth.DefaultSyncContributionProcessor{
 			ForkDigest: forkDigest,
 			Encoder:    encoder,
 		}
@@ -172,7 +129,7 @@ func TestSyncContributionProcessor(t *testing.T) {
 		}
 
 		// Test without handler
-		processor := &eth.SyncContributionProcessor{
+		processor := &eth.DefaultSyncContributionProcessor{
 			ForkDigest: forkDigest,
 			Encoder:    encoder,
 			Log:        logger,
@@ -200,7 +157,7 @@ func TestSyncContributionProcessor(t *testing.T) {
 	})
 
 	t.Run("GetTopicScoreParams", func(t *testing.T) {
-		processor := &eth.SyncContributionProcessor{
+		processor := &eth.DefaultSyncContributionProcessor{
 			ForkDigest: forkDigest,
 		}
 		

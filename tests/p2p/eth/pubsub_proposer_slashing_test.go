@@ -19,7 +19,7 @@ import (
 
 func TestProposerSlashingProcessorTopic(t *testing.T) {
 	forkDigest := [4]byte{0x01, 0x02, 0x03, 0x04}
-	processor := &eth.ProposerSlashingProcessor{
+	processor := &eth.DefaultProposerSlashingProcessor{
 		ForkDigest: forkDigest,
 	}
 
@@ -29,7 +29,7 @@ func TestProposerSlashingProcessorTopic(t *testing.T) {
 
 func TestProposerSlashingProcessorAllPossibleTopics(t *testing.T) {
 	forkDigest := [4]byte{0x01, 0x02, 0x03, 0x04}
-	processor := &eth.ProposerSlashingProcessor{
+	processor := &eth.DefaultProposerSlashingProcessor{
 		ForkDigest: forkDigest,
 	}
 
@@ -39,13 +39,13 @@ func TestProposerSlashingProcessorAllPossibleTopics(t *testing.T) {
 }
 
 func TestProposerSlashingProcessorGetTopicScoreParams(t *testing.T) {
-	processor := &eth.ProposerSlashingProcessor{}
+	processor := &eth.DefaultProposerSlashingProcessor{}
 	// eth.ProposerSlashingProcessor always returns nil for score params
 	assert.Nil(t, processor.GetTopicScoreParams())
 }
 
 func TestProposerSlashingProcessorDecode(t *testing.T) {
-	processor := &eth.ProposerSlashingProcessor{
+	processor := &eth.DefaultProposerSlashingProcessor{
 		Encoder: encoder.SszNetworkEncoder{},
 		Log:     logrus.New(),
 	}
@@ -139,7 +139,7 @@ func TestProposerSlashingProcessorValidate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			processor := &eth.ProposerSlashingProcessor{
+			processor := &eth.DefaultProposerSlashingProcessor{
 				Validator: tt.setupValidator(),
 				Log:       logrus.New(),
 			}
@@ -212,7 +212,7 @@ func TestProposerSlashingProcessorProcess(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			processor := &eth.ProposerSlashingProcessor{
+			processor := &eth.DefaultProposerSlashingProcessor{
 				Handler: tt.setupHandler(),
 				Log:     logrus.New(),
 			}
@@ -251,36 +251,10 @@ func TestProposerSlashingProcessorProcess(t *testing.T) {
 	}
 }
 
-func TestProposerSlashingProcessorSubscribeUnsubscribe(t *testing.T) {
-	mockGS := &pubsub.Gossipsub{}
-	processor := &eth.ProposerSlashingProcessor{
-		Gossipsub:  mockGS,
-		ForkDigest: [4]byte{0x01, 0x02, 0x03, 0x04},
-		Log:        logrus.New(),
-	}
-
-	// Subscribe should return error due to gossipsub.SubscribeToProcessorTopic not implemented
-	err := processor.Subscribe(context.Background())
-	assert.Error(t, err)
-
-	// Unsubscribe should also return error
-	err = processor.Unsubscribe(context.Background())
-	assert.Error(t, err)
-
-	// Test with nil gossipsub
-	processor.Gossipsub = nil
-	err = processor.Subscribe(context.Background())
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "gossipsub reference not set")
-
-	err = processor.Unsubscribe(context.Background())
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "gossipsub reference not set")
-}
 
 func TestProposerSlashingProcessorWithNilFields(t *testing.T) {
 	// Test that the processor handles nil fields gracefully
-	processor := &eth.ProposerSlashingProcessor{
+	processor := &eth.DefaultProposerSlashingProcessor{
 		Encoder: encoder.SszNetworkEncoder{},
 		Log:     logrus.New(),
 		Handler: func(ctx context.Context, slashing *pb.ProposerSlashing, from peer.ID) error {

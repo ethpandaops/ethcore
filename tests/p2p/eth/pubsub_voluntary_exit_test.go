@@ -19,7 +19,7 @@ import (
 
 func TestVoluntaryExitProcessorTopic(t *testing.T) {
 	forkDigest := [4]byte{0x01, 0x02, 0x03, 0x04}
-	processor := &eth.VoluntaryExitProcessor{
+	processor := &eth.DefaultVoluntaryExitProcessor{
 		ForkDigest: forkDigest,
 	}
 
@@ -29,7 +29,7 @@ func TestVoluntaryExitProcessorTopic(t *testing.T) {
 
 func TestVoluntaryExitProcessorAllPossibleTopics(t *testing.T) {
 	forkDigest := [4]byte{0x01, 0x02, 0x03, 0x04}
-	processor := &eth.VoluntaryExitProcessor{
+	processor := &eth.DefaultVoluntaryExitProcessor{
 		ForkDigest: forkDigest,
 	}
 
@@ -39,13 +39,13 @@ func TestVoluntaryExitProcessorAllPossibleTopics(t *testing.T) {
 }
 
 func TestVoluntaryExitProcessorGetTopicScoreParams(t *testing.T) {
-	processor := &eth.VoluntaryExitProcessor{}
+	processor := &eth.DefaultVoluntaryExitProcessor{}
 	// eth.VoluntaryExitProcessor always returns nil for score params
 	assert.Nil(t, processor.GetTopicScoreParams())
 }
 
 func TestVoluntaryExitProcessorDecode(t *testing.T) {
-	processor := &eth.VoluntaryExitProcessor{
+	processor := &eth.DefaultVoluntaryExitProcessor{
 		Encoder: encoder.SszNetworkEncoder{},
 		Log:     logrus.New(),
 	}
@@ -124,7 +124,7 @@ func TestVoluntaryExitProcessorValidate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			processor := &eth.VoluntaryExitProcessor{
+			processor := &eth.DefaultVoluntaryExitProcessor{
 				Validator: tt.setupValidator(),
 				Log:       logrus.New(),
 			}
@@ -182,7 +182,7 @@ func TestVoluntaryExitProcessorProcess(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			processor := &eth.VoluntaryExitProcessor{
+			processor := &eth.DefaultVoluntaryExitProcessor{
 				Handler: tt.setupHandler(),
 				Log:     logrus.New(),
 			}
@@ -206,36 +206,10 @@ func TestVoluntaryExitProcessorProcess(t *testing.T) {
 	}
 }
 
-func TestVoluntaryExitProcessorSubscribeUnsubscribe(t *testing.T) {
-	mockGS := &pubsub.Gossipsub{}
-	processor := &eth.VoluntaryExitProcessor{
-		Gossipsub:  mockGS,
-		ForkDigest: [4]byte{0x01, 0x02, 0x03, 0x04},
-		Log:        logrus.New(),
-	}
-
-	// Subscribe should return error due to gossipsub.SubscribeToProcessorTopic not implemented
-	err := processor.Subscribe(context.Background())
-	assert.Error(t, err)
-
-	// Unsubscribe should also return error
-	err = processor.Unsubscribe(context.Background())
-	assert.Error(t, err)
-
-	// Test with nil gossipsub
-	processor.Gossipsub = nil
-	err = processor.Subscribe(context.Background())
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "gossipsub reference not set")
-
-	err = processor.Unsubscribe(context.Background())
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "gossipsub reference not set")
-}
 
 func TestVoluntaryExitProcessorWithNilFields(t *testing.T) {
 	// Test that the processor handles nil fields gracefully
-	processor := &eth.VoluntaryExitProcessor{
+	processor := &eth.DefaultVoluntaryExitProcessor{
 		Encoder: encoder.SszNetworkEncoder{},
 		Log:     logrus.New(),
 		Handler: func(ctx context.Context, exit *pb.SignedVoluntaryExit, from peer.ID) error {

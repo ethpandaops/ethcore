@@ -20,7 +20,7 @@ import (
 
 func TestAttestationProcessorTopics(t *testing.T) {
 	forkDigest := [4]byte{0x01, 0x02, 0x03, 0x04}
-	processor := &eth.AttestationProcessor{
+	processor := &eth.DefaultAttestationProcessor{
 		ForkDigest: forkDigest,
 		Subnets:    []uint64{10, 20, 30},
 	}
@@ -34,7 +34,7 @@ func TestAttestationProcessorTopics(t *testing.T) {
 
 func TestAttestationProcessorAllPossibleTopics(t *testing.T) {
 	forkDigest := [4]byte{0x01, 0x02, 0x03, 0x04}
-	processor := &eth.AttestationProcessor{
+	processor := &eth.DefaultAttestationProcessor{
 		ForkDigest: forkDigest,
 	}
 
@@ -51,14 +51,14 @@ func TestAttestationProcessorAllPossibleTopics(t *testing.T) {
 }
 
 func TestAttestationProcessorGetTopicScoreParams(t *testing.T) {
-	processor := &eth.AttestationProcessor{}
+	processor := &eth.DefaultAttestationProcessor{}
 	// eth.AttestationProcessor always returns nil for score params
 	params := processor.GetTopicScoreParams("any_topic")
 	assert.Nil(t, params)
 }
 
 func TestAttestationProcessorDecode(t *testing.T) {
-	processor := &eth.AttestationProcessor{
+	processor := &eth.DefaultAttestationProcessor{
 		Encoder: encoder.SszNetworkEncoder{},
 		Log:     logrus.New(),
 	}
@@ -170,7 +170,7 @@ func TestAttestationProcessorValidate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			processor := &eth.AttestationProcessor{
+			processor := &eth.DefaultAttestationProcessor{
 				Validator:  tt.setupValidator(),
 				Log:        logrus.New(),
 				Subnets:    tt.subnets,
@@ -262,7 +262,7 @@ func TestAttestationProcessorProcess(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			processor := &eth.AttestationProcessor{
+			processor := &eth.DefaultAttestationProcessor{
 				Handler:    tt.setupHandler(),
 				Log:        logrus.New(),
 				Subnets:    tt.subnets,
@@ -298,42 +298,9 @@ func TestAttestationProcessorProcess(t *testing.T) {
 	}
 }
 
-func TestAttestationProcessorSubscribeUnsubscribe(t *testing.T) {
-	mockGS := &pubsub.Gossipsub{}
-	processor := &eth.AttestationProcessor{
-		Gossipsub:  mockGS,
-		ForkDigest: [4]byte{0x01, 0x02, 0x03, 0x04},
-		Log:        logrus.New(),
-		Subnets:    []uint64{},
-	}
-
-	// Test subscribe with subnets
-	err := processor.Subscribe(context.Background(), []uint64{1, 2, 3})
-	assert.Error(t, err) // Will error because gossipsub.SubscribeToMultiProcessorTopics is not implemented
-
-	// Test with no gossipsub
-	processor.Gossipsub = nil
-	err = processor.Subscribe(context.Background(), []uint64{1})
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "gossipsub reference not set")
-
-	// Restore gossipsub for unsubscribe test
-	processor.Gossipsub = mockGS
-	processor.Subnets = []uint64{1, 2, 3}
-
-	// Test unsubscribe
-	err = processor.Unsubscribe(context.Background(), []uint64{1, 2})
-	assert.NoError(t, err) // Unsubscribe returns nil even if gossipsub.Unsubscribe fails (it just logs errors)
-
-	// Test unsubscribe with no gossipsub
-	processor.Gossipsub = nil
-	err = processor.Unsubscribe(context.Background(), []uint64{1})
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "gossipsub reference not set")
-}
 
 func TestAttestationProcessorTopicIndex(t *testing.T) {
-	processor := &eth.AttestationProcessor{
+	processor := &eth.DefaultAttestationProcessor{
 		ForkDigest: [4]byte{0x01, 0x02, 0x03, 0x04},
 		Subnets:    []uint64{10, 20, 30},
 		Log:        logrus.New(),
@@ -391,7 +358,7 @@ func TestAttestationProcessorTopicIndex(t *testing.T) {
 }
 
 func TestAttestationProcessorGetActiveSubnets(t *testing.T) {
-	processor := &eth.AttestationProcessor{
+	processor := &eth.DefaultAttestationProcessor{
 		Subnets: []uint64{10, 20, 30},
 	}
 

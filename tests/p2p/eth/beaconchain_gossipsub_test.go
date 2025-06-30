@@ -3,7 +3,6 @@ package eth_test
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -63,8 +62,8 @@ func TestBeaconchainGossipsub_RegisterAndSubscribe(t *testing.T) {
 	t.Run("RegisterAndSubscribeBeaconBlock", func(t *testing.T) {
 		receivedBlocks := make(chan *pb.SignedBeaconBlock, 1)
 
-		// Register handler on node 2
-		err := bg2.RegisterBeaconBlock(
+		// Create processor on node 2
+		processor2 := bg2.CreateBeaconBlockProcessor(
 			nil, // no validator
 			func(ctx context.Context, block *pb.SignedBeaconBlock, from peer.ID) error {
 				receivedBlocks <- block
@@ -72,19 +71,17 @@ func TestBeaconchainGossipsub_RegisterAndSubscribe(t *testing.T) {
 			},
 			nil, // no score params
 		)
-		require.NoError(t, err)
 
 		// Subscribe on node 2
-		err = bg2.SubscribeBeaconBlock(ctx)
+		err = bg2.SubscribeBeaconBlock(ctx, processor2)
 		require.NoError(t, err)
 
 		// Wait for subscription to propagate
 		time.Sleep(100 * time.Millisecond)
 
 		// Also subscribe on node 1 to ensure topic exists
-		err = bg1.RegisterBeaconBlock(nil, nil, nil)
-		require.NoError(t, err)
-		err = bg1.SubscribeBeaconBlock(ctx)
+		processor1 := bg1.CreateBeaconBlockProcessor(nil, nil, nil)
+		err = bg1.SubscribeBeaconBlock(ctx, processor1)
 		require.NoError(t, err)
 
 		time.Sleep(100 * time.Millisecond)
@@ -117,8 +114,8 @@ func TestBeaconchainGossipsub_RegisterAndSubscribe(t *testing.T) {
 	t.Run("RegisterAndSubscribeAttestation", func(t *testing.T) {
 		receivedAtts := make(chan *pb.Attestation, 1)
 
-		// Register handler on node 2 for subnet 10
-		err := bg2.RegisterAttestation(
+		// Create processor on node 2 for subnet 10
+		processor2 := bg2.CreateAttestationProcessor(
 			[]uint64{10},
 			nil, // no validator
 			func(ctx context.Context, att *pb.Attestation, subnet uint64, from peer.ID) error {
@@ -127,20 +124,17 @@ func TestBeaconchainGossipsub_RegisterAndSubscribe(t *testing.T) {
 				return nil
 			},
 		)
-		require.NoError(t, err)
 
-		// Subscribe on node 2 using the generated name
-		attName := fmt.Sprintf("attestation_subnets_%v", []uint64{10})
-		err = bg2.SubscribeAttestation(ctx, attName)
+		// Subscribe on node 2
+		err = bg2.SubscribeAttestation(ctx, processor2)
 		require.NoError(t, err)
 
 		// Wait for subscription to propagate
 		time.Sleep(100 * time.Millisecond)
 
 		// Also subscribe on node 1 to ensure topic exists
-		err = bg1.RegisterAttestation([]uint64{10}, nil, nil)
-		require.NoError(t, err)
-		err = bg1.SubscribeAttestation(ctx, attName)
+		processor1 := bg1.CreateAttestationProcessor([]uint64{10}, nil, nil)
+		err = bg1.SubscribeAttestation(ctx, processor1)
 		require.NoError(t, err)
 
 		time.Sleep(100 * time.Millisecond)
@@ -173,27 +167,25 @@ func TestBeaconchainGossipsub_RegisterAndSubscribe(t *testing.T) {
 	t.Run("RegisterAndSubscribeAggregateAndProof", func(t *testing.T) {
 		receivedAggs := make(chan *pb.AggregateAttestationAndProof, 1)
 
-		// Register handler on node 2
-		err := bg2.RegisterAggregateAndProof(
+		// Create processor on node 2
+		processor2 := bg2.CreateAggregateAndProofProcessor(
 			nil, // no validator
 			func(ctx context.Context, agg *pb.AggregateAttestationAndProof, from peer.ID) error {
 				receivedAggs <- agg
 				return nil
 			},
 		)
-		require.NoError(t, err)
 
 		// Subscribe on node 2
-		err = bg2.SubscribeAggregateAndProof(ctx)
+		err = bg2.SubscribeAggregateAndProof(ctx, processor2)
 		require.NoError(t, err)
 
 		// Wait for subscription to propagate
 		time.Sleep(100 * time.Millisecond)
 
 		// Also subscribe on node 1
-		err = bg1.RegisterAggregateAndProof(nil, nil)
-		require.NoError(t, err)
-		err = bg1.SubscribeAggregateAndProof(ctx)
+		processor1 := bg1.CreateAggregateAndProofProcessor(nil, nil)
+		err = bg1.SubscribeAggregateAndProof(ctx, processor1)
 		require.NoError(t, err)
 
 		time.Sleep(100 * time.Millisecond)
@@ -230,8 +222,8 @@ func TestBeaconchainGossipsub_RegisterAndSubscribe(t *testing.T) {
 	t.Run("RegisterAndSubscribeSyncCommittee", func(t *testing.T) {
 		receivedSyncs := make(chan *pb.SyncCommitteeMessage, 1)
 
-		// Register handler on node 2 for subnet 5
-		err := bg2.RegisterSyncCommittee(
+		// Create processor on node 2 for subnet 5
+		processor2 := bg2.CreateSyncCommitteeProcessor(
 			[]uint64{5},
 			nil, // no validator
 			func(ctx context.Context, msg *pb.SyncCommitteeMessage, subnet uint64, from peer.ID) error {
@@ -240,20 +232,17 @@ func TestBeaconchainGossipsub_RegisterAndSubscribe(t *testing.T) {
 				return nil
 			},
 		)
-		require.NoError(t, err)
 
-		// Subscribe on node 2 using the generated name
-		syncName := fmt.Sprintf("sync_committee_subnets_%v", []uint64{5})
-		err = bg2.SubscribeSyncCommittee(ctx, syncName)
+		// Subscribe on node 2
+		err = bg2.SubscribeSyncCommittee(ctx, processor2)
 		require.NoError(t, err)
 
 		// Wait for subscription to propagate
 		time.Sleep(100 * time.Millisecond)
 
 		// Also subscribe on node 1
-		err = bg1.RegisterSyncCommittee([]uint64{5}, nil, nil)
-		require.NoError(t, err)
-		err = bg1.SubscribeSyncCommittee(ctx, syncName)
+		processor1 := bg1.CreateSyncCommitteeProcessor([]uint64{5}, nil, nil)
+		err = bg1.SubscribeSyncCommittee(ctx, processor1)
 		require.NoError(t, err)
 
 		time.Sleep(100 * time.Millisecond)
@@ -285,27 +274,25 @@ func TestBeaconchainGossipsub_RegisterAndSubscribe(t *testing.T) {
 	t.Run("RegisterAndSubscribeVoluntaryExit", func(t *testing.T) {
 		receivedExits := make(chan *pb.SignedVoluntaryExit, 1)
 
-		// Register handler on node 2
-		err := bg2.RegisterVoluntaryExit(
+		// Create processor on node 2
+		processor2 := bg2.CreateVoluntaryExitProcessor(
 			nil, // no validator
 			func(ctx context.Context, exit *pb.SignedVoluntaryExit, from peer.ID) error {
 				receivedExits <- exit
 				return nil
 			},
 		)
-		require.NoError(t, err)
 
 		// Subscribe on node 2
-		err = bg2.SubscribeVoluntaryExit(ctx)
+		err = bg2.SubscribeVoluntaryExit(ctx, processor2)
 		require.NoError(t, err)
 
 		// Wait for subscription to propagate
 		time.Sleep(100 * time.Millisecond)
 
 		// Also subscribe on node 1
-		err = bg1.RegisterVoluntaryExit(nil, nil)
-		require.NoError(t, err)
-		err = bg1.SubscribeVoluntaryExit(ctx)
+		processor1 := bg1.CreateVoluntaryExitProcessor(nil, nil)
+		err = bg1.SubscribeVoluntaryExit(ctx, processor1)
 		require.NoError(t, err)
 
 		time.Sleep(100 * time.Millisecond)
@@ -340,27 +327,25 @@ func TestBeaconchainGossipsub_RegisterAndSubscribe(t *testing.T) {
 	t.Run("RegisterAndSubscribeProposerSlashing", func(t *testing.T) {
 		receivedSlashings := make(chan *pb.ProposerSlashing, 1)
 
-		// Register handler on node 2
-		err := bg2.RegisterProposerSlashing(
+		// Create processor on node 2
+		processor2 := bg2.CreateProposerSlashingProcessor(
 			nil, // no validator
 			func(ctx context.Context, slashing *pb.ProposerSlashing, from peer.ID) error {
 				receivedSlashings <- slashing
 				return nil
 			},
 		)
-		require.NoError(t, err)
 
 		// Subscribe on node 2
-		err = bg2.SubscribeProposerSlashing(ctx)
+		err = bg2.SubscribeProposerSlashing(ctx, processor2)
 		require.NoError(t, err)
 
 		// Wait for subscription to propagate
 		time.Sleep(100 * time.Millisecond)
 
 		// Also subscribe on node 1
-		err = bg1.RegisterProposerSlashing(nil, nil)
-		require.NoError(t, err)
-		err = bg1.SubscribeProposerSlashing(ctx)
+		processor1 := bg1.CreateProposerSlashingProcessor(nil, nil)
+		err = bg1.SubscribeProposerSlashing(ctx, processor1)
 		require.NoError(t, err)
 
 		time.Sleep(100 * time.Millisecond)
@@ -400,27 +385,25 @@ func TestBeaconchainGossipsub_RegisterAndSubscribe(t *testing.T) {
 	t.Run("RegisterAndSubscribeAttesterSlashing", func(t *testing.T) {
 		receivedSlashings := make(chan *pb.AttesterSlashing, 1)
 
-		// Register handler on node 2
-		err := bg2.RegisterAttesterSlashing(
+		// Create processor on node 2
+		processor2 := bg2.CreateAttesterSlashingProcessor(
 			nil, // no validator
 			func(ctx context.Context, slashing *pb.AttesterSlashing, from peer.ID) error {
 				receivedSlashings <- slashing
 				return nil
 			},
 		)
-		require.NoError(t, err)
 
 		// Subscribe on node 2
-		err = bg2.SubscribeAttesterSlashing(ctx)
+		err = bg2.SubscribeAttesterSlashing(ctx, processor2)
 		require.NoError(t, err)
 
 		// Wait for subscription to propagate
 		time.Sleep(100 * time.Millisecond)
 
 		// Also subscribe on node 1
-		err = bg1.RegisterAttesterSlashing(nil, nil)
-		require.NoError(t, err)
-		err = bg1.SubscribeAttesterSlashing(ctx)
+		processor1 := bg1.CreateAttesterSlashingProcessor(nil, nil)
+		err = bg1.SubscribeAttesterSlashing(ctx, processor1)
 		require.NoError(t, err)
 
 		time.Sleep(100 * time.Millisecond)
@@ -460,27 +443,25 @@ func TestBeaconchainGossipsub_RegisterAndSubscribe(t *testing.T) {
 	t.Run("RegisterAndSubscribeSyncContributionAndProof", func(t *testing.T) {
 		receivedContribs := make(chan *pb.SignedContributionAndProof, 1)
 
-		// Register handler on node 2
-		err := bg2.RegisterSyncContributionAndProof(
+		// Create processor on node 2
+		processor2 := bg2.CreateSyncContributionAndProofProcessor(
 			nil, // no validator
 			func(ctx context.Context, contrib *pb.SignedContributionAndProof, from peer.ID) error {
 				receivedContribs <- contrib
 				return nil
 			},
 		)
-		require.NoError(t, err)
 
 		// Subscribe on node 2
-		err = bg2.SubscribeSyncContributionAndProof(ctx)
+		err = bg2.SubscribeSyncContributionAndProof(ctx, processor2)
 		require.NoError(t, err)
 
 		// Wait for subscription to propagate
 		time.Sleep(100 * time.Millisecond)
 
 		// Also subscribe on node 1
-		err = bg1.RegisterSyncContributionAndProof(nil, nil)
-		require.NoError(t, err)
-		err = bg1.SubscribeSyncContributionAndProof(ctx)
+		processor1 := bg1.CreateSyncContributionAndProofProcessor(nil, nil)
+		err = bg1.SubscribeSyncContributionAndProof(ctx, processor1)
 		require.NoError(t, err)
 
 		time.Sleep(100 * time.Millisecond)
@@ -517,27 +498,25 @@ func TestBeaconchainGossipsub_RegisterAndSubscribe(t *testing.T) {
 	t.Run("RegisterAndSubscribeBlsToExecutionChange", func(t *testing.T) {
 		receivedChanges := make(chan *pb.SignedBLSToExecutionChange, 1)
 
-		// Register handler on node 2
-		err := bg2.RegisterBlsToExecutionChange(
+		// Create processor on node 2
+		processor2 := bg2.CreateBlsToExecutionChangeProcessor(
 			nil, // no validator
 			func(ctx context.Context, change *pb.SignedBLSToExecutionChange, from peer.ID) error {
 				receivedChanges <- change
 				return nil
 			},
 		)
-		require.NoError(t, err)
 
 		// Subscribe on node 2
-		err = bg2.SubscribeBlsToExecutionChange(ctx)
+		err = bg2.SubscribeBlsToExecutionChange(ctx, processor2)
 		require.NoError(t, err)
 
 		// Wait for subscription to propagate
 		time.Sleep(100 * time.Millisecond)
 
 		// Also subscribe on node 1
-		err = bg1.RegisterBlsToExecutionChange(nil, nil)
-		require.NoError(t, err)
-		err = bg1.SubscribeBlsToExecutionChange(ctx)
+		processor1 := bg1.CreateBlsToExecutionChangeProcessor(nil, nil)
+		err = bg1.SubscribeBlsToExecutionChange(ctx, processor1)
 		require.NoError(t, err)
 
 		time.Sleep(100 * time.Millisecond)
