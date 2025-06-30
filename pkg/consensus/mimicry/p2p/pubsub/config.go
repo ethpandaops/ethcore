@@ -27,22 +27,15 @@ func DefaultConfig() *Config {
 		ValidationBufferSize:  100,      // Reasonable validation queue size
 		ValidationConcurrency: 10,       // Moderate validation concurrency
 		PublishTimeout:        5 * time.Second,
-		// Peer scoring is now handled by individual processors
-
-		// GossipSubParams left nil will use libp2p defaults
-		// Users can set custom values like:
-		// GossipSubParams: &pubsub.GossipSubParams{D: 8, Dlo: 6, Dhi: 12, ...}
-		// Or start with defaults: GossipSubParams: func() *pubsub.GossipSubParams { p := pubsub.DefaultGossipSubParams(); p.D = 8; return &p }()
 	}
 }
 
-// NewConfigWithCustomGossipSub creates a config with custom gossipsub parameters starting from defaults.
+// NewConfigWithCustomGossipSub returns a Config with custom GossipSubParams.
 func NewConfigWithCustomGossipSub() *Config {
-	config := DefaultConfig()
-	params := pubsub.DefaultGossipSubParams()
-	config.GossipSubParams = &params
-
-	return config
+	cfg := DefaultConfig()
+	// Set custom gossipsub parameters
+	cfg.GossipSubParams = &pubsub.GossipSubParams{}
+	return cfg
 }
 
 // Validate checks if the configuration is valid and returns an error if not.
@@ -63,9 +56,6 @@ func (c *Config) Validate() error {
 	if c.PublishTimeout <= 0 {
 		return fmt.Errorf("PublishTimeout must be positive, got %v", c.PublishTimeout)
 	}
-
-	// GossipSubParams validation is handled by libp2p when the params are used
-	// We don't need to duplicate all their validation logic here
 
 	return nil
 }

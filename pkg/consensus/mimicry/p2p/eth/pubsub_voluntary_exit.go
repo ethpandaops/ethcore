@@ -16,41 +16,30 @@ func VoluntaryExitTopic(forkDigest []byte) string {
 	return fmt.Sprintf(GossipsubTopicFormat, forkDigest, "voluntary_exit")
 }
 
-// voluntaryExitProcessor handles voluntary exit messages.
-type VoluntaryExitProcessor struct {
+// VoluntaryExitProcessor defines the interface for processing voluntary exit messages.
+type VoluntaryExitProcessor interface {
+	pubsub.Processor[*pb.SignedVoluntaryExit]
+}
+
+// DefaultVoluntaryExitProcessor handles voluntary exit messages.
+type DefaultVoluntaryExitProcessor struct {
 	ForkDigest [4]byte
 	Encoder    encoder.SszNetworkEncoder
 	Handler    func(context.Context, *pb.SignedVoluntaryExit, peer.ID) error
 	Validator  func(context.Context, *pb.SignedVoluntaryExit) (pubsub.ValidationResult, error)
-	Gossipsub  *pubsub.Gossipsub
 	Log        logrus.FieldLogger
 }
 
-func (p *VoluntaryExitProcessor) Topic() string {
+func (p *DefaultVoluntaryExitProcessor) Topic() string {
 	return VoluntaryExitTopic(p.ForkDigest[:])
 }
 
-func (p *VoluntaryExitProcessor) AllPossibleTopics() []string {
+func (p *DefaultVoluntaryExitProcessor) AllPossibleTopics() []string {
 	return []string{p.Topic()}
 }
 
-func (p *VoluntaryExitProcessor) Subscribe(ctx context.Context) error {
-	if p.Gossipsub == nil {
-		return fmt.Errorf("gossipsub reference not set")
-	}
 
-	return p.Gossipsub.SubscribeToProcessorTopic(ctx, p.Topic())
-}
-
-func (p *VoluntaryExitProcessor) Unsubscribe(ctx context.Context) error {
-	if p.Gossipsub == nil {
-		return fmt.Errorf("gossipsub reference not set")
-	}
-
-	return p.Gossipsub.Unsubscribe(p.Topic())
-}
-
-func (p *VoluntaryExitProcessor) Decode(ctx context.Context, data []byte) (*pb.SignedVoluntaryExit, error) {
+func (p *DefaultVoluntaryExitProcessor) Decode(ctx context.Context, data []byte) (*pb.SignedVoluntaryExit, error) {
 	exit := &pb.SignedVoluntaryExit{}
 	if err := p.Encoder.DecodeGossip(data, exit); err != nil {
 		return nil, fmt.Errorf("failed to decode voluntary exit: %w", err)
@@ -59,7 +48,7 @@ func (p *VoluntaryExitProcessor) Decode(ctx context.Context, data []byte) (*pb.S
 	return exit, nil
 }
 
-func (p *VoluntaryExitProcessor) Validate(ctx context.Context, exit *pb.SignedVoluntaryExit, from string) (pubsub.ValidationResult, error) {
+func (p *DefaultVoluntaryExitProcessor) Validate(ctx context.Context, exit *pb.SignedVoluntaryExit, from string) (pubsub.ValidationResult, error) {
 	// Defer all validation to external Validator function
 	if p.Validator != nil {
 		return p.Validator(ctx, exit)
@@ -69,7 +58,7 @@ func (p *VoluntaryExitProcessor) Validate(ctx context.Context, exit *pb.SignedVo
 	return pubsub.ValidationAccept, nil
 }
 
-func (p *VoluntaryExitProcessor) Process(ctx context.Context, exit *pb.SignedVoluntaryExit, from string) error {
+func (p *DefaultVoluntaryExitProcessor) Process(ctx context.Context, exit *pb.SignedVoluntaryExit, from string) error {
 	if p.Handler == nil {
 		p.Log.Debug("No handler provided, voluntary exit received but not processed")
 
@@ -84,11 +73,11 @@ func (p *VoluntaryExitProcessor) Process(ctx context.Context, exit *pb.SignedVol
 	return p.Handler(ctx, exit, peerID)
 }
 
-func (p *VoluntaryExitProcessor) GetTopicScoreParams() *pubsub.TopicScoreParams {
+func (p *DefaultVoluntaryExitProcessor) GetTopicScoreParams() *pubsub.TopicScoreParams {
 	// Return nil to use default/no scoring for now
 	// Users can override this by providing their own processor implementation
 	return nil
 }
 
-// Compile-time check that voluntaryExitProcessor implements pubsub.Processor.
-var _ pubsub.Processor[*pb.SignedVoluntaryExit] = (*VoluntaryExitProcessor)(nil)
+// Compile-time check that DefaultVoluntaryExitProcessor implements VoluntaryExitProcessor.
+var _ VoluntaryExitProcessor = (*DefaultVoluntaryExitProcessor)(nil)

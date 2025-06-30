@@ -21,41 +21,30 @@ func AttesterSlashingTopic(forkDigest [4]byte) string {
 	return fmt.Sprintf(GossipsubTopicFormat, forkDigest, AttesterSlashingTopicName)
 }
 
-// attesterSlashingProcessor handles attester slashing messages.
-type AttesterSlashingProcessor struct {
+// AttesterSlashingProcessor defines the interface for processing attester slashing messages.
+type AttesterSlashingProcessor interface {
+	pubsub.Processor[*pb.AttesterSlashing]
+}
+
+// DefaultAttesterSlashingProcessor handles attester slashing messages.
+type DefaultAttesterSlashingProcessor struct {
 	ForkDigest [4]byte
 	Encoder    encoder.SszNetworkEncoder
 	Handler    func(context.Context, *pb.AttesterSlashing, peer.ID) error
 	Validator  func(context.Context, *pb.AttesterSlashing) (pubsub.ValidationResult, error)
-	Gossipsub  *pubsub.Gossipsub
 	Log        logrus.FieldLogger
 }
 
-func (p *AttesterSlashingProcessor) Topic() string {
+func (p *DefaultAttesterSlashingProcessor) Topic() string {
 	return AttesterSlashingTopic(p.ForkDigest)
 }
 
-func (p *AttesterSlashingProcessor) AllPossibleTopics() []string {
+func (p *DefaultAttesterSlashingProcessor) AllPossibleTopics() []string {
 	return []string{p.Topic()}
 }
 
-func (p *AttesterSlashingProcessor) Subscribe(ctx context.Context) error {
-	if p.Gossipsub == nil {
-		return fmt.Errorf("gossipsub reference not set")
-	}
 
-	return p.Gossipsub.SubscribeToProcessorTopic(ctx, p.Topic())
-}
-
-func (p *AttesterSlashingProcessor) Unsubscribe(ctx context.Context) error {
-	if p.Gossipsub == nil {
-		return fmt.Errorf("gossipsub reference not set")
-	}
-
-	return p.Gossipsub.Unsubscribe(p.Topic())
-}
-
-func (p *AttesterSlashingProcessor) Decode(ctx context.Context, data []byte) (*pb.AttesterSlashing, error) {
+func (p *DefaultAttesterSlashingProcessor) Decode(ctx context.Context, data []byte) (*pb.AttesterSlashing, error) {
 	slashing := &pb.AttesterSlashing{}
 	if err := p.Encoder.DecodeGossip(data, slashing); err != nil {
 		return nil, fmt.Errorf("failed to decode attester slashing: %w", err)
@@ -64,7 +53,7 @@ func (p *AttesterSlashingProcessor) Decode(ctx context.Context, data []byte) (*p
 	return slashing, nil
 }
 
-func (p *AttesterSlashingProcessor) Validate(ctx context.Context, slashing *pb.AttesterSlashing, from string) (pubsub.ValidationResult, error) {
+func (p *DefaultAttesterSlashingProcessor) Validate(ctx context.Context, slashing *pb.AttesterSlashing, from string) (pubsub.ValidationResult, error) {
 	// Defer all validation to external Validator function
 	if p.Validator != nil {
 		return p.Validator(ctx, slashing)
@@ -74,7 +63,7 @@ func (p *AttesterSlashingProcessor) Validate(ctx context.Context, slashing *pb.A
 	return pubsub.ValidationAccept, nil
 }
 
-func (p *AttesterSlashingProcessor) Process(ctx context.Context, slashing *pb.AttesterSlashing, from string) error {
+func (p *DefaultAttesterSlashingProcessor) Process(ctx context.Context, slashing *pb.AttesterSlashing, from string) error {
 	if p.Handler == nil {
 		p.Log.Debug("No handler provided, attester slashing received but not processed")
 
@@ -89,11 +78,11 @@ func (p *AttesterSlashingProcessor) Process(ctx context.Context, slashing *pb.At
 	return p.Handler(ctx, slashing, peerID)
 }
 
-func (p *AttesterSlashingProcessor) GetTopicScoreParams() *pubsub.TopicScoreParams {
+func (p *DefaultAttesterSlashingProcessor) GetTopicScoreParams() *pubsub.TopicScoreParams {
 	// Return nil to use default/no scoring for now
 	// Users can override this by providing their own processor implementation
 	return nil
 }
 
-// Compile-time check that attesterSlashingProcessor implements pubsub.Processor.
-var _ pubsub.Processor[*pb.AttesterSlashing] = (*AttesterSlashingProcessor)(nil)
+// Compile-time check that DefaultAttesterSlashingProcessor implements AttesterSlashingProcessor.
+var _ AttesterSlashingProcessor = (*DefaultAttesterSlashingProcessor)(nil)

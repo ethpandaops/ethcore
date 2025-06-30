@@ -2,7 +2,6 @@ package pubsub
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -31,12 +30,6 @@ type Processor[T any] interface {
 
 	// Process handles the validated message
 	Process(ctx context.Context, msg T, from string) error
-
-	// Subscribe starts subscription to this processor's topic
-	Subscribe(ctx context.Context) error
-
-	// Unsubscribe stops subscription to this processor's topic
-	Unsubscribe(ctx context.Context) error
 }
 
 // This is useful for subnet-based topics like beacon_attestation_XX where XX is the subnet ID.
@@ -44,6 +37,14 @@ type MultiProcessor[T any] interface {
 	// AllPossibleTopics returns all topics this processor might handle (for topic scoring prewarming)
 	// For subnet-based processors, this returns all possible subnet topics (e.g., all 64 attestation subnets)
 	AllPossibleTopics() []string
+
+	// ActiveTopics returns the currently active topics this processor is interested in
+	// This subset of AllPossibleTopics() determines which topics should have active subscriptions
+	ActiveTopics() []string
+
+	// UpdateActiveTopics dynamically updates which topics this processor is interested in
+	// Returns the list of topics to subscribe to and unsubscribe from
+	UpdateActiveTopics(newActiveTopics []string) (toSubscribe []string, toUnsubscribe []string, err error)
 
 	// GetTopicScoreParams returns scoring parameters for the given topic
 	// Return nil to use default scoring or disable scoring for this topic
@@ -60,16 +61,8 @@ type MultiProcessor[T any] interface {
 
 	// Process handles the validated message for the given topic
 	Process(ctx context.Context, topic string, msg T, from string) error
-
-	// Subscribe starts subscription to the specified subnets
-	Subscribe(ctx context.Context, subnets []uint64) error
-
-	// Unsubscribe stops subscription to the specified subnets
-	Unsubscribe(ctx context.Context, subnets []uint64) error
-
-	// GetActiveSubnets returns the currently subscribed subnets
-	GetActiveSubnets() []uint64
 }
+
 
 // ProcessorMetrics tracks performance metrics for message processing.
 type ProcessorMetrics struct {
@@ -258,179 +251,4 @@ func (w *multiProcessorWrapper[T]) Process(ctx context.Context, msg T, from stri
 	return w.multiProcessor.Process(ctx, w.topic, msg, from)
 }
 
-// Subscribe is not used as subscription is managed by SubscribeMultiWithProcessor.
-func (w *multiProcessorWrapper[T]) Subscribe(ctx context.Context) error {
-	// This is handled by the parent SubscribeMultiWithProcessor function
-	return nil
-}
 
-// Unsubscribe is not used as unsubscription is managed by the gossipsub instance.
-func (w *multiProcessorWrapper[T]) Unsubscribe(ctx context.Context) error {
-	// This is handled by the gossipsub Unsubscribe function
-	return nil
-}
-
-// SelfSubscribingProcessor wraps a processor to provide working Subscribe/Unsubscribe methods.
-type SelfSubscribingProcessor[T any] struct {
-	Processor[T] // Embed the processor interface
-	gossipsub    *Gossipsub
-	subscription *ProcessorSubscription[T]
-	mu           sync.RWMutex
-	log          logrus.FieldLogger
-}
-
-// NewSelfSubscribingProcessor creates a processor wrapper with working Subscribe/Unsubscribe methods.
-func NewSelfSubscribingProcessor[T any](processor Processor[T], gossipsub *Gossipsub, log logrus.FieldLogger) *SelfSubscribingProcessor[T] {
-	return &SelfSubscribingProcessor[T]{
-		Processor: processor,
-		gossipsub: gossipsub,
-		log:       log.WithField("topic", processor.Topic()),
-	}
-}
-
-// Subscribe handles subscription using the typed RegisterWithProcessor method.
-func (sp *SelfSubscribingProcessor[T]) Subscribe(ctx context.Context) error {
-	sp.mu.Lock()
-	defer sp.mu.Unlock()
-
-	if sp.subscription != nil && sp.subscription.IsStarted() {
-		return fmt.Errorf("already subscribed to topic %s", sp.Topic())
-	}
-
-	err := RegisterWithProcessor(sp.gossipsub, ctx, sp.Processor)
-	if err != nil {
-		return fmt.Errorf("failed to subscribe: %w", err)
-	}
-
-	// Note: RegisterWithProcessor doesn't return the subscription
-	// We would need to retrieve it from the gossipsub if needed
-	sp.log.Info("Subscribed to topic")
-
-	return nil
-}
-
-// Unsubscribe handles unsubscription.
-func (sp *SelfSubscribingProcessor[T]) Unsubscribe(ctx context.Context) error {
-	sp.mu.Lock()
-	defer sp.mu.Unlock()
-
-	if sp.subscription == nil {
-		return fmt.Errorf("not subscribed to topic %s", sp.Topic())
-	}
-
-	if err := sp.gossipsub.Unsubscribe(sp.Topic()); err != nil {
-		return fmt.Errorf("failed to unsubscribe: %w", err)
-	}
-
-	sp.subscription = nil
-	sp.log.Info("Unsubscribed from topic")
-
-	return nil
-}
-
-// IsSubscribed returns whether the processor is currently subscribed.
-func (sp *SelfSubscribingProcessor[T]) IsSubscribed() bool {
-	sp.mu.RLock()
-	defer sp.mu.RUnlock()
-
-	return sp.subscription != nil && sp.subscription.IsStarted()
-}
-
-// GetSubscription returns the current subscription.
-func (sp *SelfSubscribingProcessor[T]) GetSubscription() *ProcessorSubscription[T] {
-	sp.mu.RLock()
-	defer sp.mu.RUnlock()
-
-	return sp.subscription
-}
-
-// SelfSubscribingMultiProcessor wraps a multi-processor to provide working Subscribe/Unsubscribe methods.
-type SelfSubscribingMultiProcessor[T any] struct {
-	MultiProcessor[T] // Embed the multi-processor interface
-	gossipsub         *Gossipsub
-	name              string
-	activeSubnets     []uint64
-	mu                sync.RWMutex
-	log               logrus.FieldLogger
-}
-
-// NewSelfSubscribingMultiProcessor creates a multi-processor wrapper with working Subscribe/Unsubscribe methods.
-func NewSelfSubscribingMultiProcessor[T any](processor MultiProcessor[T], name string, gossipsub *Gossipsub, log logrus.FieldLogger) *SelfSubscribingMultiProcessor[T] {
-	return &SelfSubscribingMultiProcessor[T]{
-		MultiProcessor: processor,
-		gossipsub:      gossipsub,
-		name:           name,
-		log:            log.WithField("multi_processor", name),
-	}
-}
-
-// Subscribe handles subscription to specified subnets.
-func (smp *SelfSubscribingMultiProcessor[T]) Subscribe(ctx context.Context, subnets []uint64) error {
-	smp.mu.Lock()
-	defer smp.mu.Unlock()
-
-	// First, register if not already registered
-	if err := RegisterMultiProcessor(smp.gossipsub, smp.name, smp.MultiProcessor); err != nil {
-		// Ignore already registered error
-		if !IsAlreadyRegisteredError(err) {
-			return fmt.Errorf("failed to register multi-processor: %w", err)
-		}
-	}
-
-	// Subscribe to the new subnets
-	if err := SubscribeMultiWithProcessor(smp.gossipsub, ctx, smp.MultiProcessor); err != nil {
-		return fmt.Errorf("failed to subscribe to subnets: %w", err)
-	}
-
-	smp.activeSubnets = subnets
-	smp.log.WithField("subnets", subnets).Info("Subscribed to subnets")
-
-	return nil
-}
-
-// Unsubscribe handles unsubscription from specified subnets.
-func (smp *SelfSubscribingMultiProcessor[T]) Unsubscribe(ctx context.Context, subnets []uint64) error {
-	smp.mu.Lock()
-	defer smp.mu.Unlock()
-
-	// Create a set of current subnets
-	activeMap := make(map[uint64]bool)
-	for _, subnet := range smp.activeSubnets {
-		activeMap[subnet] = true
-	}
-
-	// Unsubscribe from each specified subnet
-	for _, subnet := range subnets {
-		if activeMap[subnet] {
-			// Get the topic for this subnet
-			topics := smp.AllPossibleTopics()
-			if subnet < uint64(len(topics)) {
-				if err := smp.gossipsub.Unsubscribe(topics[subnet]); err != nil {
-					smp.log.WithError(err).WithField("subnet", subnet).Error("Failed to unsubscribe from subnet")
-				}
-			}
-
-			delete(activeMap, subnet)
-		}
-	}
-
-	// Update active subnets
-	newSubnets := make([]uint64, 0, len(activeMap))
-	for subnet := range activeMap {
-		newSubnets = append(newSubnets, subnet)
-	}
-
-	smp.activeSubnets = newSubnets
-
-	smp.log.WithField("remaining_subnets", newSubnets).Info("Unsubscribed from subnets")
-
-	return nil
-}
-
-// GetActiveSubnets returns the currently active subnets.
-func (smp *SelfSubscribingMultiProcessor[T]) GetActiveSubnets() []uint64 {
-	smp.mu.RLock()
-	defer smp.mu.RUnlock()
-
-	return append([]uint64(nil), smp.activeSubnets...) // return copy
-}

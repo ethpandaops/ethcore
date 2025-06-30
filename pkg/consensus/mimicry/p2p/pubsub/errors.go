@@ -49,6 +49,23 @@ func (e *Error) Topic() string {
 	return e.topic
 }
 
+// IsAlreadyRegisteredError checks if an error is related to already registered processors.
+func IsAlreadyRegisteredError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	// Check if it's exactly the ErrAlreadyRegistered error
+	if errors.Is(err, ErrAlreadyRegistered) {
+		return true
+	}
+
+	// Check if the error message contains "already registered"
+	errorMsg := strings.ToLower(err.Error())
+	return strings.Contains(errorMsg, "already registered")
+}
+
+
 // Predefined error variables for common error conditions.
 var (
 	ErrNotStarted             = errors.New("pubsub not started")
@@ -64,12 +81,3 @@ var (
 	ErrContextCanceled        = errors.New("context canceled")
 	ErrAlreadyRegistered      = errors.New("already registered")
 )
-
-// IsAlreadyRegisteredError checks if the error indicates a processor is already registered.
-func IsAlreadyRegisteredError(err error) bool {
-	if err == nil {
-		return false
-	}
-	// Check if it's our error type and contains "already registered"
-	return strings.Contains(err.Error(), "already registered")
-}

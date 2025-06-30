@@ -450,14 +450,15 @@ func testBeaconBlockPropagation(t *testing.T) {
 		return nil
 	}
 
-	// Register beacon block processors on all nodes except the publisher BEFORE starting
+	// Create beacon block processors on all nodes except the publisher BEFORE starting
+	beaconBlockProcessors := make([]*eth.DefaultBeaconBlockProcessor, 0, len(network.ethWrappers)-1)
 	for i := 1; i < len(network.ethWrappers); i++ {
-		err := network.ethWrappers[i].RegisterBeaconBlock(
+		processor := network.ethWrappers[i].CreateBeaconBlockProcessor(
 			nil, // No validator
 			handler,
 			nil, // Default score params
 		)
-		require.NoError(t, err)
+		beaconBlockProcessors = append(beaconBlockProcessors, processor)
 	}
 
 	// Now start all gossipsub services
@@ -470,8 +471,8 @@ func testBeaconBlockPropagation(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	// Subscribe to beacon blocks
-	for i := 1; i < len(network.ethWrappers); i++ {
-		err := network.ethWrappers[i].SubscribeBeaconBlock(ctx)
+	for i, processor := range beaconBlockProcessors {
+		err := network.ethWrappers[i+1].SubscribeBeaconBlock(ctx, processor)
 		require.NoError(t, err)
 	}
 
@@ -531,14 +532,15 @@ func testAttestationPropagation(t *testing.T) {
 		return nil
 	}
 
-	// Register attestation processors BEFORE starting services
+	// Create attestation processors BEFORE starting services
+	attestationProcessors := make([]eth.AttestationProcessor, 0, len(network.ethWrappers)-1)
 	for i := 1; i < len(network.ethWrappers); i++ {
-		err := network.ethWrappers[i].RegisterAttestation(
+		processor := network.ethWrappers[i].CreateAttestationProcessor(
 			[]uint64{testSubnet},
 			nil, // No validator
 			handler,
 		)
-		require.NoError(t, err)
+		attestationProcessors = append(attestationProcessors, processor)
 	}
 
 	// Now start all gossipsub services
@@ -551,9 +553,8 @@ func testAttestationPropagation(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	// Subscribe to attestations
-	subnetName := fmt.Sprintf("attestation_subnets_%v", []uint64{testSubnet})
-	for i := 1; i < len(network.ethWrappers); i++ {
-		err := network.ethWrappers[i].SubscribeAttestation(ctx, subnetName)
+	for i, processor := range attestationProcessors {
+		err := network.ethWrappers[i+1].SubscribeAttestation(ctx, processor)
 		require.NoError(t, err)
 	}
 
@@ -625,30 +626,33 @@ func testMultipleTopicHandling(t *testing.T) {
 		return nil
 	}
 
-	// Register all processors BEFORE starting services
+	// Create all processors BEFORE starting services
+	multiBeaconBlockProcessors := make([]*eth.DefaultBeaconBlockProcessor, 0, len(network.ethWrappers)-1)
+	multiAttestationProcessors := make([]eth.AttestationProcessor, 0, len(network.ethWrappers)-1)
+	multiVoluntaryExitProcessors := make([]*eth.DefaultVoluntaryExitProcessor, 0, len(network.ethWrappers)-1)
 	for i := 1; i < len(network.ethWrappers); i++ {
-		// Register beacon block processor
-		err := network.ethWrappers[i].RegisterBeaconBlock(
+		// Create beacon block processor
+		beaconProcessor := network.ethWrappers[i].CreateBeaconBlockProcessor(
 			nil, // No validator
 			beaconBlockHandler,
 			nil, // Default score params
 		)
-		require.NoError(t, err)
+		multiBeaconBlockProcessors = append(multiBeaconBlockProcessors, beaconProcessor)
 
-		// Register attestation processor
-		err = network.ethWrappers[i].RegisterAttestation(
+		// Create attestation processor
+		attProcessor := network.ethWrappers[i].CreateAttestationProcessor(
 			[]uint64{0},
 			nil, // No validator
 			attestationHandler,
 		)
-		require.NoError(t, err)
+		multiAttestationProcessors = append(multiAttestationProcessors, attProcessor)
 
-		// Register voluntary exit processor
-		err = network.ethWrappers[i].RegisterVoluntaryExit(
+		// Create voluntary exit processor
+		exitProcessor := network.ethWrappers[i].CreateVoluntaryExitProcessor(
 			nil, // No validator
 			voluntaryExitHandler,
 		)
-		require.NoError(t, err)
+		multiVoluntaryExitProcessors = append(multiVoluntaryExitProcessors, exitProcessor)
 	}
 
 	// Now start all gossipsub services
@@ -661,15 +665,14 @@ func testMultipleTopicHandling(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	// Subscribe to all topics
-	for i := 1; i < len(network.ethWrappers); i++ {
-		err := network.ethWrappers[i].SubscribeBeaconBlock(ctx)
+	for i := 0; i < len(multiBeaconBlockProcessors); i++ {
+		err := network.ethWrappers[i+1].SubscribeBeaconBlock(ctx, multiBeaconBlockProcessors[i])
 		require.NoError(t, err)
 
-		subnetName := fmt.Sprintf("attestation_subnets_%v", []uint64{0})
-		err = network.ethWrappers[i].SubscribeAttestation(ctx, subnetName)
+		err = network.ethWrappers[i+1].SubscribeAttestation(ctx, multiAttestationProcessors[i])
 		require.NoError(t, err)
 
-		err = network.ethWrappers[i].SubscribeVoluntaryExit(ctx)
+		err = network.ethWrappers[i+1].SubscribeVoluntaryExit(ctx, multiVoluntaryExitProcessors[i])
 		require.NoError(t, err)
 	}
 
@@ -805,9 +808,10 @@ func testMessageValidation(t *testing.T) {
 		return nil
 	}
 
-	// Register processors with validators BEFORE starting services
+	// Create processors with validators BEFORE starting services
+	validationBeaconBlockProcessors := make([]*eth.DefaultBeaconBlockProcessor, 0, len(network.ethWrappers)-1)
 	for i := 1; i < len(network.ethWrappers); i++ {
-		// Register with validator
+		// Create validator function
 		validatorFunc := func(ctx context.Context, block *pb.SignedBeaconBlock) (pubsub.ValidationResult, error) {
 			if err := validator(block); err != nil {
 				return pubsub.ValidationReject, err
@@ -816,12 +820,12 @@ func testMessageValidation(t *testing.T) {
 			return pubsub.ValidationAccept, nil
 		}
 
-		err := network.ethWrappers[i].RegisterBeaconBlock(
+		processor := network.ethWrappers[i].CreateBeaconBlockProcessor(
 			validatorFunc,
 			handler,
 			nil, // Default score params
 		)
-		require.NoError(t, err)
+		validationBeaconBlockProcessors = append(validationBeaconBlockProcessors, processor)
 	}
 
 	// Now start all gossipsub services
@@ -834,8 +838,8 @@ func testMessageValidation(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	// Subscribe to beacon blocks
-	for i := 1; i < len(network.ethWrappers); i++ {
-		err := network.ethWrappers[i].SubscribeBeaconBlock(ctx)
+	for i, processor := range validationBeaconBlockProcessors {
+		err := network.ethWrappers[i+1].SubscribeBeaconBlock(ctx, processor)
 		require.NoError(t, err)
 	}
 

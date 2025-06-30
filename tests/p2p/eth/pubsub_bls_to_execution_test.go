@@ -21,7 +21,7 @@ func TestBlsToExecutionProcessor(t *testing.T) {
 	logger := logrus.New()
 
 	t.Run("Topic", func(t *testing.T) {
-		processor := &eth.BlsToExecutionProcessor{
+		processor := &eth.DefaultBlsToExecutionProcessor{
 			ForkDigest: forkDigest,
 		}
 		
@@ -30,7 +30,7 @@ func TestBlsToExecutionProcessor(t *testing.T) {
 	})
 
 	t.Run("AllPossibleTopics", func(t *testing.T) {
-		processor := &eth.BlsToExecutionProcessor{
+		processor := &eth.DefaultBlsToExecutionProcessor{
 			ForkDigest: forkDigest,
 		}
 		
@@ -39,69 +39,58 @@ func TestBlsToExecutionProcessor(t *testing.T) {
 		assert.Equal(t, processor.Topic(), topics[0])
 	})
 
-	t.Run("Subscribe", func(t *testing.T) {
-		// Test with nil gossipsub
-		processor := &eth.BlsToExecutionProcessor{
+	t.Run("Interface", func(t *testing.T) {
+		// Test that the processor can be used with pubsub.SubscribeWithProcessor
+		processor := &eth.DefaultBlsToExecutionProcessor{
 			ForkDigest: forkDigest,
 		}
 		
-		err := processor.Subscribe(context.Background())
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "gossipsub reference not set")
-
-		// Test with mock gossipsub
-		mockGossipsub := &mockGossipsub{
-			subscribedTopics: make(map[string]bool),
-		}
-		
-		processor.Gossipsub = mockGossipsub
-		err = processor.Subscribe(context.Background())
-		assert.NoError(t, err)
-		assert.True(t, mockGossipsub.subscribedTopics[processor.Topic()])
+		// Just verify the processor implements the required interface
+		var _ eth.BlsToExecutionProcessor = processor
 	})
 
-	t.Run("Unsubscribe", func(t *testing.T) {
-		// Test with nil gossipsub
-		processor := &eth.BlsToExecutionProcessor{
+	t.Run("InterfaceCompliance", func(t *testing.T) {
+		// Test that the processor follows the new interface pattern
+		processor := &eth.DefaultBlsToExecutionProcessor{
 			ForkDigest: forkDigest,
 		}
 		
-		err := processor.Unsubscribe(context.Background())
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "gossipsub reference not set")
-
-		// Test with mock gossipsub
-		mockGossipsub := &mockGossipsub{
-			subscribedTopics: map[string]bool{
-				processor.Topic(): true,
-			},
-		}
-		
-		processor.Gossipsub = mockGossipsub
-		err = processor.Unsubscribe(context.Background())
-		assert.NoError(t, err)
-		assert.False(t, mockGossipsub.subscribedTopics[processor.Topic()])
+		// Verify the processor implements the required interface
+		var _ eth.BlsToExecutionProcessor = processor
+		var _ pubsub.Processor[*pb.SignedBLSToExecutionChange] = processor
 	})
 
 	t.Run("Decode", func(t *testing.T) {
-		processor := &eth.BlsToExecutionProcessor{
+		processor := &eth.DefaultBlsToExecutionProcessor{
 			ForkDigest: forkDigest,
 			Encoder:    encoder,
 		}
 
 		// Create test data
+		testBlsPubkey := make([]byte, 48) // BLS public key is 48 bytes
+		for i := range testBlsPubkey {
+			testBlsPubkey[i] = byte(i % 256)
+		}
+		testSignature := make([]byte, 96) // BLS signature is 96 bytes
+		for i := range testSignature {
+			testSignature[i] = byte((i + 48) % 256)
+		}
+		testExecAddress := make([]byte, 20) // Execution address is 20 bytes
+		for i := range testExecAddress {
+			testExecAddress[i] = byte((i + 96) % 256)
+		}
 		change := &pb.SignedBLSToExecutionChange{
 			Message: &pb.BLSToExecutionChange{
 				ValidatorIndex:     12345,
-				FromBlsPubkey:      []byte("test-bls-pubkey"),
-				ToExecutionAddress: []byte("test-exec-address"),
+				FromBlsPubkey:      testBlsPubkey,
+				ToExecutionAddress: testExecAddress,
 			},
-			Signature: []byte("test-signature"),
+			Signature: testSignature,
 		}
 
 		// Encode
 		var buf bytes.Buffer
-		_, err = encoder.EncodeGossip(&buf, change)
+		_, err := encoder.EncodeGossip(&buf, change)
 		require.NoError(t, err)
 		encoded := buf.Bytes()
 
@@ -126,7 +115,7 @@ func TestBlsToExecutionProcessor(t *testing.T) {
 		}
 
 		// Test without validator
-		processor := &eth.BlsToExecutionProcessor{
+		processor := &eth.DefaultBlsToExecutionProcessor{
 			ForkDigest: forkDigest,
 			Encoder:    encoder,
 		}
@@ -163,7 +152,7 @@ func TestBlsToExecutionProcessor(t *testing.T) {
 		}
 
 		// Test without handler
-		processor := &eth.BlsToExecutionProcessor{
+		processor := &eth.DefaultBlsToExecutionProcessor{
 			ForkDigest: forkDigest,
 			Encoder:    encoder,
 			Log:        logger,
@@ -191,7 +180,7 @@ func TestBlsToExecutionProcessor(t *testing.T) {
 	})
 
 	t.Run("GetTopicScoreParams", func(t *testing.T) {
-		processor := &eth.BlsToExecutionProcessor{
+		processor := &eth.DefaultBlsToExecutionProcessor{
 			ForkDigest: forkDigest,
 		}
 		

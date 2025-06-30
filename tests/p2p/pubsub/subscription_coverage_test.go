@@ -167,9 +167,10 @@ func TestGossipsubAdditionalCoverage(t *testing.T) {
 		err = gs.Stop()
 		assert.NoError(t, err)
 
-		// Stop again - should handle gracefully
+		// Stop again - should return error since not started
 		err = gs.Stop()
-		assert.NoError(t, err)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "not started")
 	})
 
 	t.Run("Gossipsub_StartAlreadyStarted", func(t *testing.T) {

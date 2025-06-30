@@ -104,11 +104,16 @@ func TestGossipsub_ProcessorRegistration(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { _ = g.Stop() }()
 
-	// Cannot register processors after start
+	// Can register new processors after start
 	newProcessor := newMockProcessor("new_topic")
 	err = ethpubsub.RegisterProcessor(g, newProcessor)
+	assert.NoError(t, err)
+	
+	// But cannot register same topic again
+	duplicateProcessor := newMockProcessor("test_topic")
+	err = ethpubsub.RegisterProcessor(g, duplicateProcessor)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "cannot register processors after gossipsub has started")
+	assert.Contains(t, err.Error(), "already registered")
 }
 
 func TestGossipsub_SubscriptionWithProcessor(t *testing.T) {
@@ -222,25 +227,12 @@ func TestGossipsub_GetStats(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { _ = g.Stop() }()
 
-	// Subscribe to a topic
+	// Subscribe to a topic (this should work after start)
 	processor := newMockProcessor("test_topic")
-	err = ethpubsub.RegisterProcessor(g, processor) // This will fail after start
-	assert.Error(t, err)
-
-	// Create a new instance for proper testing
-	g2 := createTestGossipsub(t, h)
-	processor2 := newMockProcessor("test_topic")
-	err = ethpubsub.RegisterProcessor(g2, processor2)
+	err = ethpubsub.RegisterWithProcessor(g, ctx, processor)
 	require.NoError(t, err)
 
-	err = g2.Start(ctx)
-	require.NoError(t, err)
-	defer func() { _ = g2.Stop() }()
-
-	err = ethpubsub.RegisterWithProcessor(g2, ctx, processor2)
-	require.NoError(t, err)
-
-	stats = g2.GetStats()
+	stats = g.GetStats()
 	assert.Equal(t, 1, stats.ActiveSubscriptions)
 	assert.GreaterOrEqual(t, stats.ConnectedPeers, 0)
 	assert.GreaterOrEqual(t, stats.TopicCount, 1)
@@ -263,10 +255,12 @@ func TestGossipsub_ProcessorSubscriptionMethods(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { _ = g.Stop() }()
 
-	// Test SubscribeToProcessorTopic - should return error as processor interface check fails
+	// Test SubscribeToProcessorTopic - should succeed with registered processor
 	err = g.SubscribeToProcessorTopic(ctx, "test_topic")
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "direct processor subscription not supported")
+	assert.NoError(t, err)
+	
+	// Verify subscription is active
+	assert.True(t, g.IsSubscribed("test_topic"))
 
 	// Test with unregistered topic
 	err = g.SubscribeToProcessorTopic(ctx, "unknown_topic")

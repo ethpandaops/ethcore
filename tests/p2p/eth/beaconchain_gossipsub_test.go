@@ -87,10 +87,49 @@ func TestBeaconchainGossipsub_RegisterAndSubscribe(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 
 		// Publish the block
+		testSignature := make([]byte, 96) // BLS signature is 96 bytes
+		for i := range testSignature {
+			testSignature[i] = byte(i % 256)
+		}
+		testParentRoot := make([]byte, 32) // Hash is 32 bytes
+		for i := range testParentRoot {
+			testParentRoot[i] = byte((i + 100) % 256)
+		}
+		testStateRoot := make([]byte, 32) // Hash is 32 bytes
+		for i := range testStateRoot {
+			testStateRoot[i] = byte((i + 230) % 256)
+		}
+		testRandaoReveal := make([]byte, 96) // BLS signature is 96 bytes
+		for i := range testRandaoReveal {
+			testRandaoReveal[i] = byte((i + 240) % 256)
+		}
+		testDepositRoot := make([]byte, 32) // Hash is 32 bytes
+		for i := range testDepositRoot {
+			testDepositRoot[i] = byte((i + 250) % 256)
+		}
+		testBlockHash := make([]byte, 32) // Hash is 32 bytes
+		for i := range testBlockHash {
+			testBlockHash[i] = byte((i + 260) % 256)
+		}
+		testGraffiti := make([]byte, 32) // Graffiti is 32 bytes
+		for i := range testGraffiti {
+			testGraffiti[i] = byte((i + 270) % 256)
+		}
 		testBlock := &pb.SignedBeaconBlock{
 			Block: &pb.BeaconBlock{
-				Slot: 12345,
+				Slot:       12345,
+				ParentRoot: testParentRoot,
+				StateRoot:  testStateRoot,
+				Body: &pb.BeaconBlockBody{
+					RandaoReveal: testRandaoReveal,
+					Eth1Data: &pb.Eth1Data{
+						DepositRoot: testDepositRoot,
+						BlockHash:   testBlockHash,
+					},
+					Graffiti: testGraffiti,
+				},
 			},
+			Signature: testSignature,
 		}
 
 		topic := eth.BeaconBlockTopic(forkDigest)
@@ -140,10 +179,30 @@ func TestBeaconchainGossipsub_RegisterAndSubscribe(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 
 		// Publish attestation
+		testAttBeaconBlockRoot := make([]byte, 32) // Hash is 32 bytes
+		for i := range testAttBeaconBlockRoot {
+			testAttBeaconBlockRoot[i] = byte((i + 150) % 256)
+		}
+		testAttSignature := make([]byte, 96) // BLS signature is 96 bytes
+		for i := range testAttSignature {
+			testAttSignature[i] = byte((i + 160) % 256)
+		}
+		testAttRoot := make([]byte, 32) // Hash is 32 bytes
+		for i := range testAttRoot {
+			testAttRoot[i] = byte((i + 170) % 256)
+		}
 		testAtt := &pb.Attestation{
 			Data: &pb.AttestationData{
-				Slot: 54321,
+				Slot:            54321,
+				BeaconBlockRoot: testAttBeaconBlockRoot,
+				Source: &pb.Checkpoint{
+					Root: testAttRoot,
+				},
+				Target: &pb.Checkpoint{
+					Root: testAttRoot,
+				},
 			},
+			Signature: testAttSignature,
 		}
 
 		topic := eth.AttestationSubnetTopic(forkDigest, 10)
@@ -191,13 +250,38 @@ func TestBeaconchainGossipsub_RegisterAndSubscribe(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 
 		// Publish aggregate
+		testSelectionProof := make([]byte, 96) // BLS signature is 96 bytes
+		for i := range testSelectionProof {
+			testSelectionProof[i] = byte((i + 10) % 256)
+		}
+		testAggregateSignature := make([]byte, 96) // BLS signature is 96 bytes  
+		for i := range testAggregateSignature {
+			testAggregateSignature[i] = byte((i + 20) % 256)
+		}
+		testBeaconBlockRoot := make([]byte, 32) // Hash is 32 bytes
+		for i := range testBeaconBlockRoot {
+			testBeaconBlockRoot[i] = byte((i + 30) % 256)
+		}
+		testAggRoot := make([]byte, 32) // Hash is 32 bytes
+		for i := range testAggRoot {
+			testAggRoot[i] = byte((i + 40) % 256)
+		}
 		testAgg := &pb.AggregateAttestationAndProof{
 			AggregatorIndex: 100,
 			Aggregate: &pb.Attestation{
 				Data: &pb.AttestationData{
-					Slot: 99999,
+					Slot:            99999,
+					BeaconBlockRoot: testBeaconBlockRoot,
+					Source: &pb.Checkpoint{
+						Root: testAggRoot,
+					},
+					Target: &pb.Checkpoint{
+						Root: testAggRoot,
+					},
 				},
+				Signature: testAggregateSignature,
 			},
+			SelectionProof: testSelectionProof,
 		}
 
 		topic := eth.BeaconAggregateAndProofTopic(forkDigest)
@@ -248,9 +332,18 @@ func TestBeaconchainGossipsub_RegisterAndSubscribe(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 
 		// Publish sync committee message
+		testBlockRoot := make([]byte, 32)
+		for i := range testBlockRoot {
+			testBlockRoot[i] = byte(i % 256)
+		}
+		testSyncSignature := make([]byte, 96) // BLS signature is 96 bytes
+		for i := range testSyncSignature {
+			testSyncSignature[i] = byte((i + 170) % 256)
+		}
 		testSync := &pb.SyncCommitteeMessage{
 			Slot:      777,
-			BlockRoot: []byte("test-block-root"),
+			BlockRoot: testBlockRoot, // 32 bytes for BlockRoot
+			Signature: testSyncSignature,
 		}
 
 		topic := eth.SyncCommitteeSubnetTopic(forkDigest, 5)
@@ -298,11 +391,16 @@ func TestBeaconchainGossipsub_RegisterAndSubscribe(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 
 		// Publish voluntary exit
+		testExitSignature := make([]byte, 96) // BLS signature is 96 bytes
+		for i := range testExitSignature {
+			testExitSignature[i] = byte((i + 40) % 256)
+		}
 		testExit := &pb.SignedVoluntaryExit{
 			Exit: &pb.VoluntaryExit{
 				Epoch:          111,
 				ValidatorIndex: 222,
 			},
+			Signature: testExitSignature,
 		}
 
 		topic := eth.VoluntaryExitTopic(forkDigest[:])
@@ -351,16 +449,56 @@ func TestBeaconchainGossipsub_RegisterAndSubscribe(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 
 		// Publish proposer slashing
+		testParentRoot1 := make([]byte, 32) // Hash is 32 bytes
+		for i := range testParentRoot1 {
+			testParentRoot1[i] = byte((i + 50) % 256)
+		}
+		testParentRoot2 := make([]byte, 32) // Hash is 32 bytes 
+		for i := range testParentRoot2 {
+			testParentRoot2[i] = byte((i + 60) % 256)
+		}
+		testSlashingSignature1 := make([]byte, 96) // BLS signature is 96 bytes
+		for i := range testSlashingSignature1 {
+			testSlashingSignature1[i] = byte((i + 70) % 256)
+		}
+		testSlashingSignature2 := make([]byte, 96) // BLS signature is 96 bytes
+		for i := range testSlashingSignature2 {
+			testSlashingSignature2[i] = byte((i + 80) % 256)
+		}
+		testStateRoot1 := make([]byte, 32) // Hash is 32 bytes
+		for i := range testStateRoot1 {
+			testStateRoot1[i] = byte((i + 90) % 256)
+		}
+		testStateRoot2 := make([]byte, 32) // Hash is 32 bytes
+		for i := range testStateRoot2 {
+			testStateRoot2[i] = byte((i + 100) % 256)
+		}
+		testBodyRoot1 := make([]byte, 32) // Hash is 32 bytes
+		for i := range testBodyRoot1 {
+			testBodyRoot1[i] = byte((i + 110) % 256)
+		}
+		testBodyRoot2 := make([]byte, 32) // Hash is 32 bytes
+		for i := range testBodyRoot2 {
+			testBodyRoot2[i] = byte((i + 120) % 256)
+		}
 		testSlashing := &pb.ProposerSlashing{
 			Header_1: &pb.SignedBeaconBlockHeader{
 				Header: &pb.BeaconBlockHeader{
-					Slot: 333,
+					Slot:       333,
+					ParentRoot: testParentRoot1,
+					StateRoot:  testStateRoot1,
+					BodyRoot:   testBodyRoot1,
 				},
+				Signature: testSlashingSignature1,
 			},
 			Header_2: &pb.SignedBeaconBlockHeader{
 				Header: &pb.BeaconBlockHeader{
-					Slot: 333,
+					Slot:       333,
+					ParentRoot: testParentRoot2,
+					StateRoot:  testStateRoot2,
+					BodyRoot:   testBodyRoot2,
 				},
+				Signature: testSlashingSignature2,
 			},
 		}
 
@@ -409,16 +547,56 @@ func TestBeaconchainGossipsub_RegisterAndSubscribe(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 
 		// Publish attester slashing
+		testBeaconBlockRoot1 := make([]byte, 32) // Hash is 32 bytes
+		for i := range testBeaconBlockRoot1 {
+			testBeaconBlockRoot1[i] = byte((i + 110) % 256)
+		}
+		testBeaconBlockRoot2 := make([]byte, 32) // Hash is 32 bytes
+		for i := range testBeaconBlockRoot2 {
+			testBeaconBlockRoot2[i] = byte((i + 120) % 256)
+		}
+		testIndexedSignature1 := make([]byte, 96) // BLS signature is 96 bytes
+		for i := range testIndexedSignature1 {
+			testIndexedSignature1[i] = byte((i + 130) % 256)
+		}
+		testIndexedSignature2 := make([]byte, 96) // BLS signature is 96 bytes
+		for i := range testIndexedSignature2 {
+			testIndexedSignature2[i] = byte((i + 140) % 256)
+		}
+		testAttesterRoot1 := make([]byte, 32) // Hash is 32 bytes
+		for i := range testAttesterRoot1 {
+			testAttesterRoot1[i] = byte((i + 150) % 256)
+		}
+		testAttesterRoot2 := make([]byte, 32) // Hash is 32 bytes
+		for i := range testAttesterRoot2 {
+			testAttesterRoot2[i] = byte((i + 160) % 256)
+		}
 		testSlashing := &pb.AttesterSlashing{
 			Attestation_1: &pb.IndexedAttestation{
 				Data: &pb.AttestationData{
-					Slot: 444,
+					Slot:            444,
+					BeaconBlockRoot: testBeaconBlockRoot1,
+					Source: &pb.Checkpoint{
+						Root: testAttesterRoot1,
+					},
+					Target: &pb.Checkpoint{
+						Root: testAttesterRoot1,
+					},
 				},
+				Signature: testIndexedSignature1,
 			},
 			Attestation_2: &pb.IndexedAttestation{
 				Data: &pb.AttestationData{
-					Slot: 445,
+					Slot:            445,
+					BeaconBlockRoot: testBeaconBlockRoot2,
+					Source: &pb.Checkpoint{
+						Root: testAttesterRoot2,
+					},
+					Target: &pb.Checkpoint{
+						Root: testAttesterRoot2,
+					},
 				},
+				Signature: testIndexedSignature2,
 			},
 		}
 
@@ -467,13 +645,38 @@ func TestBeaconchainGossipsub_RegisterAndSubscribe(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 
 		// Publish sync contribution
+		testContribBlockRoot := make([]byte, 32) // Hash is 32 bytes
+		for i := range testContribBlockRoot {
+			testContribBlockRoot[i] = byte((i + 180) % 256)
+		}
+		testContribSelectionProof := make([]byte, 96) // BLS signature is 96 bytes
+		for i := range testContribSelectionProof {
+			testContribSelectionProof[i] = byte((i + 190) % 256)
+		}
+		testContribSignature := make([]byte, 96) // BLS signature is 96 bytes
+		for i := range testContribSignature {
+			testContribSignature[i] = byte((i + 200) % 256)
+		}
+		testContribAggBits := make([]byte, 16) // Aggregation bits are 16 bytes
+		for i := range testContribAggBits {
+			testContribAggBits[i] = byte((i + 210) % 256)
+		}
+		testContribSyncSig := make([]byte, 96) // BLS signature is 96 bytes
+		for i := range testContribSyncSig {
+			testContribSyncSig[i] = byte((i + 220) % 256)
+		}
 		testContrib := &pb.SignedContributionAndProof{
 			Message: &pb.ContributionAndProof{
 				AggregatorIndex: 555,
 				Contribution: &pb.SyncCommitteeContribution{
-					Slot: 666,
+					Slot:            666,
+					BlockRoot:       testContribBlockRoot,
+					AggregationBits: testContribAggBits,
+					Signature:       testContribSyncSig,
 				},
+				SelectionProof: testContribSelectionProof,
 			},
+			Signature: testContribSignature,
 		}
 
 		topic := eth.SyncContributionAndProofTopic(forkDigest)
@@ -522,12 +725,25 @@ func TestBeaconchainGossipsub_RegisterAndSubscribe(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 
 		// Publish BLS to execution change
+		testBlsChangeBlsPubkey := make([]byte, 48) // BLS public key is 48 bytes
+		for i := range testBlsChangeBlsPubkey {
+			testBlsChangeBlsPubkey[i] = byte((i + 280) % 256)
+		}
+		testBlsChangeSignature := make([]byte, 96) // BLS signature is 96 bytes
+		for i := range testBlsChangeSignature {
+			testBlsChangeSignature[i] = byte((i + 290) % 256)
+		}
+		testBlsChangeExecAddress := make([]byte, 20) // Execution address is 20 bytes
+		for i := range testBlsChangeExecAddress {
+			testBlsChangeExecAddress[i] = byte((i + 300) % 256)
+		}
 		testChange := &pb.SignedBLSToExecutionChange{
 			Message: &pb.BLSToExecutionChange{
 				ValidatorIndex:     777,
-				FromBlsPubkey:      []byte("test-bls-pubkey"),
-				ToExecutionAddress: []byte("test-exec-address"),
+				FromBlsPubkey:      testBlsChangeBlsPubkey,
+				ToExecutionAddress: testBlsChangeExecAddress,
 			},
+			Signature: testBlsChangeSignature,
 		}
 
 		topic := eth.BlsToExecutionChangeTopic(forkDigest)

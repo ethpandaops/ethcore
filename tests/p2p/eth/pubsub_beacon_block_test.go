@@ -20,7 +20,7 @@ import (
 
 func TestBeaconBlockProcessorTopic(t *testing.T) {
 	forkDigest := [4]byte{0x01, 0x02, 0x03, 0x04}
-	processor := &eth.BeaconBlockProcessor{
+	processor := &eth.DefaultBeaconBlockProcessor{
 		ForkDigest: forkDigest,
 	}
 
@@ -30,7 +30,7 @@ func TestBeaconBlockProcessorTopic(t *testing.T) {
 
 func TestBeaconBlockProcessorAllPossibleTopics(t *testing.T) {
 	forkDigest := [4]byte{0x01, 0x02, 0x03, 0x04}
-	processor := &eth.BeaconBlockProcessor{
+	processor := &eth.DefaultBeaconBlockProcessor{
 		ForkDigest: forkDigest,
 	}
 
@@ -63,7 +63,7 @@ func TestBeaconBlockProcessorGetTopicScoreParams(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			processor := &eth.BeaconBlockProcessor{
+			processor := &eth.DefaultBeaconBlockProcessor{
 				ScoreParams: tt.ScoreParams,
 			}
 			assert.Equal(t, tt.expected, processor.GetTopicScoreParams())
@@ -72,7 +72,7 @@ func TestBeaconBlockProcessorGetTopicScoreParams(t *testing.T) {
 }
 
 func TestBeaconBlockProcessorDecode(t *testing.T) {
-	processor := &eth.BeaconBlockProcessor{
+	processor := &eth.DefaultBeaconBlockProcessor{
 		Encoder: encoder.SszNetworkEncoder{},
 		Log:     logrus.New(),
 	}
@@ -161,7 +161,7 @@ func TestBeaconBlockProcessorValidate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			processor := &eth.BeaconBlockProcessor{
+			processor := &eth.DefaultBeaconBlockProcessor{
 				Validator: tt.setupValidator(),
 				Log:       logrus.New(),
 			}
@@ -230,7 +230,7 @@ func TestBeaconBlockProcessorProcess(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			processor := &eth.BeaconBlockProcessor{
+			processor := &eth.DefaultBeaconBlockProcessor{
 				Handler: tt.setupHandler(),
 				Log:     logrus.New(),
 			}
@@ -265,26 +265,10 @@ func TestBeaconBlockProcessorProcess(t *testing.T) {
 	}
 }
 
-func TestBeaconBlockProcessorSubscribeUnsubscribe(t *testing.T) {
-	mockGS := &pubsub.Gossipsub{}
-	processor := &eth.BeaconBlockProcessor{
-		Gossipsub:  mockGS,
-		ForkDigest: [4]byte{0x01, 0x02, 0x03, 0x04},
-		Log:        logrus.New(),
-	}
-
-	// Subscribe should return error due to circular dependency
-	err := processor.Subscribe(context.Background())
-	assert.Error(t, err)
-
-	// Unsubscribe should also return error
-	err = processor.Unsubscribe(context.Background())
-	assert.Error(t, err)
-}
 
 func TestBeaconBlockProcessorWithNilFields(t *testing.T) {
 	// Test that the processor handles nil fields gracefully
-	processor := &eth.BeaconBlockProcessor{
+	processor := &eth.DefaultBeaconBlockProcessor{
 		Encoder: encoder.SszNetworkEncoder{},
 		Log:     logrus.New(),
 		Handler: func(ctx context.Context, block *pb.SignedBeaconBlock, from peer.ID) error {
@@ -318,18 +302,3 @@ func TestBeaconBlockProcessorWithNilFields(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestBeaconBlockProcessorNilGossipsub(t *testing.T) {
-	processor := &eth.BeaconBlockProcessor{
-		Gossipsub: nil,
-		Log:       logrus.New(),
-	}
-
-	// Should handle nil gossipsub gracefully
-	err := processor.Subscribe(context.Background())
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "gossipsub reference not set")
-
-	err = processor.Unsubscribe(context.Background())
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "gossipsub reference not set")
-}

@@ -20,7 +20,7 @@ import (
 
 func TestAggregateProcessorTopic(t *testing.T) {
 	forkDigest := [4]byte{0x01, 0x02, 0x03, 0x04}
-	processor := &eth.AggregateProcessor{
+	processor := &eth.DefaultAggregateProcessor{
 		ForkDigest: forkDigest,
 	}
 
@@ -30,7 +30,7 @@ func TestAggregateProcessorTopic(t *testing.T) {
 
 func TestAggregateProcessorAllPossibleTopics(t *testing.T) {
 	forkDigest := [4]byte{0x01, 0x02, 0x03, 0x04}
-	processor := &eth.AggregateProcessor{
+	processor := &eth.DefaultAggregateProcessor{
 		ForkDigest: forkDigest,
 	}
 
@@ -40,13 +40,13 @@ func TestAggregateProcessorAllPossibleTopics(t *testing.T) {
 }
 
 func TestAggregateProcessorGetTopicScoreParams(t *testing.T) {
-	processor := &eth.AggregateProcessor{}
+	processor := &eth.DefaultAggregateProcessor{}
 	// eth.AggregateProcessor always returns nil for score params
 	assert.Nil(t, processor.GetTopicScoreParams())
 }
 
 func TestAggregateProcessorDecode(t *testing.T) {
-	processor := &eth.AggregateProcessor{
+	processor := &eth.DefaultAggregateProcessor{
 		Encoder: encoder.SszNetworkEncoder{},
 		Log:     logrus.New(),
 	}
@@ -141,7 +141,7 @@ func TestAggregateProcessorValidate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			processor := &eth.AggregateProcessor{
+			processor := &eth.DefaultAggregateProcessor{
 				Validator: tt.setupValidator(),
 				Log:       logrus.New(),
 			}
@@ -213,7 +213,7 @@ func TestAggregateProcessorProcess(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			processor := &eth.AggregateProcessor{
+			processor := &eth.DefaultAggregateProcessor{
 				Handler: tt.setupHandler(),
 				Log:     logrus.New(),
 			}
@@ -251,36 +251,10 @@ func TestAggregateProcessorProcess(t *testing.T) {
 	}
 }
 
-func TestAggregateProcessorSubscribeUnsubscribe(t *testing.T) {
-	mockGS := &pubsub.Gossipsub{}
-	processor := &eth.AggregateProcessor{
-		Gossipsub:  mockGS,
-		ForkDigest: [4]byte{0x01, 0x02, 0x03, 0x04},
-		Log:        logrus.New(),
-	}
-
-	// Subscribe should return error due to gossipsub.SubscribeToProcessorTopic not implemented
-	err := processor.Subscribe(context.Background())
-	assert.Error(t, err)
-
-	// Unsubscribe should also return error
-	err = processor.Unsubscribe(context.Background())
-	assert.Error(t, err)
-
-	// Test with nil gossipsub
-	processor.Gossipsub = nil
-	err = processor.Subscribe(context.Background())
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "gossipsub reference not set")
-
-	err = processor.Unsubscribe(context.Background())
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "gossipsub reference not set")
-}
 
 func TestAggregateProcessorWithNilFields(t *testing.T) {
 	// Test that the processor handles nil fields gracefully
-	processor := &eth.AggregateProcessor{
+	processor := &eth.DefaultAggregateProcessor{
 		Encoder: encoder.SszNetworkEncoder{},
 		Log:     logrus.New(),
 		Handler: func(ctx context.Context, agg *pb.AggregateAttestationAndProof, from peer.ID) error {

@@ -47,16 +47,39 @@ func TestSyncContributionProcessor(t *testing.T) {
 		}
 
 		// Create test data
+		testBlockRoot := make([]byte, 32) // BlockRoot is 32 bytes
+		for i := range testBlockRoot {
+			testBlockRoot[i] = byte(i % 256)
+		}
+		testSignature := make([]byte, 96) // BLS signature is 96 bytes
+		for i := range testSignature {
+			testSignature[i] = byte((i + 32) % 256)
+		}
+		testAggregationBits := make([]byte, 16) // Aggregation bits are 16 bytes  
+		for i := range testAggregationBits {
+			testAggregationBits[i] = byte((i + 64) % 256)
+		}
+		testSyncSignature := make([]byte, 96) // BLS signature is 96 bytes
+		for i := range testSyncSignature {
+			testSyncSignature[i] = byte((i + 80) % 256)
+		}
+		testSelectionProof := make([]byte, 96) // BLS signature is 96 bytes
+		for i := range testSelectionProof {
+			testSelectionProof[i] = byte((i + 96) % 256)
+		}
 		contrib := &pb.SignedContributionAndProof{
 			Message: &pb.ContributionAndProof{
 				AggregatorIndex: 100,
 				Contribution: &pb.SyncCommitteeContribution{
-					Slot:            12345,
-					BlockRoot:       []byte("test-block-root"),
+					Slot:              12345,
+					BlockRoot:         testBlockRoot,
 					SubcommitteeIndex: 3,
+					AggregationBits:   testAggregationBits,
+					Signature:         testSyncSignature,
 				},
+				SelectionProof: testSelectionProof,
 			},
-			Signature: []byte("test-signature"),
+			Signature: testSignature,
 		}
 
 		// Encode

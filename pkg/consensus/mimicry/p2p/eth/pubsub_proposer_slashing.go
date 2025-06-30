@@ -16,41 +16,30 @@ func ProposerSlashingTopic(forkDigest []byte) string {
 	return fmt.Sprintf(GossipsubTopicFormat, forkDigest, "proposer_slashing")
 }
 
-// proposerSlashingProcessor handles proposer slashing messages.
-type ProposerSlashingProcessor struct {
+// ProposerSlashingProcessor defines the interface for processing proposer slashing messages.
+type ProposerSlashingProcessor interface {
+	pubsub.Processor[*pb.ProposerSlashing]
+}
+
+// DefaultProposerSlashingProcessor handles proposer slashing messages.
+type DefaultProposerSlashingProcessor struct {
 	ForkDigest [4]byte
 	Encoder    encoder.SszNetworkEncoder
 	Handler    func(context.Context, *pb.ProposerSlashing, peer.ID) error
 	Validator  func(context.Context, *pb.ProposerSlashing) (pubsub.ValidationResult, error)
-	Gossipsub  *pubsub.Gossipsub
 	Log        logrus.FieldLogger
 }
 
-func (p *ProposerSlashingProcessor) Topic() string {
+func (p *DefaultProposerSlashingProcessor) Topic() string {
 	return ProposerSlashingTopic(p.ForkDigest[:])
 }
 
-func (p *ProposerSlashingProcessor) AllPossibleTopics() []string {
+func (p *DefaultProposerSlashingProcessor) AllPossibleTopics() []string {
 	return []string{p.Topic()}
 }
 
-func (p *ProposerSlashingProcessor) Subscribe(ctx context.Context) error {
-	if p.Gossipsub == nil {
-		return fmt.Errorf("gossipsub reference not set")
-	}
 
-	return p.Gossipsub.SubscribeToProcessorTopic(ctx, p.Topic())
-}
-
-func (p *ProposerSlashingProcessor) Unsubscribe(ctx context.Context) error {
-	if p.Gossipsub == nil {
-		return fmt.Errorf("gossipsub reference not set")
-	}
-
-	return p.Gossipsub.Unsubscribe(p.Topic())
-}
-
-func (p *ProposerSlashingProcessor) Decode(ctx context.Context, data []byte) (*pb.ProposerSlashing, error) {
+func (p *DefaultProposerSlashingProcessor) Decode(ctx context.Context, data []byte) (*pb.ProposerSlashing, error) {
 	slashing := &pb.ProposerSlashing{}
 	if err := p.Encoder.DecodeGossip(data, slashing); err != nil {
 		return nil, fmt.Errorf("failed to decode proposer slashing: %w", err)
@@ -59,7 +48,7 @@ func (p *ProposerSlashingProcessor) Decode(ctx context.Context, data []byte) (*p
 	return slashing, nil
 }
 
-func (p *ProposerSlashingProcessor) Validate(ctx context.Context, slashing *pb.ProposerSlashing, from string) (pubsub.ValidationResult, error) {
+func (p *DefaultProposerSlashingProcessor) Validate(ctx context.Context, slashing *pb.ProposerSlashing, from string) (pubsub.ValidationResult, error) {
 	// Defer all validation to external Validator function
 	if p.Validator != nil {
 		return p.Validator(ctx, slashing)
@@ -69,7 +58,7 @@ func (p *ProposerSlashingProcessor) Validate(ctx context.Context, slashing *pb.P
 	return pubsub.ValidationAccept, nil
 }
 
-func (p *ProposerSlashingProcessor) Process(ctx context.Context, slashing *pb.ProposerSlashing, from string) error {
+func (p *DefaultProposerSlashingProcessor) Process(ctx context.Context, slashing *pb.ProposerSlashing, from string) error {
 	if p.Handler == nil {
 		p.Log.Debug("No handler provided, proposer slashing received but not processed")
 
@@ -84,11 +73,11 @@ func (p *ProposerSlashingProcessor) Process(ctx context.Context, slashing *pb.Pr
 	return p.Handler(ctx, slashing, peerID)
 }
 
-func (p *ProposerSlashingProcessor) GetTopicScoreParams() *pubsub.TopicScoreParams {
+func (p *DefaultProposerSlashingProcessor) GetTopicScoreParams() *pubsub.TopicScoreParams {
 	// Return nil to use default/no scoring for now
 	// Users can override this by providing their own processor implementation
 	return nil
 }
 
-// Compile-time check that proposerSlashingProcessor implements pubsub.Processor.
-var _ pubsub.Processor[*pb.ProposerSlashing] = (*ProposerSlashingProcessor)(nil)
+// Compile-time check that DefaultProposerSlashingProcessor implements ProposerSlashingProcessor.
+var _ ProposerSlashingProcessor = (*DefaultProposerSlashingProcessor)(nil)

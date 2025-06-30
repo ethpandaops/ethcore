@@ -105,13 +105,6 @@ func (m *mockProcessor) AllPossibleTopics() []string {
 	return []string{m.topic}
 }
 
-func (m *mockProcessor) Subscribe(ctx context.Context) error {
-	return nil
-}
-
-func (m *mockProcessor) Unsubscribe(ctx context.Context) error {
-	return nil
-}
 
 // Helper methods for testing.
 func (m *mockProcessor) setDecodeError(err error) {
@@ -195,9 +188,6 @@ func newMockMultiProcessor(topics []string) *mockMultiProcessor {
 	}
 }
 
-func (m *mockMultiProcessor) Topics() []string {
-	return m.topics
-}
 
 func (m *mockMultiProcessor) Decode(ctx context.Context, topic string, data []byte) (string, error) {
 	m.mu.Lock()
@@ -260,17 +250,6 @@ func (m *mockMultiProcessor) AllPossibleTopics() []string {
 	return m.topics
 }
 
-func (m *mockMultiProcessor) Subscribe(ctx context.Context, subnets []uint64) error {
-	return nil
-}
-
-func (m *mockMultiProcessor) Unsubscribe(ctx context.Context, subnets []uint64) error {
-	return nil
-}
-
-func (m *mockMultiProcessor) GetActiveSubnets() []uint64 {
-	return []uint64{}
-}
 
 func (m *mockMultiProcessor) TopicIndex(topic string) (int, error) {
 	for i, t := range m.topics {
@@ -280,6 +259,47 @@ func (m *mockMultiProcessor) TopicIndex(topic string) (int, error) {
 	}
 
 	return -1, errors.New("topic not found")
+}
+
+// ActiveTopics returns the currently active topics (for testing, return all topics).
+func (m *mockMultiProcessor) ActiveTopics() []string {
+	return m.topics
+}
+
+// UpdateActiveTopics updates which topics this processor is interested in.
+func (m *mockMultiProcessor) UpdateActiveTopics(newActiveTopics []string) (toSubscribe []string, toUnsubscribe []string, err error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// Create maps for current and new topics
+	current := make(map[string]bool)
+	for _, topic := range m.topics {
+		current[topic] = true
+	}
+
+	new := make(map[string]bool)
+	for _, topic := range newActiveTopics {
+		new[topic] = true
+	}
+
+	// Find topics to subscribe
+	for topic := range new {
+		if !current[topic] {
+			toSubscribe = append(toSubscribe, topic)
+		}
+	}
+
+	// Find topics to unsubscribe
+	for topic := range current {
+		if !new[topic] {
+			toUnsubscribe = append(toUnsubscribe, topic)
+		}
+	}
+
+	// Update the topics list
+	m.topics = newActiveTopics
+
+	return toSubscribe, toUnsubscribe, nil
 }
 
 // Helper methods for testing.
@@ -381,7 +401,7 @@ func TestMultiProcessorInterface(t *testing.T) {
 	var _ ethpubsub.MultiProcessor[string] = processor
 
 	// Test methods
-	topics := processor.Topics()
+	topics := processor.AllPossibleTopics()
 	assert.Equal(t, []string{"topic1", "topic2"}, topics)
 
 	ctx := context.Background()
@@ -722,8 +742,8 @@ func TestMultiProcessor(t *testing.T) {
 	// Test interface compliance
 	var _ ethpubsub.MultiProcessor[string] = processor
 
-	// Test Topics method
-	assert.ElementsMatch(t, topics, processor.Topics())
+	// Test AllPossibleTopics method
+	assert.ElementsMatch(t, topics, processor.AllPossibleTopics())
 
 	// Test operations on different topics
 	for _, topic := range topics {
@@ -1005,13 +1025,13 @@ func TestProcessorEdgeCases(t *testing.T) {
 
 	t.Run("multiprocessor_empty_topics", func(t *testing.T) {
 		processor := newMockMultiProcessor([]string{})
-		assert.Equal(t, []string{}, processor.Topics())
+		assert.Equal(t, []string{}, processor.AllPossibleTopics())
 	})
 
 	t.Run("multiprocessor_duplicate_topics", func(t *testing.T) {
 		topics := []string{"topic1", "topic1", "topic2"}
 		processor := newMockMultiProcessor(topics)
-		assert.Equal(t, topics, processor.Topics()) // Should preserve duplicates as provided
+		assert.Equal(t, topics, processor.AllPossibleTopics()) // Should preserve duplicates as provided
 	})
 
 	t.Run("nil_context_handling", func(t *testing.T) {
