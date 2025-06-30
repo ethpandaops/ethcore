@@ -81,9 +81,11 @@ func (d *DiscV4) startListener(ctx context.Context) error {
 		return err
 	}
 
+	d.mu.Lock()
 	d.privKey = privKey
+	d.mu.Unlock()
 
-	listener, err := d.startDiscovery(ctx, d.privKey)
+	listener, err := d.startDiscovery(ctx, privKey)
 	if err != nil {
 		return err
 	}
@@ -167,6 +169,20 @@ func (l *ListenerV4) Close() error {
 	}
 
 	return nil
+}
+
+// GetLocalNodeID returns the local node ID in a thread-safe manner.
+func (l *ListenerV4) GetLocalNodeID() *enode.ID {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	if l.localNode == nil {
+		return nil
+	}
+
+	id := l.localNode.ID()
+
+	return &id
 }
 
 func (d *DiscV4) startCrons(ctx context.Context) error {
@@ -355,8 +371,11 @@ func (d *DiscV4) filterPeer(node *enode.Node) bool {
 	listener := d.listener
 	d.mu.Unlock()
 
-	if listener != nil && listener.localNode != nil && node.ID() == listener.localNode.ID() {
-		return false
+	if listener != nil {
+		localID := listener.GetLocalNodeID()
+		if localID != nil && node.ID() == *localID {
+			return false
+		}
 	}
 
 	// do not dial nodes with their tcp ports not set
