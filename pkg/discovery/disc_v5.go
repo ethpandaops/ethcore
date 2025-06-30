@@ -20,6 +20,7 @@ const (
 	topicNodeRecord = "node_record"
 )
 
+// DiscV5 implements the discovery v5 protocol for finding Ethereum nodes.
 type DiscV5 struct {
 	log       logrus.FieldLogger
 	restart   time.Duration
@@ -32,6 +33,7 @@ type DiscV5 struct {
 	started   bool
 }
 
+// ListenerV5 manages the UDP connection and discovery protocol instance.
 type ListenerV5 struct {
 	conn      *net.UDPConn
 	localNode *enode.LocalNode
@@ -39,6 +41,7 @@ type ListenerV5 struct {
 	mu        sync.Mutex
 }
 
+// NewDiscV5 creates a new discovery v5 instance.
 func NewDiscV5(_ context.Context, restart time.Duration, log logrus.FieldLogger) *DiscV5 {
 	return &DiscV5{
 		log:     log.WithField("module", "ethcore/discovery/discV5"),
@@ -48,6 +51,7 @@ func NewDiscV5(_ context.Context, restart time.Duration, log logrus.FieldLogger)
 	}
 }
 
+// Start initializes and starts the discovery v5 protocol.
 func (d *DiscV5) Start(ctx context.Context) error {
 	d.mu.Lock()
 
@@ -97,6 +101,7 @@ func (d *DiscV5) startListener(ctx context.Context) error {
 	return nil
 }
 
+// Stop gracefully shuts down the discovery v5 protocol.
 func (d *DiscV5) Stop(_ context.Context) error {
 	d.mu.Lock()
 	listener := d.listener
@@ -119,6 +124,7 @@ func (d *DiscV5) Stop(_ context.Context) error {
 	return nil
 }
 
+// Close shuts down the listener and releases all resources.
 func (l *ListenerV5) Close() error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -139,6 +145,7 @@ func (l *ListenerV5) Close() error {
 	return nil
 }
 
+// UpdateBootNodes updates the list of bootstrap nodes used for discovery.
 func (d *DiscV5) UpdateBootNodes(bootNodes []string) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -159,6 +166,7 @@ func (d *DiscV5) UpdateBootNodes(bootNodes []string) error {
 	return nil
 }
 
+// OnNodeRecord registers a handler to be called when new nodes are discovered.
 func (d *DiscV5) OnNodeRecord(ctx context.Context, handler func(ctx context.Context, reason *enode.Node) error) {
 	d.broker.On(topicNodeRecord, func(reason *enode.Node) {
 		d.handleSubscriberError(handler(ctx, reason), topicNodeRecord)

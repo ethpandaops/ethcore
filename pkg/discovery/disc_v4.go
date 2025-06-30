@@ -16,6 +16,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// DiscV4 implements the discovery v4 protocol for finding Ethereum nodes.
 type DiscV4 struct {
 	log       logrus.FieldLogger
 	restart   time.Duration
@@ -28,6 +29,7 @@ type DiscV4 struct {
 	started   bool
 }
 
+// ListenerV4 manages the UDP connection and discovery protocol instance.
 type ListenerV4 struct {
 	conn      *net.UDPConn
 	localNode *enode.LocalNode
@@ -35,6 +37,7 @@ type ListenerV4 struct {
 	mu        sync.Mutex
 }
 
+// NewDiscV4 creates a new discovery v4 instance.
 func NewDiscV4(_ context.Context, restart time.Duration, log logrus.FieldLogger) *DiscV4 {
 	return &DiscV4{
 		log:     log.WithField("module", "discovery/p2p/discV4"),
@@ -44,6 +47,7 @@ func NewDiscV4(_ context.Context, restart time.Duration, log logrus.FieldLogger)
 	}
 }
 
+// Start initializes and starts the discovery v4 protocol.
 func (d *DiscV4) Start(ctx context.Context) error {
 	d.mu.Lock()
 
@@ -93,6 +97,7 @@ func (d *DiscV4) startListener(ctx context.Context) error {
 	return nil
 }
 
+// Stop gracefully shuts down the discovery v4 protocol.
 func (d *DiscV4) Stop(_ context.Context) error {
 	d.mu.Lock()
 	listener := d.listener
@@ -115,6 +120,7 @@ func (d *DiscV4) Stop(_ context.Context) error {
 	return nil
 }
 
+// UpdateBootNodes updates the list of bootstrap nodes used for discovery.
 func (d *DiscV4) UpdateBootNodes(bootNodes []string) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -135,12 +141,14 @@ func (d *DiscV4) UpdateBootNodes(bootNodes []string) error {
 	return nil
 }
 
+// OnNodeRecord registers a handler to be called when new nodes are discovered.
 func (d *DiscV4) OnNodeRecord(ctx context.Context, handler func(ctx context.Context, reason *enode.Node) error) {
 	d.broker.On(topicNodeRecord, func(reason *enode.Node) {
 		d.handleSubscriberError(handler(ctx, reason), topicNodeRecord)
 	})
 }
 
+// Close shuts down the listener and releases all resources.
 func (l *ListenerV4) Close() error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
