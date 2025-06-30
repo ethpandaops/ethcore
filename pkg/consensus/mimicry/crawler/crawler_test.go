@@ -31,6 +31,8 @@ type TestCrawlerConfig struct {
 	DialConcurrency int
 	// CooloffDuration is the duration to wait between dials.
 	CooloffDuration time.Duration
+	// DialTimeout is the timeout for dialing peers.
+	DialTimeout time.Duration
 }
 
 // DefaultTestCrawlerConfig returns a default configuration for the crawler tests.
@@ -39,6 +41,7 @@ func DefaultTestCrawlerConfig() *TestCrawlerConfig {
 		CrawlerTimeout:  60 * time.Second,
 		DialConcurrency: 10,
 		CooloffDuration: 1 * time.Second,
+		DialTimeout:     30 * time.Second, // Generous timeout for Kurtosis environment
 	}
 }
 
@@ -175,6 +178,7 @@ func setupCrawler(t *testing.T, tf *kurtosis.TestFoundation, network network.Net
 	cr := crawler.New(logger, &crawler.Config{
 		DialConcurrency: config.DialConcurrency,
 		CooloffDuration: config.CooloffDuration,
+		DialTimeout:     config.DialTimeout,
 		Node: &host.Config{
 			IPAddr: net.ParseIP("127.0.0.1"),
 		},
