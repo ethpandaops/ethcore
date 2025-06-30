@@ -1,9 +1,10 @@
-package p2p
+package p2p_test
 
 import (
 	"bytes"
 	"testing"
 
+	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/protolambda/ztyp/codec"
 	"github.com/protolambda/ztyp/tree"
@@ -93,7 +94,7 @@ func TestWrappedSpecObjectEncoder_MarshalSSZ(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			w := WrapSpecObject(spec, tt.obj)
+			w := p2p.WrapSpecObject(spec, tt.obj)
 			got, err := w.MarshalSSZ()
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -111,7 +112,7 @@ func TestWrappedSpecObjectEncoder_MarshalSSZTo(t *testing.T) {
 	spec := &common.Spec{}
 
 	obj := &mockSpecObj{value: 42}
-	w := WrapSpecObject(spec, obj)
+	w := p2p.WrapSpecObject(spec, obj)
 
 	dst := []byte{1, 2, 3}
 	expected := append([]byte{1, 2, 3}, []byte{42, 0, 0, 0, 0, 0, 0, 0}...)
@@ -145,7 +146,7 @@ func TestWrappedSpecObjectEncoder_UnmarshalSSZ(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			obj := &mockSpecObj{}
-			w := WrapSpecObject(spec, obj)
+			w := p2p.WrapSpecObject(spec, obj)
 
 			err := w.UnmarshalSSZ(tt.data)
 			if tt.wantErr {
@@ -164,7 +165,7 @@ func TestWrappedSpecObjectEncoder_SizeSSZ(t *testing.T) {
 	spec := &common.Spec{}
 
 	obj := &mockSpecObj{value: 42}
-	w := WrapSpecObject(spec, obj)
+	w := p2p.WrapSpecObject(spec, obj)
 
 	size := w.SizeSSZ()
 	assert.Equal(t, 8, size)
@@ -186,7 +187,7 @@ func TestWrappedSSZObjectEncoder_MarshalSSZ(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			w := WrapSSZObject(tt.obj)
+			w := p2p.WrapSSZObject(tt.obj)
 			got, err := w.MarshalSSZ()
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -202,7 +203,7 @@ func TestWrappedSSZObjectEncoder_MarshalSSZ(t *testing.T) {
 
 func TestWrappedSSZObjectEncoder_MarshalSSZTo(t *testing.T) {
 	obj := &mockSSZObj{value: 42}
-	w := WrapSSZObject(obj)
+	w := p2p.WrapSSZObject(obj)
 
 	dst := []byte{1, 2, 3}
 	expected := append([]byte{1, 2, 3}, []byte{42, 0, 0, 0}...)
@@ -234,7 +235,7 @@ func TestWrappedSSZObjectEncoder_UnmarshalSSZ(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			obj := &mockSSZObj{}
-			w := WrapSSZObject(obj)
+			w := p2p.WrapSSZObject(obj)
 
 			err := w.UnmarshalSSZ(tt.data)
 			if tt.wantErr {
@@ -251,7 +252,7 @@ func TestWrappedSSZObjectEncoder_UnmarshalSSZ(t *testing.T) {
 
 func TestWrappedSSZObjectEncoder_SizeSSZ(t *testing.T) {
 	obj := &mockSSZObj{value: 42}
-	w := WrapSSZObject(obj)
+	w := p2p.WrapSSZObject(obj)
 
 	size := w.SizeSSZ()
 	assert.Equal(t, 4, size)
@@ -267,7 +268,7 @@ func TestWrappedSSZObjectEncoder_RealTypes(t *testing.T) {
 		HeadSlot:       common.Slot(3200),
 	}
 
-	w := WrapSSZObject(status)
+	w := p2p.WrapSSZObject(status)
 
 	// Test marshal
 	data, err := w.MarshalSSZ()
@@ -280,7 +281,7 @@ func TestWrappedSSZObjectEncoder_RealTypes(t *testing.T) {
 
 	// Test unmarshal
 	newStatus := &common.Status{}
-	w2 := WrapSSZObject(newStatus)
+	w2 := p2p.WrapSSZObject(newStatus)
 	err = w2.UnmarshalSSZ(data)
 	require.NoError(t, err)
 	assert.Equal(t, status, newStatus)
@@ -292,7 +293,7 @@ func TestEncodingRoundTrip(t *testing.T) {
 		spec := &common.Spec{}
 
 		original := &mockSpecObj{value: 12345}
-		w := WrapSpecObject(spec, original)
+		w := p2p.WrapSpecObject(spec, original)
 
 		// Marshal
 		data, err := w.MarshalSSZ()
@@ -300,7 +301,7 @@ func TestEncodingRoundTrip(t *testing.T) {
 
 		// Unmarshal
 		decoded := &mockSpecObj{}
-		w2 := WrapSpecObject(spec, decoded)
+		w2 := p2p.WrapSpecObject(spec, decoded)
 		err = w2.UnmarshalSSZ(data)
 		require.NoError(t, err)
 
@@ -309,7 +310,7 @@ func TestEncodingRoundTrip(t *testing.T) {
 
 	t.Run("SSZObject round trip", func(t *testing.T) {
 		original := &mockSSZObj{value: 54321}
-		w := WrapSSZObject(original)
+		w := p2p.WrapSSZObject(original)
 
 		// Marshal
 		data, err := w.MarshalSSZ()
@@ -317,7 +318,7 @@ func TestEncodingRoundTrip(t *testing.T) {
 
 		// Unmarshal
 		decoded := &mockSSZObj{}
-		w2 := WrapSSZObject(decoded)
+		w2 := p2p.WrapSSZObject(decoded)
 		err = w2.UnmarshalSSZ(data)
 		require.NoError(t, err)
 
@@ -375,7 +376,7 @@ func TestWrappedSpecObjectEncoder_Errors(t *testing.T) {
 	spec := &common.Spec{}
 
 	obj := &errorSpecObj{}
-	w := WrapSpecObject(spec, obj)
+	w := p2p.WrapSpecObject(spec, obj)
 
 	t.Run("MarshalSSZ error", func(t *testing.T) {
 		_, err := w.MarshalSSZ()
@@ -396,7 +397,7 @@ func TestWrappedSpecObjectEncoder_Errors(t *testing.T) {
 
 func TestWrappedSSZObjectEncoder_Errors(t *testing.T) {
 	obj := &errorSSZObj{}
-	w := WrapSSZObject(obj)
+	w := p2p.WrapSSZObject(obj)
 
 	t.Run("MarshalSSZ error", func(t *testing.T) {
 		_, err := w.MarshalSSZ()
@@ -419,7 +420,7 @@ func TestWrappedSSZObjectEncoder_Errors(t *testing.T) {
 func BenchmarkWrappedSpecObjectEncoder_MarshalSSZ(b *testing.B) {
 	spec := &common.Spec{}
 	obj := &mockSpecObj{value: 42}
-	w := WrapSpecObject(spec, obj)
+	w := p2p.WrapSpecObject(spec, obj)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -433,7 +434,7 @@ func BenchmarkWrappedSpecObjectEncoder_MarshalSSZ(b *testing.B) {
 // BenchmarkWrappedSSZObjectEncoder benchmarks SSZObject encoding.
 func BenchmarkWrappedSSZObjectEncoder_MarshalSSZ(b *testing.B) {
 	obj := &mockSSZObj{value: 42}
-	w := WrapSSZObject(obj)
+	w := p2p.WrapSSZObject(obj)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -449,7 +450,7 @@ func TestWrappedEncoders_Concurrent(t *testing.T) {
 	t.Run("SpecObject concurrent", func(t *testing.T) {
 		spec := &common.Spec{}
 		obj := &mockSpecObj{value: 42}
-		w := WrapSpecObject(spec, obj)
+		w := p2p.WrapSpecObject(spec, obj)
 
 		// Run multiple goroutines marshaling/unmarshaling
 		done := make(chan bool, 10)
@@ -471,7 +472,7 @@ func TestWrappedEncoders_Concurrent(t *testing.T) {
 
 	t.Run("SSZObject concurrent", func(t *testing.T) {
 		obj := &mockSSZObj{value: 42}
-		w := WrapSSZObject(obj)
+		w := p2p.WrapSSZObject(obj)
 
 		// Run multiple goroutines marshaling/unmarshaling
 		done := make(chan bool, 10)
@@ -496,7 +497,7 @@ func TestWrappedEncoders_Concurrent(t *testing.T) {
 func TestWrappedEncoders_EdgeCases(t *testing.T) {
 	t.Run("MarshalSSZTo with nil destination", func(t *testing.T) {
 		obj := &mockSSZObj{value: 42}
-		w := WrapSSZObject(obj)
+		w := p2p.WrapSSZObject(obj)
 
 		got, err := w.MarshalSSZTo(nil)
 		require.NoError(t, err)
@@ -505,7 +506,7 @@ func TestWrappedEncoders_EdgeCases(t *testing.T) {
 
 	t.Run("UnmarshalSSZ with empty data", func(t *testing.T) {
 		obj := &mockSSZObj{}
-		w := WrapSSZObject(obj)
+		w := p2p.WrapSSZObject(obj)
 
 		err := w.UnmarshalSSZ([]byte{})
 		assert.Error(t, err)
@@ -513,7 +514,7 @@ func TestWrappedEncoders_EdgeCases(t *testing.T) {
 
 	t.Run("UnmarshalSSZ with nil data", func(t *testing.T) {
 		obj := &mockSSZObj{}
-		w := WrapSSZObject(obj)
+		w := p2p.WrapSSZObject(obj)
 
 		err := w.UnmarshalSSZ(nil)
 		assert.Error(t, err)

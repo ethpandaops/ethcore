@@ -19,6 +19,7 @@ require (
 	github.com/kurtosis-tech/kurtosis/api/golang v1.10.1
 	github.com/libp2p/go-libp2p v0.41.1
 	github.com/libp2p/go-libp2p-mplex v0.10.0
+	github.com/libp2p/go-libp2p-pubsub v0.13.0
 	github.com/multiformats/go-multiaddr v0.16.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.22.0
@@ -83,6 +84,7 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.26.3 // indirect
+	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/herumi/bls-eth-go-binary v1.36.4 // indirect
 	github.com/holiman/bloomfilter/v2 v2.0.3 // indirect
 	github.com/holiman/uint256 v1.3.2 // indirect

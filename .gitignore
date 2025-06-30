@@ -10,3 +10,10 @@ config.yaml
 dist
 
 .vscode
+
+# Test binaries
+*.test
+
+# Test binaries
+*.test
+*.exe
