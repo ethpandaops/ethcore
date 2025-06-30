@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethpandaops/beacon/pkg/beacon"
 	"github.com/ethpandaops/beacon/pkg/beacon/api/types"
 	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/crawler"
@@ -197,7 +198,7 @@ func setupCrawler(t *testing.T, tf *kurtosis.TestFoundation, network network.Net
 func setupCrawlerEventHandlers(t *testing.T, cr *crawler.Crawler, logger *logrus.Logger, identities map[string]*types.Identity, successful map[string]bool, mu *sync.Mutex) {
 	t.Helper()
 
-	cr.OnSuccessfulCrawl(func(peerID peer.ID, status *common.Status, metadata *common.MetaData) {
+	cr.OnSuccessfulCrawl(func(peerID peer.ID, enr *enode.Node, status *common.Status, metadata *common.MetaData) {
 		logger.Infof("Got status/metadata: %s", peerID)
 
 		// Get the service name

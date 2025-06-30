@@ -61,6 +61,10 @@ type Crawler struct {
 	metrics            *Metrics
 	peersToDial        chan *discovery.ConnectablePeer
 	OnReady            chan struct{}
+
+	// ENR storage
+	peerENRs   map[peer.ID]*enode.Node
+	peerENRsMu sync.RWMutex
 }
 
 // New creates a new Crawler.
@@ -83,6 +87,8 @@ func New(log logrus.FieldLogger, config *Config, userAgent, namespace string, f 
 		discovery:          f,
 		peersToDial:        make(chan *discovery.ConnectablePeer, 10000),
 		OnReady:            make(chan struct{}),
+		peerENRs:           make(map[peer.ID]*enode.Node, 1000),
+		peerENRsMu:         sync.RWMutex{},
 	}
 }
 
@@ -364,6 +370,11 @@ func (c *Crawler) ConnectToPeer(ctx context.Context, p peer.AddrInfo, n *enode.N
 		return errors.New("already connected to peer")
 	}
 
+	// Store the ENR for this peer
+	c.peerENRsMu.Lock()
+	c.peerENRs[p.ID] = n
+	c.peerENRsMu.Unlock()
+
 	// Connect to the peer
 	timeoutCtx, cancel := context.WithTimeout(ctx, c.config.DialTimeout)
 	defer cancel()
@@ -407,6 +418,11 @@ func (c *Crawler) DisconnectFromPeer(ctx context.Context, peerID peer.ID, reason
 		Payload:    &goodbye,
 		Timeout:    time.Second * 5,
 	}, &resp)
+
+	// Clean up ENR storage
+	c.peerENRsMu.Lock()
+	delete(c.peerENRs, peerID)
+	c.peerENRsMu.Unlock()
 
 	// Always disconnect regardless of goodbye message status
 	return c.node.DisconnectFromPeer(ctx, peerID)
@@ -485,6 +501,13 @@ func (c *Crawler) GetPeerAgentVersion(peerID peer.ID) string {
 	}
 
 	return agentVersion
+}
+
+func (c *Crawler) GetPeerENR(peerID peer.ID) *enode.Node {
+	c.peerENRsMu.RLock()
+	defer c.peerENRsMu.RUnlock()
+
+	return c.peerENRs[peerID]
 }
 
 func (c *Crawler) fetchAndSetStatus(ctx context.Context) error {
