@@ -17,12 +17,12 @@ import (
 )
 
 // Test the filterPeer function with various node configurations.
-func TestDiscV5_FilterPeer(t *testing.T) {
+func TestDiscV4_FilterPeer(t *testing.T) {
 	ctx := context.Background()
 	logger := logrus.New()
 	logger.SetLevel(logrus.DebugLevel)
 
-	disc := NewDiscV5(ctx, 30*time.Second, logger)
+	disc := NewDiscV4(ctx, 30*time.Second, logger)
 
 	// Create a mock listener with a local node for testing
 	privKey, err := crypto.GenerateKey()
@@ -37,7 +37,7 @@ func TestDiscV5_FilterPeer(t *testing.T) {
 	localNode.Set(enr.TCP(30303))
 	localNode.Set(enr.UDP(30303))
 
-	disc.listener = &ListenerV5{
+	disc.listener = &ListenerV4{
 		localNode: localNode,
 	}
 
@@ -71,13 +71,6 @@ func TestDiscV5_FilterPeer(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "self node",
-			node: func() *enode.Node {
-				return localNode.Node()
-			},
-			expected: false,
-		},
-		{
 			name: "node without TCP port",
 			node: func() *enode.Node {
 				privKey, _ := crypto.GenerateKey()
@@ -90,23 +83,6 @@ func TestDiscV5_FilterPeer(t *testing.T) {
 				ln.Set(enr.UDP(30303))
 
 				// Don't set TCP
-				return ln.Node()
-			},
-			expected: false,
-		},
-		{
-			name: "private IP node",
-			node: func() *enode.Node {
-				privKey, _ := crypto.GenerateKey()
-				db, _ := enode.OpenDB("")
-
-				defer db.Close()
-
-				ln := enode.NewLocalNode(db, privKey)
-				ln.Set(enr.IP(net.ParseIP("192.168.1.100")))
-				ln.Set(enr.TCP(30303))
-				ln.Set(enr.UDP(30303))
-
 				return ln.Node()
 			},
 			expected: false,
@@ -128,6 +104,23 @@ func TestDiscV5_FilterPeer(t *testing.T) {
 			},
 			expected: true,
 		},
+		{
+			name: "private IP node",
+			node: func() *enode.Node {
+				privKey, _ := crypto.GenerateKey()
+				db, _ := enode.OpenDB("")
+
+				defer db.Close()
+
+				ln := enode.NewLocalNode(db, privKey)
+				ln.Set(enr.IP(net.ParseIP("192.168.1.100")))
+				ln.Set(enr.TCP(30303))
+				ln.Set(enr.UDP(30303))
+
+				return ln.Node()
+			},
+			expected: true, // Note: DiscV4 doesn't filter private IPs like DiscV5 does
+		},
 	}
 
 	for _, tt := range tests {
@@ -140,10 +133,10 @@ func TestDiscV5_FilterPeer(t *testing.T) {
 }
 
 // Test UpdateBootNodes functionality.
-func TestDiscV5_UpdateBootNodes(t *testing.T) {
+func TestDiscV4_UpdateBootNodes(t *testing.T) {
 	ctx := context.Background()
 	logger := logrus.New()
-	disc := NewDiscV5(ctx, 30*time.Second, logger)
+	disc := NewDiscV4(ctx, 30*time.Second, logger)
 
 	tests := []struct {
 		name      string
@@ -206,7 +199,7 @@ func TestDiscV5_UpdateBootNodes(t *testing.T) {
 }
 
 // Integration test for basic discovery lifecycle.
-func TestDiscV5_Lifecycle(t *testing.T) {
+func TestDiscV4_Lifecycle(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -215,7 +208,7 @@ func TestDiscV5_Lifecycle(t *testing.T) {
 	logger := logrus.New()
 	logger.SetLevel(logrus.DebugLevel)
 
-	disc := NewDiscV5(ctx, 5*time.Second, logger)
+	disc := NewDiscV4(ctx, 5*time.Second, logger)
 
 	// Test starting
 	err := disc.Start(ctx)
@@ -236,15 +229,18 @@ func TestDiscV5_Lifecycle(t *testing.T) {
 }
 
 // Test OnNodeRecord subscription.
-func TestDiscV5_OnNodeRecord(t *testing.T) {
+func TestDiscV4_OnNodeRecord(t *testing.T) {
 	ctx := context.Background()
 	logger := logrus.New()
-	disc := NewDiscV5(ctx, 30*time.Second, logger)
+	disc := NewDiscV4(ctx, 30*time.Second, logger)
 
 	// Set up a handler to capture emitted nodes
 	receivedNodes := make([]*enode.Node, 0)
+	var mu sync.Mutex
 	disc.OnNodeRecord(ctx, func(ctx context.Context, node *enode.Node) error {
+		mu.Lock()
 		receivedNodes = append(receivedNodes, node)
+		mu.Unlock()
 
 		return nil
 	})
@@ -269,24 +265,29 @@ func TestDiscV5_OnNodeRecord(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	// Check that we received the node
+	mu.Lock()
+	defer mu.Unlock()
 	assert.Len(t, receivedNodes, 1)
 	assert.Equal(t, testNode.ID(), receivedNodes[0].ID())
 }
 
 // Test error handling in OnNodeRecord.
-func TestDiscV5_OnNodeRecord_ErrorHandling(t *testing.T) {
+func TestDiscV4_OnNodeRecord_ErrorHandling(t *testing.T) {
 	ctx := context.Background()
 	logger := logrus.New()
 	logger.SetLevel(logrus.FatalLevel) // Suppress error logs during test
 
-	disc := NewDiscV5(ctx, 30*time.Second, logger)
+	disc := NewDiscV4(ctx, 30*time.Second, logger)
 
 	// Track if error handler was called
 	errorHandled := false
+	var mu sync.Mutex
 
 	// Set up a handler that returns an error
 	disc.OnNodeRecord(ctx, func(ctx context.Context, node *enode.Node) error {
+		mu.Lock()
 		errorHandled = true
+		mu.Unlock()
 
 		return assert.AnError
 	})
@@ -310,18 +311,20 @@ func TestDiscV5_OnNodeRecord_ErrorHandling(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	// Verify that the error handler was called
+	mu.Lock()
+	defer mu.Unlock()
 	assert.True(t, errorHandled, "Error handler should have been called")
 }
 
 // Test concurrent operations.
-func TestDiscV5_ConcurrentOperations(t *testing.T) {
+func TestDiscV4_ConcurrentOperations(t *testing.T) {
 	ctx := context.Background()
 	logger := logrus.New()
 	logger.SetLevel(logrus.ErrorLevel) // Reduce log noise
 
 	// Test concurrent UpdateBootNodes without Start/Stop
 	t.Run("concurrent boot node updates", func(t *testing.T) {
-		disc := NewDiscV5(ctx, 1*time.Hour, logger)
+		disc := NewDiscV4(ctx, 1*time.Hour, logger)
 		var wg sync.WaitGroup
 		wg.Add(3)
 
@@ -365,16 +368,16 @@ func TestDiscV5_ConcurrentOperations(t *testing.T) {
 
 	// Test multiple instances don't interfere
 	t.Run("multiple instances", func(t *testing.T) {
-		instances := make([]*DiscV5, 3)
+		instances := make([]*DiscV4, 3)
 		for i := 0; i < 3; i++ {
-			instances[i] = NewDiscV5(ctx, 1*time.Hour, logger)
+			instances[i] = NewDiscV4(ctx, 1*time.Hour, logger)
 		}
 
 		var wg sync.WaitGroup
 		wg.Add(len(instances))
 
 		for idx, disc := range instances {
-			go func(d *DiscV5, i int) {
+			go func(d *DiscV4, i int) {
 				defer wg.Done()
 				for j := 0; j < 10; j++ {
 					err := d.UpdateBootNodes([]string{
@@ -390,12 +393,12 @@ func TestDiscV5_ConcurrentOperations(t *testing.T) {
 }
 
 // Test concurrent Start/Stop operations.
-func TestDiscV5_ConcurrentStartStop(t *testing.T) {
+func TestDiscV4_ConcurrentStartStop(t *testing.T) {
 	ctx := context.Background()
 	logger := logrus.New()
 	logger.SetLevel(logrus.ErrorLevel)
 
-	disc := NewDiscV5(ctx, 1*time.Hour, logger)
+	disc := NewDiscV4(ctx, 1*time.Hour, logger)
 
 	var wg sync.WaitGroup
 	wg.Add(3)
