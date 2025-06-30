@@ -1,11 +1,11 @@
 package p2p_test
 
 import (
-	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p"
 	"testing"
 	"time"
 
 	"github.com/OffchainLabs/prysm/v6/beacon-chain/p2p/encoder"
+	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p"
 	"github.com/libp2p/go-libp2p"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"

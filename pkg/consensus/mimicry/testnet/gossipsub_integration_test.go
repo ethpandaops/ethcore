@@ -331,7 +331,7 @@ func TestGossipsubIntegration(t *testing.T) {
 	})
 }
 
-// testNetworkTopology tests the basic network topology setup
+// testNetworkTopology tests the basic network topology setup.
 func testNetworkTopology(t *testing.T) {
 	t.Helper()
 	network := setupTestNetwork(t, testNetworkSize)
@@ -354,7 +354,7 @@ func testNetworkTopology(t *testing.T) {
 	}
 }
 
-// testBasicSubscriptionAndPublishing tests basic gossipsub subscription and publishing
+// testBasicSubscriptionAndPublishing tests basic gossipsub subscription and publishing.
 func testBasicSubscriptionAndPublishing(t *testing.T) {
 	t.Helper()
 	network := setupTestNetwork(t, testNetworkSize)
@@ -430,7 +430,7 @@ func testBasicSubscriptionAndPublishing(t *testing.T) {
 	}
 }
 
-// testBeaconBlockPropagation tests Ethereum beacon block propagation
+// testBeaconBlockPropagation tests Ethereum beacon block propagation.
 func testBeaconBlockPropagation(t *testing.T) {
 	t.Helper()
 	network := setupTestNetwork(t, testNetworkSize)
@@ -509,7 +509,7 @@ func testBeaconBlockPropagation(t *testing.T) {
 	assert.Contains(t, receivedFromPeers, publisherID, "Should receive block from publisher")
 }
 
-// testAttestationPropagation tests attestation propagation on subnets
+// testAttestationPropagation tests attestation propagation on subnets.
 func testAttestationPropagation(t *testing.T) {
 	t.Helper()
 	network := setupTestNetwork(t, testNetworkSize)
@@ -588,7 +588,7 @@ func testAttestationPropagation(t *testing.T) {
 		"Expected at least %d attestations, got %d", expectedMin, len(receivedAttestations))
 }
 
-// testMultipleTopicHandling tests handling multiple topics simultaneously
+// testMultipleTopicHandling tests handling multiple topics simultaneously.
 func testMultipleTopicHandling(t *testing.T) {
 	t.Helper()
 	network := setupTestNetwork(t, testNetworkSize)
@@ -771,7 +771,7 @@ func testMultipleTopicHandling(t *testing.T) {
 		"Expected at least %d voluntary exits, got %d", expectedNodes*2, receivedVoluntaryExits)
 }
 
-// testMessageValidation tests message validation functionality
+// testMessageValidation tests message validation functionality.
 func testMessageValidation(t *testing.T) {
 	t.Helper()
 	network := setupTestNetwork(t, testNetworkSize)
@@ -793,12 +793,15 @@ func testMessageValidation(t *testing.T) {
 	// Handler to count received messages
 	handler := func(ctx context.Context, block *pb.SignedBeaconBlock, from peer.ID) error {
 		mutex.Lock()
+
 		if block.Block.Slot%2 == 0 {
 			invalidMessages++
 		} else {
 			validMessages++
 		}
+
 		mutex.Unlock()
+
 		return nil
 	}
 
@@ -809,6 +812,7 @@ func testMessageValidation(t *testing.T) {
 			if err := validator(block); err != nil {
 				return pubsub.ValidationReject, err
 			}
+
 			return pubsub.ValidationAccept, nil
 		}
 
@@ -868,7 +872,7 @@ func testMessageValidation(t *testing.T) {
 		"Expected at least %d valid messages, got %d", expectedValidMin, validMessages)
 }
 
-// testConcurrentOperations tests concurrent operations across the network
+// testConcurrentOperations tests concurrent operations across the network.
 func testConcurrentOperations(t *testing.T) {
 	t.Helper()
 	network := setupTestNetwork(t, testNetworkSize)
@@ -882,6 +886,7 @@ func testConcurrentOperations(t *testing.T) {
 		mutex.Lock()
 		receiveCount++
 		mutex.Unlock()
+
 		return nil
 	}
 
@@ -961,7 +966,7 @@ func testConcurrentOperations(t *testing.T) {
 		"Should receive more messages (%d) than published (%d) due to network propagation", receiveCount, publishCount)
 }
 
-// TestGossipsubPerformance tests performance characteristics of the gossipsub implementation
+// TestGossipsubPerformance tests performance characteristics of the gossipsub implementation.
 func TestGossipsubPerformance(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping performance test in short mode")
@@ -988,7 +993,7 @@ func TestGossipsubPerformance(t *testing.T) {
 	})
 }
 
-// testHighVolumeMessagePropagation tests handling of high message volumes
+// testHighVolumeMessagePropagation tests handling of high message volumes.
 func testHighVolumeMessagePropagation(t *testing.T) {
 	t.Helper()
 	network := setupTestNetwork(t, testNetworkSize)
@@ -1003,6 +1008,7 @@ func testHighVolumeMessagePropagation(t *testing.T) {
 		mutex.Lock()
 		receivedCount++
 		mutex.Unlock()
+
 		return nil
 	}
 
@@ -1083,7 +1089,7 @@ func testHighVolumeMessagePropagation(t *testing.T) {
 		"Should receive at least %d messages, got %d", expectedMinReceived, finalReceivedCount)
 }
 
-// testLatencyMeasurement measures message propagation latency
+// testLatencyMeasurement measures message propagation latency.
 func testLatencyMeasurement(t *testing.T) {
 	t.Helper()
 	network := setupTestNetwork(t, testNetworkSize)
@@ -1106,6 +1112,7 @@ func testLatencyMeasurement(t *testing.T) {
 			latencies = append(latencies, latency)
 			mutex.Unlock()
 		}
+
 		return nil
 	}
 
@@ -1195,7 +1202,7 @@ func testLatencyMeasurement(t *testing.T) {
 		"Average latency %v should be greater than 1ms (sanity check)", avgLatency)
 }
 
-// testThroughputMeasurement measures sustained throughput
+// testThroughputMeasurement measures sustained throughput.
 func testThroughputMeasurement(t *testing.T) {
 	t.Helper()
 	network := setupTestNetwork(t, testNetworkSize)
@@ -1210,6 +1217,7 @@ func testThroughputMeasurement(t *testing.T) {
 		mutex.Lock()
 		receivedCount++
 		mutex.Unlock()
+
 		return nil
 	}
 
@@ -1302,7 +1310,7 @@ measureResults:
 		"Should receive at least %.0f messages, got %d", expectedMinReceived, finalReceivedCount)
 }
 
-// testConcurrentSubscriptions tests handling many concurrent subscriptions
+// testConcurrentSubscriptions tests handling many concurrent subscriptions.
 func testConcurrentSubscriptions(t *testing.T) {
 	t.Helper()
 	network := setupTestNetwork(t, testNetworkSize)
@@ -1317,6 +1325,7 @@ func testConcurrentSubscriptions(t *testing.T) {
 		mutex.Lock()
 		totalReceived++
 		mutex.Unlock()
+
 		return nil
 	}
 
@@ -1402,7 +1411,7 @@ func testConcurrentSubscriptions(t *testing.T) {
 	}
 }
 
-// testLargeMessageHandling tests handling of large messages
+// testLargeMessageHandling tests handling of large messages.
 func testLargeMessageHandling(t *testing.T) {
 	t.Helper()
 	network := setupTestNetwork(t, testNetworkSize)
@@ -1417,6 +1426,7 @@ func testLargeMessageHandling(t *testing.T) {
 		mutex.Lock()
 		receivedSizes = append(receivedSizes, len(msg))
 		mutex.Unlock()
+
 		return nil
 	}
 

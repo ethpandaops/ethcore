@@ -1,9 +1,9 @@
 package eth_test
 
 import (
-	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/eth"
 	"testing"
 
+	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/eth"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/stretchr/testify/assert"

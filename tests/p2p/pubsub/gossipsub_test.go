@@ -14,17 +14,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// createTestHost creates a test libp2p host
+// createTestHost creates a test libp2p host.
 func createTestHost(t *testing.T) host.Host {
 	t.Helper()
 	h, err := libp2p.New(
 		libp2p.ListenAddrStrings("/ip4/127.0.0.1/tcp/0"),
 	)
 	require.NoError(t, err)
+
 	return h
 }
 
-// createTestGossipsub creates a test Gossipsub instance
+// createTestGossipsub creates a test Gossipsub instance.
 func createTestGossipsub(t *testing.T, h host.Host) *ethpubsub.Gossipsub {
 	t.Helper()
 	log := logrus.New()

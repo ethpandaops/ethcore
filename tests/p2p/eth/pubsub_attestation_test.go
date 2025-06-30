@@ -1,11 +1,12 @@
 package eth_test
 
 import (
-	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/eth"
 	"bytes"
 	"context"
 	"errors"
 	"testing"
+
+	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/eth"
 
 	"github.com/OffchainLabs/prysm/v6/beacon-chain/p2p/encoder"
 	"github.com/OffchainLabs/prysm/v6/consensus-types/primitives"
@@ -21,7 +22,7 @@ func TestAttestationProcessorTopics(t *testing.T) {
 	forkDigest := [4]byte{0x01, 0x02, 0x03, 0x04}
 	processor := &eth.AttestationProcessor{
 		ForkDigest: forkDigest,
-		Subnets: []uint64{10, 20, 30},
+		Subnets:    []uint64{10, 20, 30},
 	}
 
 	topics := processor.Topics()
@@ -112,10 +113,11 @@ func TestAttestationProcessorValidate(t *testing.T) {
 			setupValidator: func() func(context.Context, *pb.Attestation, uint64) (pubsub.ValidationResult, error) {
 				return func(ctx context.Context, att *pb.Attestation, subnet uint64) (pubsub.ValidationResult, error) {
 					assert.Equal(t, uint64(10), subnet)
+
 					return pubsub.ValidationAccept, nil
 				}
 			},
-			subnets: []uint64{10, 20},
+			subnets:        []uint64{10, 20},
 			topic:          "/eth2/01020304/beacon_attestation_10/ssz_snappy",
 			expectedResult: pubsub.ValidationAccept,
 			expectError:    false,
@@ -127,7 +129,7 @@ func TestAttestationProcessorValidate(t *testing.T) {
 					return pubsub.ValidationReject, nil
 				}
 			},
-			subnets: []uint64{10},
+			subnets:        []uint64{10},
 			topic:          "/eth2/01020304/beacon_attestation_10/ssz_snappy",
 			expectedResult: pubsub.ValidationReject,
 			expectError:    false,
@@ -139,7 +141,7 @@ func TestAttestationProcessorValidate(t *testing.T) {
 					return pubsub.ValidationReject, errors.New("validation failed")
 				}
 			},
-			subnets: []uint64{10},
+			subnets:        []uint64{10},
 			topic:          "/eth2/01020304/beacon_attestation_10/ssz_snappy",
 			expectedResult: pubsub.ValidationReject,
 			expectError:    true,
@@ -147,7 +149,7 @@ func TestAttestationProcessorValidate(t *testing.T) {
 		{
 			name:           "no validator",
 			setupValidator: func() func(context.Context, *pb.Attestation, uint64) (pubsub.ValidationResult, error) { return nil },
-			subnets: []uint64{10},
+			subnets:        []uint64{10},
 			topic:          "/eth2/01020304/beacon_attestation_10/ssz_snappy",
 			expectedResult: pubsub.ValidationAccept,
 			expectError:    false,
@@ -159,7 +161,7 @@ func TestAttestationProcessorValidate(t *testing.T) {
 					return pubsub.ValidationAccept, nil
 				}
 			},
-			subnets: []uint64{10},
+			subnets:        []uint64{10},
 			topic:          "/eth2/01020304/beacon_attestation_999/ssz_snappy",
 			expectedResult: pubsub.ValidationReject,
 			expectError:    true,
@@ -200,6 +202,7 @@ func TestAttestationProcessorValidate(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
+
 			assert.Equal(t, tt.expectedResult, result)
 		})
 	}
@@ -218,10 +221,11 @@ func TestAttestationProcessorProcess(t *testing.T) {
 			setupHandler: func() func(context.Context, *pb.Attestation, uint64, peer.ID) error {
 				return func(ctx context.Context, att *pb.Attestation, subnet uint64, from peer.ID) error {
 					assert.Equal(t, uint64(20), subnet)
+
 					return nil
 				}
 			},
-			subnets: []uint64{10, 20, 30},
+			subnets:     []uint64{10, 20, 30},
 			topic:       "/eth2/01020304/beacon_attestation_20/ssz_snappy",
 			expectError: false,
 		},
@@ -232,14 +236,14 @@ func TestAttestationProcessorProcess(t *testing.T) {
 					return errors.New("processing failed")
 				}
 			},
-			subnets: []uint64{10},
+			subnets:     []uint64{10},
 			topic:       "/eth2/01020304/beacon_attestation_10/ssz_snappy",
 			expectError: true,
 		},
 		{
 			name:         "no handler",
 			setupHandler: func() func(context.Context, *pb.Attestation, uint64, peer.ID) error { return nil },
-			subnets: []uint64{10},
+			subnets:      []uint64{10},
 			topic:        "/eth2/01020304/beacon_attestation_10/ssz_snappy",
 			expectError:  false,
 		},
@@ -250,7 +254,7 @@ func TestAttestationProcessorProcess(t *testing.T) {
 					return nil
 				}
 			},
-			subnets: []uint64{10},
+			subnets:     []uint64{10},
 			topic:       "/eth2/01020304/beacon_attestation_999/ssz_snappy",
 			expectError: true,
 		},
@@ -300,7 +304,7 @@ func TestAttestationProcessorSubscribeUnsubscribe(t *testing.T) {
 		Gossipsub:  mockGS,
 		ForkDigest: [4]byte{0x01, 0x02, 0x03, 0x04},
 		Log:        logrus.New(),
-		Subnets: []uint64{},
+		Subnets:    []uint64{},
 	}
 
 	// Test subscribe with subnets
@@ -331,7 +335,7 @@ func TestAttestationProcessorSubscribeUnsubscribe(t *testing.T) {
 func TestAttestationProcessorTopicIndex(t *testing.T) {
 	processor := &eth.AttestationProcessor{
 		ForkDigest: [4]byte{0x01, 0x02, 0x03, 0x04},
-		Subnets: []uint64{10, 20, 30},
+		Subnets:    []uint64{10, 20, 30},
 		Log:        logrus.New(),
 	}
 

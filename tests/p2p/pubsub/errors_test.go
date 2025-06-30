@@ -1,11 +1,11 @@
 package pubsub_test
 
 import (
-	ethpubsub "github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub"
 	"errors"
 	"fmt"
 	"testing"
 
+	ethpubsub "github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

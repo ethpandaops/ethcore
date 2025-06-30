@@ -1,15 +1,18 @@
 package pubsub_test
 
 import (
-	ethpubsub "github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub"
 	"testing"
 	"time"
+
+	ethpubsub "github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub"
 
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+const topic = "test/topic"
 
 func TestNewMetrics(t *testing.T) {
 	metrics := ethpubsub.NewMetrics("test")
@@ -69,7 +72,6 @@ func TestMetricsRecordMethods(t *testing.T) {
 
 func TestMetricsRecordMessageReceived(t *testing.T) {
 	metrics := ethpubsub.NewMetrics("test")
-	topic := "test/topic"
 
 	// Record some messages
 	for i := 0; i < 5; i++ {
@@ -85,7 +87,6 @@ func TestMetricsRecordMessageReceived(t *testing.T) {
 
 func TestMetricsRecordMessagePublished(t *testing.T) {
 	metrics := ethpubsub.NewMetrics("test")
-	topic := "test/topic"
 
 	// Record successful and failed publishes
 	metrics.RecordMessagePublished(topic, true)
@@ -107,7 +108,6 @@ func TestMetricsRecordMessagePublished(t *testing.T) {
 
 func TestMetricsRecordMessageValidated(t *testing.T) {
 	metrics := ethpubsub.NewMetrics("test")
-	topic := "test/topic"
 
 	// Record validations
 	metrics.RecordMessageValidated(topic, ethpubsub.ValidationAccept)
@@ -136,7 +136,6 @@ func TestMetricsRecordMessageValidated(t *testing.T) {
 
 func TestMetricsRecordMessageHandled(t *testing.T) {
 	metrics := ethpubsub.NewMetrics("test")
-	topic := "test/topic"
 	duration := 50 * time.Millisecond
 
 	// Record handled messages
@@ -170,7 +169,6 @@ func TestMetricsRecordMessageHandled(t *testing.T) {
 
 func TestMetricsRecordErrors(t *testing.T) {
 	metrics := ethpubsub.NewMetrics("test")
-	topic := "test/topic"
 
 	// Record various errors
 	metrics.RecordValidationError(topic)
@@ -201,7 +199,6 @@ func TestMetricsRecordErrors(t *testing.T) {
 
 func TestMetricsRecordDurations(t *testing.T) {
 	metrics := ethpubsub.NewMetrics("test")
-	topic := "test/topic"
 
 	durations := []time.Duration{
 		10 * time.Millisecond,
@@ -260,7 +257,6 @@ func TestMetricsRecordDurations(t *testing.T) {
 
 func TestMetricsSetStateMetrics(t *testing.T) {
 	metrics := ethpubsub.NewMetrics("test")
-	topic := "test/topic"
 
 	// Set active subscriptions
 	metrics.SetActiveSubscriptions(5)
@@ -324,7 +320,6 @@ func TestMetricsRegister(t *testing.T) {
 
 func TestMetricsConcurrency(t *testing.T) {
 	metrics := ethpubsub.NewMetrics("test")
-	topic := "test/topic"
 
 	// Run concurrent operations
 	done := make(chan bool)

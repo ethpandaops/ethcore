@@ -1,7 +1,6 @@
 package pubsub_test
 
 import (
-	ethpubsub "github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub"
 	"context"
 	"errors"
 	"fmt"
@@ -10,12 +9,14 @@ import (
 	"testing"
 	"time"
 
+	ethpubsub "github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub"
+
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// mockProcessor implements the Processor interface for testing
+// mockProcessor implements the Processor interface for testing.
 type mockProcessor struct {
 	topic string
 
@@ -96,6 +97,7 @@ func (m *mockProcessor) Process(ctx context.Context, msg string, from string) er
 func (m *mockProcessor) GetTopicScoreParams() *ethpubsub.TopicScoreParams {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+
 	return m.scoreParams
 }
 
@@ -111,7 +113,7 @@ func (m *mockProcessor) Unsubscribe(ctx context.Context) error {
 	return nil
 }
 
-// Helper methods for testing
+// Helper methods for testing.
 func (m *mockProcessor) setDecodeError(err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -160,21 +162,7 @@ func (m *mockProcessor) getProcessCalls() int32 {
 	return atomic.LoadInt32(&m.processCalls)
 }
 
-func (m *mockProcessor) reset() {
-	atomic.StoreInt32(&m.decodeCalls, 0)
-	atomic.StoreInt32(&m.validateCalls, 0)
-	atomic.StoreInt32(&m.processCalls, 0)
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.decodeError = nil
-	m.validateError = nil
-	m.processError = nil
-	m.decodeResult = ""
-	m.validateResult = ethpubsub.ValidationAccept
-	m.processingDelay = 0
-}
-
-// mockMultiProcessor implements the MultiProcessor interface for testing
+// mockMultiProcessor implements the MultiProcessor interface for testing.
 type mockMultiProcessor struct {
 	topics []string
 
@@ -264,6 +252,7 @@ func (m *mockMultiProcessor) Process(ctx context.Context, topic string, msg stri
 func (m *mockMultiProcessor) GetTopicScoreParams(topic string) *ethpubsub.TopicScoreParams {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+
 	return m.scoreParams[topic]
 }
 
@@ -289,49 +278,57 @@ func (m *mockMultiProcessor) TopicIndex(topic string) (int, error) {
 			return i, nil
 		}
 	}
+
 	return -1, errors.New("topic not found")
 }
 
-// Helper methods for testing
+// Helper methods for testing.
 func (m *mockMultiProcessor) setDecodeError(topic string, err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
 	m.decodeErrors[topic] = err
 }
 
 func (m *mockMultiProcessor) setValidateError(topic string, err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
 	m.validateErrors[topic] = err
 }
 
 func (m *mockMultiProcessor) setProcessError(topic string, err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
 	m.processErrors[topic] = err
 }
 
 func (m *mockMultiProcessor) getDecodeCalls(topic string) int32 {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+
 	return m.decodeCalls[topic]
 }
 
 func (m *mockMultiProcessor) getValidateCalls(topic string) int32 {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+
 	return m.validateCalls[topic]
 }
 
 func (m *mockMultiProcessor) getProcessCalls(topic string) int32 {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+
 	return m.processCalls[topic]
 }
 
 func (m *mockMultiProcessor) reset() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
 	m.decodeErrors = make(map[string]error)
 	m.validateErrors = make(map[string]error)
 	m.processErrors = make(map[string]error)
@@ -543,7 +540,7 @@ func TestProcessorMetricsLogStats(t *testing.T) {
 	metrics.LogStats()
 }
 
-// TestProcessorMessageHandling tests the processor message handling pipeline
+// TestProcessorMessageHandling tests the processor message handling pipeline.
 func TestProcessorMessageHandling(t *testing.T) {
 	log := logrus.New()
 	log.SetLevel(logrus.ErrorLevel)
@@ -618,6 +615,7 @@ func TestProcessorMessageHandling(t *testing.T) {
 				decoded, err := processor.Decode(ctx, testData)
 				if tt.expectDecodeError {
 					assert.Error(t, err)
+
 					return // Can't continue pipeline if decode fails
 				}
 				require.NoError(t, err)
@@ -626,6 +624,7 @@ func TestProcessorMessageHandling(t *testing.T) {
 				result, err := processor.Validate(ctx, decoded, testPeer)
 				if tt.expectValidateError {
 					assert.Error(t, err)
+
 					return // Can't continue pipeline if validate fails
 				}
 				require.NoError(t, err)
@@ -644,7 +643,7 @@ func TestProcessorMessageHandling(t *testing.T) {
 	})
 }
 
-// TestProcessorValidation tests processor validation in depth
+// TestProcessorValidation tests processor validation in depth.
 func TestProcessorValidation(t *testing.T) {
 	ctx := context.Background()
 
@@ -714,7 +713,7 @@ func TestProcessorValidation(t *testing.T) {
 	})
 }
 
-// TestMultiProcessor tests MultiProcessor functionality
+// TestMultiProcessor tests MultiProcessor functionality.
 func TestMultiProcessor(t *testing.T) {
 	ctx := context.Background()
 	topics := []string{"topic1", "topic2", "topic3"}
@@ -783,7 +782,7 @@ func TestMultiProcessor(t *testing.T) {
 	})
 }
 
-// TestProcessorMetricsRaceConditions tests metrics under concurrent access
+// TestProcessorMetricsRaceConditions tests metrics under concurrent access.
 func TestProcessorMetricsRaceConditions(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping race condition test in short mode")
@@ -881,7 +880,7 @@ func TestProcessorMetricsRaceConditions(t *testing.T) {
 	})
 }
 
-// TestProcessorContextHandling tests context cancellation handling
+// TestProcessorContextHandling tests context cancellation handling.
 func TestProcessorContextHandling(t *testing.T) {
 	processor := newMockProcessor("test-topic")
 
@@ -912,41 +911,41 @@ func TestProcessorContextHandling(t *testing.T) {
 	}
 }
 
-// TestProcessorPublicInterface tests the processor public interface behavior
+// TestProcessorPublicInterface tests the processor public interface behavior.
 func TestProcessorPublicInterface(t *testing.T) {
 	// Test processor validation behavior indirectly through public interface
 	// Since we can't access unexported fields from external tests, we test
 	// the overall behavior rather than internal implementation details.
-	
+
 	processor := newMockProcessor("test-topic")
-	
+
 	// Test that processor methods return expected results
 	ctx := context.Background()
-	
+
 	// Test decode functionality
 	decoded, err := processor.Decode(ctx, []byte("test message"))
 	assert.NoError(t, err)
 	assert.Equal(t, "test message", decoded)
-	
+
 	// Test validation functionality
 	result, err := processor.Validate(ctx, "valid", "peer1")
 	assert.NoError(t, err)
 	assert.Equal(t, ethpubsub.ValidationAccept, result)
-	
+
 	result, err = processor.Validate(ctx, "invalid", "peer1")
 	assert.NoError(t, err)
 	assert.Equal(t, ethpubsub.ValidationReject, result)
-	
+
 	result, err = processor.Validate(ctx, "ignore", "peer1")
 	assert.NoError(t, err)
 	assert.Equal(t, ethpubsub.ValidationIgnore, result)
-	
+
 	// Test process functionality
 	err = processor.Process(ctx, "test", "peer1")
 	assert.NoError(t, err)
 }
 
-// TestProcessorPerformanceMetrics tests performance-related metrics
+// TestProcessorPerformanceMetrics tests performance-related metrics.
 func TestProcessorPerformanceMetrics(t *testing.T) {
 	log := logrus.New()
 	log.SetLevel(logrus.ErrorLevel)
@@ -981,7 +980,7 @@ func TestProcessorPerformanceMetrics(t *testing.T) {
 	assert.Equal(t, time.Duration(0), stats.AvgProcessingTime) // Should be 0 when no messages processed
 }
 
-// TestProcessorEdgeCases tests various edge cases
+// TestProcessorEdgeCases tests various edge cases.
 func TestProcessorEdgeCases(t *testing.T) {
 	t.Run("empty_topic_names", func(t *testing.T) {
 		processor := newMockProcessor("")

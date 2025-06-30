@@ -1,9 +1,9 @@
 package pubsub_test
 
 import (
-	ethpubsub "github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub"
 	"testing"
 
+	ethpubsub "github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/assert"
 )

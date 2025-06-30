@@ -1,17 +1,15 @@
 package p2p_test
 
 import (
-	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p"
 	"context"
-	"errors"
 	"testing"
 	"time"
 
+	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p"
+
 	"github.com/OffchainLabs/prysm/v6/beacon-chain/p2p/encoder"
 	"github.com/libp2p/go-libp2p"
-	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
-	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -59,7 +57,7 @@ func TestSupportedProtocols(t *testing.T) {
 	}
 
 	r := p2p.NewReqResp(log, h, encoder.SszNetworkEncoder{}, config)
-	
+
 	// Initially should have no protocols
 	protocols := r.SupportedProtocols()
 	assert.Empty(t, protocols)
@@ -131,26 +129,6 @@ func TestRegisterHandler(t *testing.T) {
 			}
 		})
 	}
-}
-
-// mockHost implements a minimal host.Host for testing.
-type mockHost struct {
-	host.Host
-	streamHandlers map[protocol.ID]network.StreamHandler
-}
-
-func newMockHost() *mockHost {
-	return &mockHost{
-		streamHandlers: make(map[protocol.ID]network.StreamHandler),
-	}
-}
-
-func (m *mockHost) SetStreamHandler(pid protocol.ID, handler network.StreamHandler) {
-	m.streamHandlers[pid] = handler
-}
-
-func (m *mockHost) NewStream(ctx context.Context, p peer.ID, pids ...protocol.ID) (network.Stream, error) {
-	return nil, errors.New("not implemented")
 }
 
 func TestWrapper(t *testing.T) {

@@ -1,11 +1,12 @@
 package eth_test
 
 import (
-	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/eth"
 	"bytes"
 	"context"
 	"errors"
 	"testing"
+
+	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/eth"
 
 	"github.com/OffchainLabs/prysm/v6/beacon-chain/p2p/encoder"
 	"github.com/OffchainLabs/prysm/v6/consensus-types/primitives"
@@ -289,6 +290,7 @@ func TestBeaconBlockProcessorWithNilFields(t *testing.T) {
 		Handler: func(ctx context.Context, block *pb.SignedBeaconBlock, from peer.ID) error {
 			// Verify block is not nil
 			assert.NotNil(t, block)
+
 			return nil
 		},
 	}

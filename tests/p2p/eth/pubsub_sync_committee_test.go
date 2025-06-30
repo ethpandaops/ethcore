@@ -1,11 +1,12 @@
 package eth_test
 
 import (
-	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/eth"
 	"bytes"
 	"context"
 	"errors"
 	"testing"
+
+	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/eth"
 
 	"github.com/OffchainLabs/prysm/v6/beacon-chain/p2p/encoder"
 	"github.com/OffchainLabs/prysm/v6/consensus-types/primitives"
@@ -21,7 +22,7 @@ func TestSyncCommitteeProcessorTopics(t *testing.T) {
 	forkDigest := [4]byte{0x01, 0x02, 0x03, 0x04}
 	processor := &eth.SyncCommitteeProcessor{
 		ForkDigest: forkDigest,
-		Subnets: []uint64{0, 1, 2},
+		Subnets:    []uint64{0, 1, 2},
 	}
 
 	topics := processor.Topics()
@@ -56,6 +57,7 @@ func TestSyncCommitteeProcessorGetTopicScoreParams(t *testing.T) {
 	assert.Nil(t, params)
 }
 
+//nolint:staticcheck // deprecated types still require testing.
 func TestSyncCommitteeProcessorDecode(t *testing.T) {
 	processor := &eth.SyncCommitteeProcessor{
 		Encoder: encoder.SszNetworkEncoder{},
@@ -88,6 +90,7 @@ func TestSyncCommitteeProcessorDecode(t *testing.T) {
 	assert.Error(t, err)
 }
 
+//nolint:staticcheck // deprecated methods still need testing.
 func TestSyncCommitteeProcessorValidate(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -102,10 +105,11 @@ func TestSyncCommitteeProcessorValidate(t *testing.T) {
 			setupValidator: func() func(context.Context, *pb.SyncCommitteeMessage, uint64) (pubsub.ValidationResult, error) {
 				return func(ctx context.Context, msg *pb.SyncCommitteeMessage, subnet uint64) (pubsub.ValidationResult, error) {
 					assert.Equal(t, uint64(1), subnet)
+
 					return pubsub.ValidationAccept, nil
 				}
 			},
-			subnets: []uint64{0, 1, 2},
+			subnets:        []uint64{0, 1, 2},
 			topic:          "/eth2/01020304/sync_committee_1/ssz_snappy",
 			expectedResult: pubsub.ValidationAccept,
 			expectError:    false,
@@ -117,7 +121,7 @@ func TestSyncCommitteeProcessorValidate(t *testing.T) {
 					return pubsub.ValidationReject, nil
 				}
 			},
-			subnets: []uint64{0},
+			subnets:        []uint64{0},
 			topic:          "/eth2/01020304/sync_committee_0/ssz_snappy",
 			expectedResult: pubsub.ValidationReject,
 			expectError:    false,
@@ -129,7 +133,7 @@ func TestSyncCommitteeProcessorValidate(t *testing.T) {
 					return pubsub.ValidationReject, errors.New("validation failed")
 				}
 			},
-			subnets: []uint64{2},
+			subnets:        []uint64{2},
 			topic:          "/eth2/01020304/sync_committee_2/ssz_snappy",
 			expectedResult: pubsub.ValidationReject,
 			expectError:    true,
@@ -139,7 +143,7 @@ func TestSyncCommitteeProcessorValidate(t *testing.T) {
 			setupValidator: func() func(context.Context, *pb.SyncCommitteeMessage, uint64) (pubsub.ValidationResult, error) {
 				return nil
 			},
-			subnets: []uint64{3},
+			subnets:        []uint64{3},
 			topic:          "/eth2/01020304/sync_committee_3/ssz_snappy",
 			expectedResult: pubsub.ValidationAccept,
 			expectError:    false,
@@ -151,7 +155,7 @@ func TestSyncCommitteeProcessorValidate(t *testing.T) {
 					return pubsub.ValidationAccept, nil
 				}
 			},
-			subnets: []uint64{0},
+			subnets:        []uint64{0},
 			topic:          "/eth2/01020304/sync_committee_999/ssz_snappy",
 			expectedResult: pubsub.ValidationReject,
 			expectError:    true,
@@ -186,6 +190,7 @@ func TestSyncCommitteeProcessorValidate(t *testing.T) {
 	}
 }
 
+//nolint:staticcheck // deprecated methods still need testing.
 func TestSyncCommitteeProcessorProcess(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -199,10 +204,11 @@ func TestSyncCommitteeProcessorProcess(t *testing.T) {
 			setupHandler: func() func(context.Context, *pb.SyncCommitteeMessage, uint64, peer.ID) error {
 				return func(ctx context.Context, msg *pb.SyncCommitteeMessage, subnet uint64, from peer.ID) error {
 					assert.Equal(t, uint64(1), subnet)
+
 					return nil
 				}
 			},
-			subnets: []uint64{0, 1, 2},
+			subnets:     []uint64{0, 1, 2},
 			topic:       "/eth2/01020304/sync_committee_1/ssz_snappy",
 			expectError: false,
 		},
@@ -213,14 +219,14 @@ func TestSyncCommitteeProcessorProcess(t *testing.T) {
 					return errors.New("processing failed")
 				}
 			},
-			subnets: []uint64{0},
+			subnets:     []uint64{0},
 			topic:       "/eth2/01020304/sync_committee_0/ssz_snappy",
 			expectError: true,
 		},
 		{
 			name:         "no handler",
 			setupHandler: func() func(context.Context, *pb.SyncCommitteeMessage, uint64, peer.ID) error { return nil },
-			subnets: []uint64{0},
+			subnets:      []uint64{0},
 			topic:        "/eth2/01020304/sync_committee_0/ssz_snappy",
 			expectError:  false,
 		},
@@ -231,7 +237,7 @@ func TestSyncCommitteeProcessorProcess(t *testing.T) {
 					return nil
 				}
 			},
-			subnets: []uint64{0},
+			subnets:     []uint64{0},
 			topic:       "/eth2/01020304/sync_committee_999/ssz_snappy",
 			expectError: true,
 		},
@@ -270,7 +276,7 @@ func TestSyncCommitteeProcessorSubscribeUnsubscribe(t *testing.T) {
 		Gossipsub:  mockGS,
 		ForkDigest: [4]byte{0x01, 0x02, 0x03, 0x04},
 		Log:        logrus.New(),
-		Subnets: []uint64{},
+		Subnets:    []uint64{},
 	}
 
 	// Test subscribe with subnets
@@ -301,7 +307,7 @@ func TestSyncCommitteeProcessorSubscribeUnsubscribe(t *testing.T) {
 func TestSyncCommitteeProcessorTopicIndex(t *testing.T) {
 	processor := &eth.SyncCommitteeProcessor{
 		ForkDigest: [4]byte{0x01, 0x02, 0x03, 0x04},
-		Subnets: []uint64{0, 1, 3},
+		Subnets:    []uint64{0, 1, 3},
 		Log:        logrus.New(),
 	}
 

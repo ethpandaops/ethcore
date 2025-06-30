@@ -1,8 +1,9 @@
 package eth_test
 
 import (
-	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/eth"
 	"testing"
+
+	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/eth"
 
 	"github.com/OffchainLabs/prysm/v6/beacon-chain/p2p/encoder"
 	"github.com/sirupsen/logrus"
@@ -27,7 +28,7 @@ func TestNewBeaconchainGossipsub(t *testing.T) {
 }
 
 // TestProcessorTopics tests that topic functions work correctly
-// Since processor types are unexported, we test the public topic functions directly
+// Since processor types are unexported, we test the public topic functions directly.
 func TestProcessorTopics(t *testing.T) {
 	forkDigest := [4]byte{0x01, 0x02, 0x03, 0x04}
 
@@ -62,7 +63,7 @@ func TestProcessorTopics(t *testing.T) {
 	})
 }
 
-// TestTopicGeneration verifies that topics are generated correctly
+// TestTopicGeneration verifies that topics are generated correctly.
 func TestTopicGeneration(t *testing.T) {
 	forkDigest := [4]byte{0x01, 0x02, 0x03, 0x04}
 

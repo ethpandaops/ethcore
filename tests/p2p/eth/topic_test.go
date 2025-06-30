@@ -1,10 +1,10 @@
 package eth_test
 
 import (
-	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/eth"
 	"fmt"
 	"testing"
 
+	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/eth"
 	"github.com/stretchr/testify/assert"
 )
 

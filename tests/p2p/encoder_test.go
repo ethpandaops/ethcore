@@ -1,10 +1,10 @@
 package p2p_test
 
 import (
-	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p"
 	"bytes"
 	"testing"
 
+	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/protolambda/ztyp/codec"
 	"github.com/protolambda/ztyp/tree"

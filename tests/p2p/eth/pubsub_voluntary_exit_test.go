@@ -1,7 +1,6 @@
 package eth_test
 
 import (
-	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/eth"
 	"bytes"
 	"context"
 	"errors"
@@ -10,6 +9,7 @@ import (
 	"github.com/OffchainLabs/prysm/v6/beacon-chain/p2p/encoder"
 	"github.com/OffchainLabs/prysm/v6/consensus-types/primitives"
 	pb "github.com/OffchainLabs/prysm/v6/proto/prysm/v1alpha1"
+	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/eth"
 	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/sirupsen/logrus"
@@ -241,6 +241,7 @@ func TestVoluntaryExitProcessorWithNilFields(t *testing.T) {
 		Handler: func(ctx context.Context, exit *pb.SignedVoluntaryExit, from peer.ID) error {
 			// Verify exit is not nil
 			assert.NotNil(t, exit)
+
 			return nil
 		},
 	}

@@ -1,11 +1,12 @@
 package eth_test
 
 import (
-	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/eth"
 	"bytes"
 	"context"
 	"errors"
 	"testing"
+
+	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/eth"
 
 	"github.com/OffchainLabs/prysm/v6/beacon-chain/p2p/encoder"
 	"github.com/OffchainLabs/prysm/v6/consensus-types/primitives"
@@ -285,6 +286,7 @@ func TestAggregateProcessorWithNilFields(t *testing.T) {
 		Handler: func(ctx context.Context, agg *pb.AggregateAttestationAndProof, from peer.ID) error {
 			// Verify aggregate is not nil
 			assert.NotNil(t, agg)
+
 			return nil
 		},
 	}
