@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/jellydator/ttlcache/v3"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -377,4 +379,195 @@ func TestDuplicateCache_EvictionCallback(t *testing.T) {
 func TestDuplicateCache_InterfaceCompliance(t *testing.T) {
 	// Verify interface compliance at compile time
 	var _ DuplicateCache[string, time.Time] = (*duplicateCache[string, time.Time])(nil)
+}
+
+func TestDuplicateCacheWithMetrics(t *testing.T) {
+	log := logrus.New()
+	log.SetLevel(logrus.DebugLevel)
+
+	// Create a test registry to avoid conflicts
+	registry := prometheus.NewRegistry()
+
+	config := Config{
+		TTL:      time.Minute,
+		Capacity: 100,
+		Metrics: &MetricsConfig{
+			Namespace:      "test",
+			Subsystem:      "cache",
+			InstanceLabels: map[string]string{"cache_name": "test_cache"},
+			UpdateInterval: 100 * time.Millisecond,
+			Registerer:     registry,
+		},
+	}
+
+	cache := NewDuplicateCacheWithConfig[string, string](log, config)
+
+	dc, ok := cache.(*duplicateCache[string, string])
+	require.True(t, ok)
+
+	ctx := context.Background()
+
+	err := cache.Start(ctx)
+	require.NoError(t, err)
+
+	defer func() {
+		_ = cache.Stop()
+	}()
+
+	// Test insertions
+	cache.Set("key1", "value1")
+	cache.Set("key2", "value2")
+	cache.Set("key3", "value3")
+
+	// Test hits
+	item := cache.Get("key1")
+	assert.NotNil(t, item)
+	assert.Equal(t, "value1", item.Value())
+
+	has := cache.Has("key2")
+	assert.True(t, has)
+
+	// Test misses
+	item = cache.Get("nonexistent")
+	assert.Nil(t, item)
+
+	has = cache.Has("nonexistent")
+	assert.False(t, has)
+
+	// Wait for metrics to be updated
+	time.Sleep(200 * time.Millisecond)
+
+	// Verify metrics
+	assert.NotNil(t, dc.metrics)
+
+	// Check insertion metrics
+	insertions := testutil.ToFloat64(dc.metrics.insertionsTotal.WithLabelValues("test_cache"))
+	assert.Equal(t, float64(3), insertions)
+
+	// Check hit metrics
+	hits := testutil.ToFloat64(dc.metrics.hitsTotal.WithLabelValues("test_cache"))
+	assert.Equal(t, float64(2), hits)
+
+	// Check miss metrics
+	misses := testutil.ToFloat64(dc.metrics.missesTotal.WithLabelValues("test_cache"))
+	assert.Equal(t, float64(2), misses)
+
+	// Check size metric
+	size := testutil.ToFloat64(dc.metrics.sizeGauge.WithLabelValues("test_cache"))
+	assert.Equal(t, float64(3), size)
+}
+
+func TestDuplicateCacheWithoutMetrics(t *testing.T) {
+	log := logrus.New()
+
+	config := Config{
+		TTL:      time.Minute,
+		Capacity: 100,
+		// No metrics configuration
+	}
+
+	cache := NewDuplicateCacheWithConfig[string, string](log, config)
+
+	dc, ok := cache.(*duplicateCache[string, string])
+	require.True(t, ok)
+
+	ctx := context.Background()
+
+	err := cache.Start(ctx)
+	require.NoError(t, err)
+
+	defer func() {
+		_ = cache.Stop()
+	}()
+
+	// Operations should work without metrics
+	cache.Set("key1", "value1")
+	item := cache.Get("key1")
+	assert.NotNil(t, item)
+	assert.Equal(t, "value1", item.Value())
+
+	// Verify no metrics were created
+	assert.Nil(t, dc.metrics)
+}
+
+func TestDuplicateCacheMetricsEvictions(t *testing.T) {
+	log := logrus.New()
+	registry := prometheus.NewRegistry()
+
+	config := Config{
+		TTL:      100 * time.Millisecond, // Short TTL for testing
+		Capacity: 2,                      // Small capacity to force evictions
+		Metrics: &MetricsConfig{
+			Namespace:      "test",
+			Subsystem:      "cache",
+			InstanceLabels: map[string]string{"cache_name": "test_cache"},
+			UpdateInterval: 50 * time.Millisecond,
+			Registerer:     registry,
+		},
+	}
+
+	cache := NewDuplicateCacheWithConfig[string, string](log, config)
+
+	dc, ok := cache.(*duplicateCache[string, string])
+	require.True(t, ok)
+
+	ctx := context.Background()
+
+	err := cache.Start(ctx)
+	require.NoError(t, err)
+
+	defer func() {
+		_ = cache.Stop()
+	}()
+
+	// Add items to trigger capacity eviction
+	cache.Set("key1", "value1")
+	cache.Set("key2", "value2")
+	cache.Set("key3", "value3") // This should evict key1
+
+	// Wait for TTL evictions
+	time.Sleep(200 * time.Millisecond)
+
+	// Check eviction metrics
+	evictions := testutil.ToFloat64(dc.metrics.evictionsTotal.WithLabelValues("test_cache"))
+	assert.Greater(t, evictions, float64(0))
+}
+
+func TestMetricsRegistrationError(t *testing.T) {
+	log := logrus.New()
+	registry := prometheus.NewRegistry()
+
+	// Register a conflicting metric
+	counter := prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "test",
+		Subsystem: "cache",
+		Name:      "insertions_total",
+		Help:      "Test counter for registration conflict testing",
+	}, []string{"cache_name"})
+
+	err := registry.Register(counter)
+	require.NoError(t, err)
+
+	config := Config{
+		TTL: time.Minute,
+		Metrics: &MetricsConfig{
+			Namespace:      "test",
+			Subsystem:      "cache",
+			InstanceLabels: map[string]string{"cache_name": "test_cache"},
+			Registerer:     registry,
+		},
+	}
+
+	// Should not panic, just log a warning
+	cache := NewDuplicateCacheWithConfig[string, string](log, config)
+	assert.NotNil(t, cache)
+
+	ctx := context.Background()
+
+	err = cache.Start(ctx)
+	require.NoError(t, err)
+
+	defer func() {
+		_ = cache.Stop()
+	}()
 }
