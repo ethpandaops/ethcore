@@ -71,7 +71,7 @@ func registerTopic[T any](gs *v1.Gossipsub, topic *v1.Topic[T], handler *v1.Hand
 func subscribeTopic[T any](gs *v1.Gossipsub, topic *v1.Topic[T]) (*v1.Subscription, error) {
 	// Use unsafe conversion to convert *Topic[T] to *Topic[any]
 	anyTopic := (*v1.Topic[any])(unsafe.Pointer(topic))
-	return v1.Subscribe(gs, anyTopic)
+	return v1.Subscribe(context.Background(), gs, anyTopic)
 }
 
 // publishTopic is a helper function that converts typed Topic for publishing
@@ -93,7 +93,7 @@ func registerSubnetTopic[T any](gs *v1.Gossipsub, subnetTopic *v1.SubnetTopic[T]
 func subscribeSubnetTopic[T any](gs *v1.Gossipsub, subnetTopic *v1.SubnetTopic[T], subnet uint64, forkDigest [4]byte) (*v1.Subscription, error) {
 	// Use unsafe conversion to convert *SubnetTopic[T] to *SubnetTopic[any]
 	anySubnetTopic := (*v1.SubnetTopic[any])(unsafe.Pointer(subnetTopic))
-	return v1.SubscribeSubnet(gs, anySubnetTopic, subnet, forkDigest)
+	return v1.SubscribeSubnet(context.Background(), gs, anySubnetTopic, subnet, forkDigest)
 }
 
 // createTestHandler creates a basic handler config with a no-op processor for testing

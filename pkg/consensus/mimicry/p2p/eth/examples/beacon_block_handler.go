@@ -136,7 +136,7 @@ func ExampleBeaconBlockSetup(ctx context.Context, db *sql.DB, log logrus.FieldLo
 	}
 
 	// Subscribe to the topic to start receiving messages
-	sub, err := v1.Subscribe(g, topic)
+	sub, err := v1.Subscribe(context.Background(), g, topic)
 	if err != nil {
 		return fmt.Errorf("failed to subscribe to topic: %w", err)
 	}

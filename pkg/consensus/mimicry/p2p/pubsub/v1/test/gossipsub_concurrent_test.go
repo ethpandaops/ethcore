@@ -50,7 +50,7 @@ func TestGossipsub_ConcurrentOperations(t *testing.T) {
 			wg.Add(1)
 			go func(idx int) {
 				defer wg.Done()
-				sub, err := v1.Subscribe(gs, topics[idx])
+				sub, err := v1.Subscribe(context.Background(), gs, topics[idx])
 				if err != nil {
 					errors <- err
 					return

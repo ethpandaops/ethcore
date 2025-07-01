@@ -72,7 +72,7 @@ func Example_metrics() {
 	}
 
 	// Subscribe to topic - metrics will track active subscriptions
-	sub, err := v1.Subscribe(gs, topic)
+	sub, err := v1.Subscribe(context.Background(), gs, topic)
 	if err != nil {
 		log.Fatalf("Failed to subscribe: %v", err)
 	}

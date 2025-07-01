@@ -309,7 +309,7 @@ func (h *AttestationHandler) subscribeToSubnet(
 	}
 
 	// Subscribe to the subnet topic
-	sub, err := v1.Subscribe(g, topic)
+	sub, err := v1.Subscribe(context.Background(), g, topic)
 	if err != nil {
 		return fmt.Errorf("failed to subscribe to subnet %d: %w", subnet, err)
 	}

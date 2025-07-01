@@ -56,7 +56,7 @@ func benchmarkSubscribe(b *testing.B) {
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		sub, err := v1.Subscribe(gs, topics[i])
+		sub, err := v1.Subscribe(context.Background(), gs, topics[i])
 		if err != nil {
 			b.Fatal(err)
 		}

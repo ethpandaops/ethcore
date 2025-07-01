@@ -86,7 +86,6 @@ type Gossipsub struct {
 	log    logrus.FieldLogger
 	host   host.Host
 	pubsub *pubsub.PubSub
-	ctx    context.Context
 	cancel context.CancelFunc
 
 	// Configuration
@@ -130,7 +129,6 @@ func New(ctx context.Context, host host.Host, opts ...Option) (*Gossipsub, error
 	g := &Gossipsub{
 		log:                   logrus.StandardLogger().WithField("component", "gossipsub-v1"),
 		host:                  host,
-		ctx:                   gossipCtx,
 		cancel:                cancel,
 		maxMessageSize:        10 << 20, // 10MB default
 		publishTimeout:        5 * time.Second,
@@ -149,7 +147,7 @@ func New(ctx context.Context, host host.Host, opts ...Option) (*Gossipsub, error
 	}
 
 	// Initialize libp2p pubsub
-	if err := g.initializePubSub(); err != nil {
+	if err := g.initializePubSub(gossipCtx); err != nil {
 		cancel()
 		return nil, fmt.Errorf("failed to initialize pubsub: %w", err)
 	}
@@ -159,7 +157,7 @@ func New(ctx context.Context, host host.Host, opts ...Option) (*Gossipsub, error
 }
 
 // initializePubSub creates the underlying libp2p pubsub instance.
-func (g *Gossipsub) initializePubSub() error {
+func (g *Gossipsub) initializePubSub(ctx context.Context) error {
 	opts := []pubsub.Option{
 		pubsub.WithMaxMessageSize(g.maxMessageSize),
 		pubsub.WithValidateWorkers(g.validationConcurrency),
@@ -172,7 +170,7 @@ func (g *Gossipsub) initializePubSub() error {
 		opts = append(opts, pubsub.WithGossipSubParams(g.gossipSubParams))
 	}
 
-	ps, err := pubsub.NewGossipSub(g.ctx, g.host, opts...)
+	ps, err := pubsub.NewGossipSub(ctx, g.host, opts...)
 	if err != nil {
 		return fmt.Errorf("failed to create gossipsub: %w", err)
 	}
@@ -198,7 +196,7 @@ func (g *Gossipsub) RegisterSubnet(subnetTopic *SubnetTopic[any], handler *Handl
 }
 
 // Subscribe subscribes to a specific topic and returns a subscription handle.
-func Subscribe[T any](g *Gossipsub, topic *Topic[T]) (*Subscription, error) {
+func Subscribe[T any](ctx context.Context, g *Gossipsub, topic *Topic[T]) (*Subscription, error) {
 	if !g.started {
 		return nil, fmt.Errorf("gossipsub not started")
 	}
@@ -230,14 +228,15 @@ func Subscribe[T any](g *Gossipsub, topic *Topic[T]) (*Subscription, error) {
 		name:    topic.name,
 		encoder: wrapEncoder(topic.encoder),
 	}
-	proc, err := g.createProcessor(anyTopic, handler, libp2pSub)
+	proc, procCtx, err := g.createProcessor(ctx, anyTopic, handler, libp2pSub)
 	if err != nil {
 		libp2pSub.Cancel()
 		return nil, fmt.Errorf("failed to create processor: %w", err)
 	}
 
 	// Create subscription
-	ctx, cancel := context.WithCancel(g.ctx)
+	subCtx, cancel := context.WithCancel(ctx)
+
 	sub := &Subscription{
 		topic:  topicName,
 		cancel: cancel,
@@ -254,21 +253,22 @@ func Subscribe[T any](g *Gossipsub, topic *Topic[T]) (*Subscription, error) {
 
 	// Start processor in background
 	g.wg.Add(1)
+
 	go func() {
 		defer g.wg.Done()
-		<-ctx.Done()
+		<-subCtx.Done()
 		g.removeProcessor(topicName)
 	}()
 
 	// Start the processor
-	proc.start()
+	proc.start(procCtx)
 
 	g.log.WithField("topic", topicName).Debug("Subscribed to topic")
 	return sub, nil
 }
 
 // SubscribeSubnet subscribes to a specific subnet of a subnet topic.
-func SubscribeSubnet[T any](g *Gossipsub, subnetTopic *SubnetTopic[T], subnet uint64, forkDigest [4]byte) (*Subscription, error) {
+func SubscribeSubnet[T any](ctx context.Context, g *Gossipsub, subnetTopic *SubnetTopic[T], subnet uint64, forkDigest [4]byte) (*Subscription, error) {
 	if !g.started {
 		return nil, fmt.Errorf("gossipsub not started")
 	}
@@ -280,7 +280,7 @@ func SubscribeSubnet[T any](g *Gossipsub, subnetTopic *SubnetTopic[T], subnet ui
 	}
 
 	// Subscribe using the regular Subscribe function
-	return Subscribe(g, topic)
+	return Subscribe(ctx, g, topic)
 }
 
 // CreateSubnetSubscription creates a new subnet subscription manager.
@@ -334,17 +334,17 @@ func Publish[T any](g *Gossipsub, topic *Topic[T], msg T) error {
 }
 
 // createProcessor creates a new processor for a topic.
-func (g *Gossipsub) createProcessor(topic *Topic[any], handler *HandlerConfig[any], sub *pubsub.Subscription) (*processor[any], error) {
-	proc, err := newProcessor(g.ctx, topic, handler, sub, g.metrics)
+func (g *Gossipsub) createProcessor(ctx context.Context, topic *Topic[any], handler *HandlerConfig[any], sub *pubsub.Subscription) (*processor[any], context.Context, error) {
+	proc, procCtx, err := newProcessor(ctx, topic, handler, sub, g.metrics)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	g.procMutex.Lock()
 	g.processors[topic.Name()] = proc
 	g.procMutex.Unlock()
 
-	return proc, nil
+	return proc, procCtx, nil
 }
 
 // removeProcessor removes a processor for a topic.

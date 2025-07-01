@@ -31,6 +31,7 @@ func (s *Subscription) Topic() string {
 	if s == nil {
 		return ""
 	}
+
 	return s.topic
 }
 
@@ -60,6 +61,7 @@ func (s *Subscription) IsCancelled() bool {
 
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+
 	return s.cancelled
 }
 
@@ -109,6 +111,7 @@ func (ss *SubnetSubscription[T]) Add(subnet uint64, subscription *Subscription) 
 	}
 
 	ss.subscriptions[subnet] = subscription
+
 	return nil
 }
 
@@ -125,6 +128,7 @@ func (ss *SubnetSubscription[T]) Remove(subnet uint64) bool {
 
 	subscription.Cancel()
 	delete(ss.subscriptions, subnet)
+
 	return true
 }
 
@@ -151,6 +155,7 @@ func (ss *SubnetSubscription[T]) Set(subscriptions map[uint64]*Subscription) err
 
 	// Create new map to prevent external modifications
 	newSubs := make(map[uint64]*Subscription, len(subscriptions))
+
 	for subnet, sub := range subscriptions {
 		if sub != nil {
 			newSubs[subnet] = sub
@@ -158,6 +163,7 @@ func (ss *SubnetSubscription[T]) Set(subscriptions map[uint64]*Subscription) err
 	}
 
 	ss.subscriptions = newSubs
+
 	return nil
 }
 
@@ -168,6 +174,7 @@ func (ss *SubnetSubscription[T]) Active() []uint64 {
 	defer ss.mu.RUnlock()
 
 	active := make([]uint64, 0, len(ss.subscriptions))
+
 	for subnet, sub := range ss.subscriptions {
 		if sub != nil && !sub.IsCancelled() {
 			active = append(active, subnet)
@@ -207,6 +214,7 @@ func (ss *SubnetSubscription[T]) Count() int {
 	defer ss.mu.RUnlock()
 
 	count := 0
+
 	for _, sub := range ss.subscriptions {
 		if sub != nil && !sub.IsCancelled() {
 			count++
@@ -229,9 +237,6 @@ type processor[T any] struct {
 	// topic is the topic this processor is subscribed to
 	topic *Topic[T]
 
-	// ctx is the context for this processor
-	ctx context.Context
-
 	// cancel is the function to cancel this processor
 	cancel context.CancelFunc
 
@@ -243,15 +248,17 @@ type processor[T any] struct {
 }
 
 // newProcessor creates a new processor for handling messages on a topic.
-func newProcessor[T any](ctx context.Context, topic *Topic[T], handler *HandlerConfig[T], sub *pubsub.Subscription, metrics *Metrics) (*processor[T], error) {
+func newProcessor[T any](ctx context.Context, topic *Topic[T], handler *HandlerConfig[T], sub *pubsub.Subscription, metrics *Metrics) (*processor[T], context.Context, error) {
 	if topic == nil {
-		return nil, fmt.Errorf("topic cannot be nil")
+		return nil, nil, fmt.Errorf("topic cannot be nil")
 	}
+
 	if handler == nil {
-		return nil, fmt.Errorf("handler cannot be nil")
+		return nil, nil, fmt.Errorf("handler cannot be nil")
 	}
+
 	if sub == nil {
-		return nil, fmt.Errorf("subscription cannot be nil")
+		return nil, nil, fmt.Errorf("subscription cannot be nil")
 	}
 
 	// Create a cancellable context for this processor
@@ -261,18 +268,17 @@ func newProcessor[T any](ctx context.Context, topic *Topic[T], handler *HandlerC
 		handler: handler,
 		sub:     sub,
 		topic:   topic,
-		ctx:     procCtx,
 		cancel:  cancel,
 		metrics: metrics,
 	}
 
-	return p, nil
+	return p, procCtx, nil
 }
 
 // start begins processing messages from the subscription.
-func (p *processor[T]) start() {
+func (p *processor[T]) start(ctx context.Context) {
 	p.wg.Add(1)
-	go p.run()
+	go p.run(ctx)
 }
 
 // stop cancels the processor and waits for it to finish.
@@ -283,14 +289,14 @@ func (p *processor[T]) stop() {
 }
 
 // run is the main message processing loop.
-func (p *processor[T]) run() {
+func (p *processor[T]) run(ctx context.Context) {
 	defer p.wg.Done()
 
 	for {
-		msg, err := p.sub.Next(p.ctx)
+		msg, err := p.sub.Next(ctx)
 		if err != nil {
 			// Context cancelled, normal shutdown
-			if p.ctx.Err() != nil {
+			if ctx.Err() != nil {
 				return
 			}
 			// Log error and continue
@@ -299,12 +305,12 @@ func (p *processor[T]) run() {
 		}
 
 		// Process message in a separate goroutine to avoid blocking
-		go p.processMessage(msg)
+		go p.processMessage(ctx, msg)
 	}
 }
 
 // processMessage handles a single message.
-func (p *processor[T]) processMessage(msg *pubsub.Message) {
+func (p *processor[T]) processMessage(ctx context.Context, msg *pubsub.Message) {
 	// Skip messages from self
 	if msg.ReceivedFrom == peer.ID("") {
 		return
@@ -333,7 +339,7 @@ func (p *processor[T]) processMessage(msg *pubsub.Message) {
 	// Validate the message if validator is configured
 	if p.handler.validator != nil {
 		startTime := time.Now()
-		result := p.handler.validator(p.ctx, decoded, msg.ReceivedFrom)
+		result := p.handler.validator(ctx, decoded, msg.ReceivedFrom)
 
 		if p.metrics != nil {
 			p.metrics.RecordValidationDuration(topicName, time.Since(startTime))
@@ -344,19 +350,18 @@ func (p *processor[T]) processMessage(msg *pubsub.Message) {
 		case ValidationReject, ValidationIgnore:
 			// Don't process rejected or ignored messages
 			return
-		case ValidationAccept:
-			// Continue to processing
 		}
 	}
 
 	// Process the message if processor is configured
 	if p.handler.processor != nil {
 		startTime := time.Now()
-		err := p.handler.processor(p.ctx, decoded, msg.ReceivedFrom)
+		err := p.handler.processor(ctx, decoded, msg.ReceivedFrom)
 
 		if p.metrics != nil {
 			success := err == nil
 			p.metrics.RecordMessageHandled(topicName, success, time.Since(startTime))
+
 			if !success {
 				p.metrics.RecordHandlerError(topicName)
 			}

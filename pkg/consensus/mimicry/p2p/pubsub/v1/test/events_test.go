@@ -15,69 +15,69 @@ import (
 func TestEventTypeString(t *testing.T) {
 	tests := []struct {
 		name     string
-		typ      v1.EventType
+		eventType v1.EventType
 		expected string
 	}{
 		{
 			name:     "subscribed",
-			typ:      v1.EventTypeSubscribed,
+			eventType: v1.EventTypeSubscribed,
 			expected: "subscribed",
 		},
 		{
 			name:     "unsubscribed",
-			typ:      v1.EventTypeUnsubscribed,
+			eventType: v1.EventTypeUnsubscribed,
 			expected: "unsubscribed",
 		},
 		{
 			name:     "message_received",
-			typ:      v1.EventTypeMessageReceived,
+			eventType: v1.EventTypeMessageReceived,
 			expected: "message_received",
 		},
 		{
 			name:     "message_validated",
-			typ:      v1.EventTypeMessageValidated,
+			eventType: v1.EventTypeMessageValidated,
 			expected: "message_validated",
 		},
 		{
 			name:     "message_rejected",
-			typ:      v1.EventTypeMessageRejected,
+			eventType: v1.EventTypeMessageRejected,
 			expected: "message_rejected",
 		},
 		{
 			name:     "message_processed",
-			typ:      v1.EventTypeMessageProcessed,
+			eventType: v1.EventTypeMessageProcessed,
 			expected: "message_processed",
 		},
 		{
 			name:     "message_published",
-			typ:      v1.EventTypeMessagePublished,
+			eventType: v1.EventTypeMessagePublished,
 			expected: "message_published",
 		},
 		{
 			name:     "error",
-			typ:      v1.EventTypeError,
+			eventType: v1.EventTypeError,
 			expected: "error",
 		},
 		{
 			name:     "peer_connected",
-			typ:      v1.EventTypePeerConnected,
+			eventType: v1.EventTypePeerConnected,
 			expected: "peer_connected",
 		},
 		{
 			name:     "peer_disconnected",
-			typ:      v1.EventTypePeerDisconnected,
+			eventType: v1.EventTypePeerDisconnected,
 			expected: "peer_disconnected",
 		},
 		{
 			name:     "unknown",
-			typ:      v1.EventType(999),
+			eventType: v1.EventType(999),
 			expected: "unknown(999)",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, tt.typ.String())
+			assert.Equal(t, tt.expected, tt.eventType.String())
 		})
 	}
 }

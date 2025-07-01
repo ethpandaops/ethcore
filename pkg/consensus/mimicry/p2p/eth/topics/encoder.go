@@ -11,7 +11,7 @@ import (
 	fastssz "github.com/prysmaticlabs/fastssz"
 )
 
-// SSZMarshaler is a type constraint that combines fastssz marshaling and unmarshaling.
+// SSZMarshaler is a type constraint that combines fastssz marshaling and unmarshalling.
 type SSZMarshaler interface {
 	fastssz.Marshaler
 	fastssz.Unmarshaler
@@ -56,12 +56,12 @@ func (e *SSZSnappyEncoder[T]) Decode(data []byte) (T, error) {
 	}
 
 	// Use reflection to create a proper instance
-	typ := reflect.TypeOf(zero)
+	reflectType := reflect.TypeOf(zero)
 
 	// If T is a pointer type (e.g., *eth.Attestation)
-	if typ.Kind() == reflect.Ptr {
+	if reflectType.Kind() == reflect.Ptr {
 		// Create a new instance of the element type
-		elem := reflect.New(typ.Elem())
+		elem := reflect.New(reflectType.Elem())
 
 		// Get the unmarshaler interface
 		unmarshaler := elem.Interface().(fastssz.Unmarshaler)
@@ -76,7 +76,7 @@ func (e *SSZSnappyEncoder[T]) Decode(data []byte) (T, error) {
 	}
 
 	// For non-pointer types (though this shouldn't happen with our constraint)
-	return zero, fmt.Errorf("expected pointer type, got %v", typ)
+	return zero, fmt.Errorf("expected pointer type, got %v", reflectType)
 }
 
 // SSZSnappyEncoderWithMaxLen implements the v1.Encoder interface with a maximum message length.
@@ -175,12 +175,12 @@ func (e *PrysmSSZSnappyEncoder[T]) Decode(data []byte) (T, error) {
 	var zero T
 
 	// Use reflection to create a proper instance
-	typ := reflect.TypeOf(zero)
+	reflectType := reflect.TypeOf(zero)
 
 	// If T is a pointer type (e.g., *eth.Attestation)
-	if typ.Kind() == reflect.Ptr {
+	if reflectType.Kind() == reflect.Ptr {
 		// Create a new instance of the element type
-		elem := reflect.New(typ.Elem())
+		elem := reflect.New(reflectType.Elem())
 
 		// Decode into the pointer
 		err := e.encoder.DecodeWithMaxLength(bytes.NewReader(data), elem.Interface().(fastssz.Unmarshaler))
@@ -193,5 +193,5 @@ func (e *PrysmSSZSnappyEncoder[T]) Decode(data []byte) (T, error) {
 	}
 
 	// For non-pointer types
-	return zero, fmt.Errorf("expected pointer type, got %v", typ)
+	return zero, fmt.Errorf("expected pointer type, got %v", reflectType)
 }
