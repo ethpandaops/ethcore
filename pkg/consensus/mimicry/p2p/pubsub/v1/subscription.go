@@ -237,6 +237,9 @@ type processor[T any] struct {
 	// topic is the topic this processor is subscribed to
 	topic *Topic[T]
 
+	// globalInvalidPayloadHandler is the global handler for invalid payloads
+	globalInvalidPayloadHandler func(ctx context.Context, data []byte, err error, from peer.ID, topic string)
+
 	// cancel is the function to cancel this processor
 	cancel context.CancelFunc
 
@@ -248,7 +251,7 @@ type processor[T any] struct {
 }
 
 // newProcessor creates a new processor for handling messages on a topic.
-func newProcessor[T any](ctx context.Context, topic *Topic[T], handler *HandlerConfig[T], sub *pubsub.Subscription, metrics *Metrics) (*processor[T], context.Context, error) {
+func newProcessor[T any](ctx context.Context, topic *Topic[T], handler *HandlerConfig[T], sub *pubsub.Subscription, metrics *Metrics, globalInvalidPayloadHandler func(ctx context.Context, data []byte, err error, from peer.ID, topic string)) (*processor[T], context.Context, error) {
 	if topic == nil {
 		return nil, nil, fmt.Errorf("topic cannot be nil")
 	}
@@ -265,11 +268,12 @@ func newProcessor[T any](ctx context.Context, topic *Topic[T], handler *HandlerC
 	procCtx, cancel := context.WithCancel(ctx)
 
 	p := &processor[T]{
-		handler: handler,
-		sub:     sub,
-		topic:   topic,
-		cancel:  cancel,
-		metrics: metrics,
+		handler:                     handler,
+		sub:                         sub,
+		topic:                       topic,
+		globalInvalidPayloadHandler: globalInvalidPayloadHandler,
+		cancel:                      cancel,
+		metrics:                     metrics,
 	}
 
 	return p, procCtx, nil
@@ -331,8 +335,17 @@ func (p *processor[T]) processMessage(ctx context.Context, msg *pubsub.Message) 
 
 	decoded, err := decoder(msg.Data)
 	if err != nil {
-		// Decoding error - ignore message
-		// In production, this would be logged
+		// Call topic-specific invalid payload handler if configured
+		if p.handler.invalidPayloadHandler != nil {
+			p.handler.invalidPayloadHandler(ctx, msg.Data, err, msg.ReceivedFrom)
+		}
+
+		// Call global invalid payload handler if configured
+		if p.globalInvalidPayloadHandler != nil {
+			p.globalInvalidPayloadHandler(ctx, msg.Data, err, msg.ReceivedFrom, topicName)
+		}
+
+		// Decoding error - ignore message after calling handlers
 		return
 	}
 

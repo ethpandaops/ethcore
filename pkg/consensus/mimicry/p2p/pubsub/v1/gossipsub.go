@@ -1,4 +1,8 @@
 // Package v1 provides a type-safe gossipsub implementation for Ethereum consensus layer p2p communication.
+//
+// This file contains the core Gossipsub struct and its lifecycle management methods.
+// The Gossipsub struct wraps libp2p's pubsub implementation with additional features
+// like metrics, validation concurrency control, and type-safe topic handling.
 package v1
 
 import (
@@ -63,7 +67,9 @@ func WithValidationConcurrency(concurrency int) Option {
 		if concurrency <= 0 {
 			return fmt.Errorf("validation concurrency must be positive, got %d", concurrency)
 		}
+
 		g.validationConcurrency = concurrency
+
 		return nil
 	}
 }
@@ -74,7 +80,19 @@ func WithMetrics(metrics *Metrics) Option {
 		if metrics == nil {
 			return fmt.Errorf("metrics cannot be nil")
 		}
+
 		g.metrics = metrics
+
+		return nil
+	}
+}
+
+// WithGlobalInvalidPayloadHandler sets a global handler for invalid payload errors across all topics.
+// This handler will be called for any decoding failures that occur, in addition to any topic-specific handlers.
+func WithGlobalInvalidPayloadHandler(handler func(ctx context.Context, data []byte, err error, from peer.ID, topic string)) Option {
+	return func(g *Gossipsub) error {
+		g.globalInvalidPayloadHandler = handler
+
 		return nil
 	}
 }
@@ -107,6 +125,9 @@ type Gossipsub struct {
 
 	// Metrics
 	metrics *Metrics
+
+	// Global invalid payload handler
+	globalInvalidPayloadHandler func(ctx context.Context, data []byte, err error, from peer.ID, topic string)
 
 	// Lifecycle
 	started bool
@@ -335,7 +356,7 @@ func Publish[T any](g *Gossipsub, topic *Topic[T], msg T) error {
 
 // createProcessor creates a new processor for a topic.
 func (g *Gossipsub) createProcessor(ctx context.Context, topic *Topic[any], handler *HandlerConfig[any], sub *pubsub.Subscription) (*processor[any], context.Context, error) {
-	proc, procCtx, err := newProcessor(ctx, topic, handler, sub, g.metrics)
+	proc, procCtx, err := newProcessor(ctx, topic, handler, sub, g.metrics, g.globalInvalidPayloadHandler)
 	if err != nil {
 		return nil, nil, err
 	}

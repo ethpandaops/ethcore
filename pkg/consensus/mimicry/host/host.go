@@ -147,6 +147,10 @@ func (n *Node) Connectedness(p peer.ID) network.Connectedness {
 	return n.host.Network().Connectedness(p)
 }
 
+func (n *Node) Host() host.Host {
+	return n.host
+}
+
 func (n *Node) ConnectToPeer(ctx context.Context, p peer.AddrInfo) error {
 	// Emit BeforePeerConnect event
 	n.emitBeforePeerConnect(p.ID)

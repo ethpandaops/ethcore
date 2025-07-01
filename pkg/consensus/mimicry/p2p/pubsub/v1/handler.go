@@ -31,6 +31,11 @@ type SubnetValidator[T any] func(ctx context.Context, msg T, from peer.ID, subne
 // It includes the subnet ID as an additional parameter for subnet-specific processing logic.
 type SubnetProcessor[T any] func(ctx context.Context, msg T, from peer.ID, subnet uint64) error
 
+// InvalidPayloadHandler is a function type that handles invalid payload decoding errors.
+// It receives the raw data that failed to decode, the decoding error, and the sender's peer ID.
+// This allows for custom handling of malformed messages, such as logging, metrics, or peer scoring.
+type InvalidPayloadHandler[T any] func(ctx context.Context, data []byte, err error, from peer.ID)
+
 // HandlerConfig contains the configuration for message handling.
 // It defines how messages of type T should be decoded, validated, and processed.
 type HandlerConfig[T any] struct {
@@ -45,6 +50,10 @@ type HandlerConfig[T any] struct {
 	// processor is the function used to process validated messages.
 	// This is where the actual business logic for handling messages is implemented.
 	processor Processor[T]
+
+	// invalidPayloadHandler is called when decoding fails for a message.
+	// This allows for custom handling of malformed payloads (logging, metrics, etc.).
+	invalidPayloadHandler InvalidPayloadHandler[T]
 
 	// scoreParams defines the topic scoring parameters for gossipsub.
 	// These parameters affect how peers are scored based on their behavior on this topic.
@@ -125,6 +134,14 @@ func WithSSZDecoding[T any]() HandlerOption[T] {
 func WithScoreParams[T any](params *pubsub.TopicScoreParams) HandlerOption[T] {
 	return func(h *HandlerConfig[T]) {
 		h.scoreParams = params
+	}
+}
+
+// WithInvalidPayloadHandler sets the invalid payload handler for the handler.
+// This handler will be called when decoding fails, allowing for custom error handling.
+func WithInvalidPayloadHandler[T any](handler InvalidPayloadHandler[T]) HandlerOption[T] {
+	return func(h *HandlerConfig[T]) {
+		h.invalidPayloadHandler = handler
 	}
 }
 
