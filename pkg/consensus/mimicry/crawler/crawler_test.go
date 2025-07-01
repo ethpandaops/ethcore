@@ -326,11 +326,6 @@ func feedENRsToCrawler(
 			}
 			mu.Unlock()
 
-			// Give nodes extra time to initialize their P2P stack
-			// before they can properly handle identify protocol requests
-			//nodeLogger.Infof("Waiting for node %s to initialize P2P stack", clientName)
-			//time.Sleep(5 * time.Second)
-
 			nodeLogger.Infof("Adding node %s's ENR to discovery pool (%s)", clientName, nodeInfo.Identity.ENR)
 
 			en, err := discovery.ENRToEnode(nodeInfo.Identity.ENR)
