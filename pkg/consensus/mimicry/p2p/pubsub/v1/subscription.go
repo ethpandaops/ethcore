@@ -304,7 +304,7 @@ func (p *processor[T]) run(ctx context.Context) {
 				return
 			}
 			// Log error and continue
-			// Note: In production, this would use the logger passed to the gossipsub instance
+			// Log error and continue
 			continue
 		}
 
@@ -315,11 +315,6 @@ func (p *processor[T]) run(ctx context.Context) {
 
 // processMessage handles a single message.
 func (p *processor[T]) processMessage(ctx context.Context, msg *pubsub.Message) {
-	// Skip messages from self
-	if msg.ReceivedFrom == peer.ID("") {
-		return
-	}
-
 	topicName := p.topic.Name()
 
 	// Record message received

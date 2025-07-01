@@ -238,8 +238,14 @@ func Subscribe[T any](ctx context.Context, g *Gossipsub, topic *Topic[T]) (*Subs
 		return nil, fmt.Errorf("already subscribed to topic %s", topicName)
 	}
 
-	// Subscribe to the libp2p topic
-	libp2pSub, err := g.pubsub.Subscribe(topicName)
+	// Join the topic first
+	topicHandle, err := g.pubsub.Join(topicName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to join topic %s: %w", topicName, err)
+	}
+	
+	// Subscribe to the topic
+	libp2pSub, err := topicHandle.Subscribe()
 	if err != nil {
 		return nil, fmt.Errorf("failed to subscribe to topic %s: %w", topicName, err)
 	}
@@ -332,7 +338,7 @@ func Publish[T any](g *Gossipsub, topic *Topic[T], msg T) error {
 	}
 
 	// Publish to the topic
-	if err := g.pubsub.Publish(topicName, data, pubsub.WithReadiness(pubsub.MinTopicSize(0))); err != nil {
+	if err := g.pubsub.Publish(topicName, data); err != nil {
 		if g.metrics != nil {
 			g.metrics.RecordPublishError(topicName)
 			g.metrics.RecordMessagePublished(topicName, false)
