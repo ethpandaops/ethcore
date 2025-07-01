@@ -15,6 +15,7 @@ require (
 	github.com/ethpandaops/ethereum-package-go v0.4.0
 	github.com/ethpandaops/ethwallclock v0.4.0
 	github.com/go-co-op/gocron/v2 v2.16.2
+	github.com/golang/snappy v1.0.0
 	github.com/jellydator/ttlcache/v3 v3.4.0
 	github.com/kurtosis-tech/kurtosis/api/golang v1.10.1
 	github.com/libp2p/go-libp2p v0.41.1
@@ -23,10 +24,10 @@ require (
 	github.com/multiformats/go-multiaddr v0.16.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.22.0
-	github.com/prometheus/client_model v0.6.2
 	github.com/protolambda/zrnt v0.34.1
 	github.com/protolambda/ztyp v0.2.2
 	github.com/prysmaticlabs/fastssz v0.0.0-20241008181541-518c4ce73516
+	github.com/prysmaticlabs/go-bitfield v0.0.0-20240618144021-706c95b2dd15
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.10.0
 )
@@ -79,7 +80,6 @@ require (
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/gofrs/flock v0.12.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
-	github.com/golang/snappy v1.0.0 // indirect
 	github.com/google/gopacket v1.1.19 // indirect
 	github.com/google/pprof v0.0.0-20250501235452-c0086092b71a // indirect
 	github.com/google/uuid v1.6.0 // indirect
@@ -164,10 +164,10 @@ require (
 	github.com/pion/webrtc/v4 v4.1.0 // indirect
 	github.com/pk910/dynamic-ssz v0.0.6 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
+	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.63.0 // indirect
 	github.com/prometheus/procfs v0.16.1 // indirect
 	github.com/protolambda/bls12-381-util v0.1.0 // indirect
-	github.com/prysmaticlabs/go-bitfield v0.0.0-20240618144021-706c95b2dd15 // indirect
 	github.com/prysmaticlabs/gohashtree v0.0.4-beta.0.20240624100937-73632381301b // indirect
 	github.com/quic-go/qpack v0.5.1 // indirect
 	github.com/quic-go/quic-go v0.51.0 // indirect
