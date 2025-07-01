@@ -23,6 +23,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// NodeInfo holds beacon node and its identity information.
+type NodeInfo struct {
+	Node     *ethereum.BeaconNode
+	Identity *types.Identity
+}
+
 // TestCrawlerConfig holds configuration for the crawler tests.
 type TestCrawlerConfig struct {
 	// CrawlerTimeout is the timeout for crawler operations.
@@ -70,16 +76,22 @@ func Test_RunKurtosisTests(t *testing.T) {
 	require.NotNil(t, epgNetwork, "EPG network must be available")
 
 	t.Run("discover-crawlable-nodes", func(t *testing.T) {
-		allDiscoverableNodes(t, foundation, epgNetwork, crawlerConfig, logger)
+		allDiscoverableNodes(t, epgNetwork, crawlerConfig, logger)
 	})
 }
 
 // allDiscoverableNodes tests that all nodes are discoverable.
-func allDiscoverableNodes(t *testing.T, tf *kurtosis.TestFoundation, network network.Network, config *TestCrawlerConfig, logger *logrus.Logger) {
+func allDiscoverableNodes(
+	t *testing.T,
+	network network.Network,
+	config *TestCrawlerConfig,
+	logger *logrus.Logger,
+) {
 	t.Helper()
 
-	// Get all our peer IDs
-	identities, successful := setupNodeTracking(t, tf, network, logger)
+	// Setup beacon nodes and get their identities.
+	nodeInfos, successful := setupBeaconNodes(t, network, logger)
+	defer cleanupBeaconNodes(nodeInfos, logger)
 
 	// Create mutex for synchronizing access to the successful map
 	mu := &sync.Mutex{}
@@ -89,6 +101,12 @@ func allDiscoverableNodes(t *testing.T, tf *kurtosis.TestFoundation, network net
 
 	// Setup and start the crawler
 	cr := setupCrawler(t, network, logger, manual, config)
+
+	// Extract identities from nodeInfos for event handlers
+	identities := make(map[string]*types.Identity)
+	for name, info := range nodeInfos {
+		identities[name] = info.Identity
+	}
 
 	// Create a sink of the crawler's events
 	setupCrawlerEventHandlers(t, cr, logger, identities, successful, mu)
@@ -102,65 +120,102 @@ func allDiscoverableNodes(t *testing.T, tf *kurtosis.TestFoundation, network net
 	}
 
 	// Feed ENRs to the crawler and wait for results
-	feedENRsToCrawler(t, tf, network, logger, manual, successful, mu, config.CrawlerTimeout)
+	feedENRsToCrawler(t, nodeInfos, logger, manual, successful, mu, config.CrawlerTimeout)
 }
 
-// setupNodeTracking sets up tracking of node identities and crawl status.
-func setupNodeTracking(t *testing.T, tf *kurtosis.TestFoundation, network network.Network, logger *logrus.Logger) (map[string]*types.Identity, map[string]bool) {
+// setupBeaconNodes creates and starts beacon nodes for all consensus clients.
+func setupBeaconNodes(t *testing.T, network network.Network, logger *logrus.Logger) (map[string]*NodeInfo, map[string]bool) {
 	t.Helper()
 
 	var (
-		identities = make(map[string]*types.Identity)
+		nodeInfos  = make(map[string]*NodeInfo)
 		successful = make(map[string]bool)
+		mu         sync.Mutex
+		wg         sync.WaitGroup
 	)
 
 	// Get all consensus clients
 	consensusClients := network.ConsensusClients().All()
 
-	for _, client := range consensusClients {
-		// Create a beacon node client to fetch identity
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	for i, client := range consensusClients {
+		clientName := client.Name()
+		nodeLogger := logger.WithField("client", clientName)
+
+		// Configure the beacon node
+		config := &ethereum.Config{
+			BeaconNodeAddress: client.BeaconAPIURL(),
+		}
+
+		// Set up beacon options
 		opts := beacon.DefaultOptions()
 		opts = opts.DisablePrometheusMetrics()
 		opts.HealthCheck.Interval.Duration = 250 * time.Millisecond
+		opts.HealthCheck.SuccessfulResponses = 1
 
-		beaconNode := beacon.NewNode(
-			logger.WithField("client", client.Name()),
-			&beacon.Config{
-				Name: client.Name(),
-				Addr: client.BeaconAPIURL(),
-			},
-			fmt.Sprintf("crawler-test-%s", client.Name()),
+		// Create the beacon node using ethereum.NewBeaconNode
+		beaconNode, err := ethereum.NewBeaconNode(
+			nodeLogger,
+			fmt.Sprintf("crawler-test-%s-%v", clientName, i),
+			config,
 			*opts,
 		)
+		require.NoError(t, err, "Failed to create beacon node for %s", clientName)
 
-		// Start the beacon node temporarily
-		nodeCtx, nodeCancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer nodeCancel()
+		wg.Add(1)
 
-		go func() {
-			if err := beaconNode.Start(nodeCtx); err != nil {
-				logger.WithError(err).Warnf("Failed to start beacon node %s", client.Name())
+		// Register callback for when node is ready
+		beaconNode.OnReady(ctx, func(ctx context.Context) error {
+			defer wg.Done()
+
+			// Fetch node identity
+			identity, err := beaconNode.Node().FetchNodeIdentity(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to fetch node identity for %s: %w", clientName, err)
 			}
-		}()
 
-		// Wait for it to be healthy
-		for i := 0; i < 20; i++ {
-			if beaconNode.Healthy() {
-				break
+			mu.Lock()
+			nodeInfos[clientName] = &NodeInfo{
+				Node:     beaconNode,
+				Identity: identity,
 			}
-			time.Sleep(500 * time.Millisecond)
-		}
 
-		identity, err := beaconNode.FetchNodeIdentity(context.Background())
-		require.NoError(t, err, "Failed to fetch node identity for %s", client.Name())
+			successful[clientName] = false
+			mu.Unlock()
 
-		identities[client.Name()] = identity
-		successful[client.Name()] = false
+			nodeLogger.Infof("Identified peer ID for %s: %s", clientName, identity.PeerID)
 
-		logger.Infof("Identified peer ID for %s: %s", client.Name(), identity.PeerID)
+			return nil
+		})
+
+		// Start the node in a goroutine
+		go func(bn *ethereum.BeaconNode, name string) {
+			if err := bn.Start(ctx); err != nil {
+				nodeLogger.WithError(err).Errorf("Failed to start beacon node %s", name)
+
+				wg.Done() // Ensure we decrease the counter even on error
+			}
+		}(beaconNode, clientName)
 	}
 
-	return identities, successful
+	// Wait for all nodes to be ready and fetch their identities
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		logger.Info("All beacon nodes are ready and identities fetched")
+	case <-ctx.Done():
+		t.Fatal("Timeout waiting for beacon nodes to be ready")
+	}
+
+	return nodeInfos, successful
 }
 
 // setupCrawler creates and starts a crawler instance.
@@ -200,7 +255,14 @@ func setupCrawler(t *testing.T, network network.Network, logger *logrus.Logger, 
 }
 
 // setupCrawlerEventHandlers sets up event handlers for the crawler.
-func setupCrawlerEventHandlers(t *testing.T, cr *crawler.Crawler, logger *logrus.Logger, identities map[string]*types.Identity, successful map[string]bool, mu *sync.Mutex) {
+func setupCrawlerEventHandlers(
+	t *testing.T,
+	cr *crawler.Crawler,
+	logger *logrus.Logger,
+	identities map[string]*types.Identity,
+	successful map[string]bool,
+	mu *sync.Mutex,
+) {
 	t.Helper()
 
 	cr.OnSuccessfulCrawl(func(peerID peer.ID, enr *enode.Node, status *common.Status, metadata *common.MetaData) {
@@ -234,76 +296,56 @@ func setupCrawlerEventHandlers(t *testing.T, cr *crawler.Crawler, logger *logrus
 }
 
 // feedENRsToCrawler feeds ENRs to the crawler and waits for results.
-func feedENRsToCrawler(t *testing.T, tf *kurtosis.TestFoundation, network network.Network, logger *logrus.Logger, manual *discovery.Manual, successful map[string]bool, mu *sync.Mutex, timeout time.Duration) {
+func feedENRsToCrawler(
+	t *testing.T,
+	nodeInfos map[string]*NodeInfo,
+	logger *logrus.Logger,
+	manual *discovery.Manual,
+	successful map[string]bool,
+	mu *sync.Mutex,
+	timeout time.Duration,
+) {
 	t.Helper()
 
 	// Create a context with timeout for crawler operations
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	// Get all consensus clients
-	consensusClients := network.ConsensusClients().All()
-
 	// Start feeding in the ENR's
 	go func() {
-		// Get all our enrs
-		for _, client := range consensusClients {
-			// Create a beacon node client to fetch identity
-			opts := beacon.DefaultOptions()
-			opts = opts.DisablePrometheusMetrics()
-			opts.HealthCheck.Interval.Duration = 250 * time.Millisecond
+		// Process each node
+		for clientName, nodeInfo := range nodeInfos {
+			nodeLogger := logger.WithField("client", clientName)
 
-			beaconNode := beacon.NewNode(
-				logger.WithField("client", client.Name()),
-				&beacon.Config{
-					Name: client.Name(),
-					Addr: client.BeaconAPIURL(),
-				},
-				fmt.Sprintf("crawler-test-%s", client.Name()),
-				*opts,
-			)
+			// Check if we already have this client's data
+			mu.Lock()
+			if complete, ok := successful[clientName]; ok && complete {
+				mu.Unlock()
 
-			// Start the beacon node temporarily
-			nodeCtx, nodeCancel := context.WithTimeout(context.Background(), 30*time.Second)
-			defer nodeCancel()
-
-			go func() {
-				if err := beaconNode.Start(nodeCtx); err != nil {
-					logger.WithError(err).Warnf("Failed to start beacon node %s", client.Name())
-				}
-			}()
-
-			// Wait for it to be healthy
-			for i := 0; i < 20; i++ {
-				if beaconNode.Healthy() {
-					break
-				}
-				time.Sleep(500 * time.Millisecond)
+				continue
 			}
+			mu.Unlock()
 
-			identity, err := beaconNode.FetchNodeIdentity(context.Background())
-			require.NoError(t, err, "Failed to fetch node identity")
+			// Give nodes extra time to initialize their P2P stack
+			// before they can properly handle identify protocol requests
+			//nodeLogger.Infof("Waiting for node %s to initialize P2P stack", clientName)
+			//time.Sleep(5 * time.Second)
 
-			if complete, ok := successful[client.Name()]; ok && complete {
-				logger.Infof("Already have status/metadata for participant: %s", client.Name())
+			nodeLogger.Infof("Adding node %s's ENR to discovery pool (%s)", clientName, nodeInfo.Identity.ENR)
+
+			en, err := discovery.ENRToEnode(nodeInfo.Identity.ENR)
+			if err != nil {
+				nodeLogger.WithError(err).Errorf("Failed to convert ENR to enode")
 
 				continue
 			}
 
-			// Give nodes extra time to initialize their P2P stack
-			// before they can properly handle identify protocol requests
-			logger.Infof("Waiting for node %s to initialize P2P stack", client.Name())
-			time.Sleep(5 * time.Second)
-
-			logger.Infof("Adding node %s's ENR to discovery pool (%s)", client.Name(), identity.ENR)
-
-			en, err := discovery.ENRToEnode(identity.ENR)
-			require.NoError(t, err, "Failed to convert ENR to enode")
-
-			if err := manual.AddNode(context.Background(), en); err != nil {
-				logger.Errorf("Failed to add node: %v", err)
+			if err := manual.AddNode(ctx, en); err != nil {
+				nodeLogger.Errorf("Failed to add node: %v", err)
 			}
 		}
+
+		logger.Info("Finished feeding ENRs to crawler")
 	}()
 
 	// Wait until we've discovered all the nodes or timeout.
@@ -341,4 +383,26 @@ func feedENRsToCrawler(t *testing.T, tf *kurtosis.TestFoundation, network networ
 			}
 		}
 	}
+}
+
+// cleanupBeaconNodes stops all beacon nodes.
+func cleanupBeaconNodes(nodeInfos map[string]*NodeInfo, logger *logrus.Logger) {
+	var wg sync.WaitGroup
+	ctx := context.Background()
+
+	for name, info := range nodeInfos {
+		wg.Add(1)
+
+		go func(nodeName string, nodeInfo *NodeInfo) {
+			defer wg.Done()
+
+			if err := nodeInfo.Node.Stop(ctx); err != nil {
+				logger.WithError(err).Errorf("Failed to stop beacon node %s", nodeName)
+			}
+		}(name, info)
+	}
+
+	wg.Wait()
+
+	logger.Info("All beacon nodes cleaned up")
 }
