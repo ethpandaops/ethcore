@@ -78,7 +78,7 @@ func (c *Crawler) wireUpComponents(ctx context.Context) error {
 		c.metrics.RecordFailedCrawl(reason.Error())
 	})
 
-	c.OnSuccessfulCrawl(func(peerID peer.ID, status *common.Status, metadata *common.MetaData) {
+	c.OnSuccessfulCrawl(func(peerID peer.ID, enr *enode.Node, status *common.Status, metadata *common.MetaData) {
 		c.metrics.RecordSuccessfulCrawl(string(clients.ClientFromString(c.GetPeerAgentVersion(peerID))))
 	})
 
@@ -309,7 +309,7 @@ func (c *Crawler) startDialer(ctx context.Context) error {
 				c.metrics.RecordNodeProcessed()
 				c.metrics.RecordPendingDials(len(c.peersToDial))
 
-				if err := c.node.ConnectToPeer(ctx, node.AddrInfo); err != nil {
+				if err := c.ConnectToPeer(ctx, node.AddrInfo, node.Enode); err != nil {
 					c.log.WithError(err).Trace("Failed to connect to peer")
 				}
 			}

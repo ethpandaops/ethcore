@@ -2,9 +2,8 @@ package crawler
 
 import (
 	"fmt"
-	"time"
 
-	"github.com/jellydator/ttlcache/v3"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 )
@@ -23,7 +22,7 @@ var (
 
 type OnPeerStatusUpdatedCallback func(peerID peer.ID, status *common.Status)
 type OnMetadataReceivedCallback func(peerID peer.ID, metadata *common.MetaData)
-type OnSuccessfulCrawlCallback func(peerID peer.ID, status *common.Status, metadata *common.MetaData)
+type OnSuccessfulCrawlCallback func(peerID peer.ID, enr *enode.Node, status *common.Status, metadata *common.MetaData)
 type OnFailedCrawlCallback func(peerID peer.ID, err CrawlError)
 
 // OnPeerStatusUpdated subscribes to the peer status updated event.
@@ -55,9 +54,7 @@ func (n *Crawler) emitMetadataReceived(peerID peer.ID, metadata *common.MetaData
 }
 
 func (n *Crawler) emitSuccessfulCrawl(peerID peer.ID, status *common.Status, metadata *common.MetaData) {
-	// Add the peer to the duplicate cache to prevent re-crawling too soon
-	n.duplicateCache.GetCache().Set(peerID.String(), time.Now(), ttlcache.DefaultTTL)
-	n.broker.Emit(OnSuccessfulCrawl, peerID, status, metadata)
+	n.broker.Emit(OnSuccessfulCrawl, peerID, n.GetPeerENR(peerID), status, metadata)
 }
 
 func (n *Crawler) emitFailedCrawl(peerID peer.ID, err CrawlError) {

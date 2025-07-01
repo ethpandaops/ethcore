@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethpandaops/beacon/pkg/beacon"
 	"github.com/ethpandaops/beacon/pkg/beacon/api/types"
 	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/crawler"
@@ -30,6 +31,8 @@ type TestCrawlerConfig struct {
 	DialConcurrency int
 	// CooloffDuration is the duration to wait between dials.
 	CooloffDuration time.Duration
+	// DialTimeout is the timeout for dialing peers.
+	DialTimeout time.Duration
 }
 
 // DefaultTestCrawlerConfig returns a default configuration for the crawler tests.
@@ -38,6 +41,7 @@ func DefaultTestCrawlerConfig() *TestCrawlerConfig {
 		CrawlerTimeout:  60 * time.Second,
 		DialConcurrency: 10,
 		CooloffDuration: 1 * time.Second,
+		DialTimeout:     30 * time.Second, // Generous timeout for Kurtosis environment
 	}
 }
 
@@ -174,6 +178,7 @@ func setupCrawler(t *testing.T, tf *kurtosis.TestFoundation, network network.Net
 	cr := crawler.New(logger, &crawler.Config{
 		DialConcurrency: config.DialConcurrency,
 		CooloffDuration: config.CooloffDuration,
+		DialTimeout:     config.DialTimeout,
 		Node: &host.Config{
 			IPAddr: net.ParseIP("127.0.0.1"),
 		},
@@ -197,7 +202,7 @@ func setupCrawler(t *testing.T, tf *kurtosis.TestFoundation, network network.Net
 func setupCrawlerEventHandlers(t *testing.T, cr *crawler.Crawler, logger *logrus.Logger, identities map[string]*types.Identity, successful map[string]bool, mu *sync.Mutex) {
 	t.Helper()
 
-	cr.OnSuccessfulCrawl(func(peerID peer.ID, status *common.Status, metadata *common.MetaData) {
+	cr.OnSuccessfulCrawl(func(peerID peer.ID, enr *enode.Node, status *common.Status, metadata *common.MetaData) {
 		logger.Infof("Got status/metadata: %s", peerID)
 
 		// Get the service name
