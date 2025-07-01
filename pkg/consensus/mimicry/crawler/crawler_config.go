@@ -12,12 +12,14 @@ import (
 
 // Config is the configuration for the Crawler.
 type Config struct {
-	Node            *host.Config `yaml:"node"`
-	UserAgent       string
-	Beacon          *ethereum.Config `yaml:"ethereum"`
-	DialConcurrency int              `yaml:"dialConcurrency" default:"10"`
-	DialTimeout     time.Duration    `yaml:"dialTimeout" default:"5s"`
-	CooloffDuration time.Duration    `yaml:"cooloffDuration" default:"600s"`
+	Node             *host.Config `yaml:"node"`
+	UserAgent        string
+	Beacon           *ethereum.Config `yaml:"ethereum"`
+	DialConcurrency  int              `yaml:"dialConcurrency" default:"10"`
+	DialTimeout      time.Duration    `yaml:"dialTimeout" default:"5s"`
+	CooloffDuration  time.Duration    `yaml:"cooloffDuration" default:"600s"`
+	MaxRetryAttempts int              `yaml:"maxRetryAttempts" default:"3"`
+	RetryBackoff     time.Duration    `yaml:"retryBackoff" default:"10s"`
 }
 
 // Validate validates the CrawlerConfig.

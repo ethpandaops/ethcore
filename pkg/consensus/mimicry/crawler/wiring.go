@@ -197,7 +197,7 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 
 		logCtx.Error("Failed to complete identify protocol")
 
-		c.emitFailedCrawl(conn.RemotePeer(), ErrCrawlIdentifyTimeout)
+		c.handleCrawlFailure(conn.RemotePeer(), ErrCrawlIdentifyTimeout)
 
 		return
 	}
@@ -265,7 +265,7 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 	if err != nil {
 		logCtx.WithError(err).Debug("Failed to request status from peer after retries")
 
-		c.emitFailedCrawl(conn.RemotePeer(), ErrCrawlFailedToRequestStatus)
+		c.handleCrawlFailure(conn.RemotePeer(), ErrCrawlFailedToRequestStatus)
 
 		return
 	}
@@ -276,7 +276,7 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 		// They're on a different fork
 		goodbyeReason = eth.GoodbyeReasonIrrelevantNetwork
 
-		c.emitFailedCrawl(conn.RemotePeer(), ErrCrawlStatusForkDigest.WithDetails(fmt.Sprintf("ours %s != theirs %s", ourStatus.ForkDigest, status.ForkDigest)))
+		c.handleCrawlFailure(conn.RemotePeer(), ErrCrawlStatusForkDigest.WithDetails(fmt.Sprintf("ours %s != theirs %s", ourStatus.ForkDigest, status.ForkDigest)))
 
 		return
 	}
@@ -333,7 +333,7 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 	if err != nil {
 		logCtx.WithError(err).Error("Failed to request metadata from peer after retries")
 
-		c.emitFailedCrawl(conn.RemotePeer(), ErrCrawlFailedToRequestMetadata)
+		c.handleCrawlFailure(conn.RemotePeer(), ErrCrawlFailedToRequestMetadata)
 
 		return
 	}
@@ -423,6 +423,74 @@ func (c *Crawler) startDialer(ctx context.Context) error {
 			}
 		}()
 	}
+
+	return nil
+}
+
+// startRetryWorker starts a worker that processes retry requests.
+func (c *Crawler) startRetryWorker(ctx context.Context) error {
+	c.log.WithFields(logrus.Fields{
+		"max_attempts": c.config.MaxRetryAttempts,
+		"backoff":      c.config.RetryBackoff,
+	}).Info("Starting retry worker")
+
+	c.dialerWg.Add(1)
+
+	go func() {
+		defer c.dialerWg.Done()
+
+		for {
+			select {
+			case retryInfo, ok := <-c.retryQueue:
+				if !ok {
+					return
+				}
+
+				// Check if we're shutting down
+				c.shutdownMu.RLock()
+				if c.isShutdown {
+					c.shutdownMu.RUnlock()
+
+					return
+				}
+				c.shutdownMu.RUnlock()
+
+				// Wait for backoff period
+				backoffDuration := retryInfo.BackoffDelay
+				c.log.WithFields(logrus.Fields{
+					"peer":     retryInfo.Peer.AddrInfo.ID,
+					"attempts": retryInfo.Attempts,
+					"backoff":  backoffDuration,
+				}).Debug("Waiting before retry attempt")
+
+				select {
+				case <-time.After(backoffDuration):
+					// Continue with retry
+				case <-ctx.Done():
+					return
+				}
+
+				// Remove from retry tracker
+				c.retryMu.Lock()
+				delete(c.retryTracker, retryInfo.Peer.AddrInfo.ID)
+				c.retryMu.Unlock()
+
+				// Re-add to dialer queue
+				select {
+				case c.peersToDial <- retryInfo.Peer:
+					c.log.WithFields(logrus.Fields{
+						"peer":     retryInfo.Peer.AddrInfo.ID,
+						"attempts": retryInfo.Attempts,
+					}).Debug("Re-queued peer for retry")
+				case <-ctx.Done():
+					return
+				}
+
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
 
 	return nil
 }
