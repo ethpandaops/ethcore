@@ -132,11 +132,19 @@ func (n *Node) Start(ctx context.Context) (host.Host, error) {
 }
 
 func (n *Node) Stop(ctx context.Context) error {
-	return n.host.Close()
+	if n.host != nil {
+		return n.host.Close()
+	}
+
+	return nil
 }
 
 func (n *Node) Peerstore() peerstore.Peerstore {
-	return n.host.Peerstore()
+	if n.host != nil {
+		return n.host.Peerstore()
+	}
+
+	return nil
 }
 
 func (n *Node) Network() network.Network {

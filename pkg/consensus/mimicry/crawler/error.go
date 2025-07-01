@@ -23,6 +23,8 @@ var (
 	ErrCrawlStatusForkDigest = CrawlError{Msg: "wrong fork digest in status message", Type: "wrong_status_fork_digest"}
 	// ErrCrawlFailedToRequestStatus indicates that we failed to request status from the peer.
 	ErrCrawlFailedToRequestStatus = CrawlError{Msg: "failed to request status", Type: "failed_request_status"}
+	// ErrCrawlFailedToRequestMetadata indicates that we failed to request metadata from the peer.
+	ErrCrawlFailedToRequestMetadata = CrawlError{Msg: "failed to request metadata", Type: "failed_request_metadata"}
 	// ErrCrawlIdentifyTimeout indicates that the libp2p identify protocol timed out.
 	ErrCrawlIdentifyTimeout = CrawlError{Msg: "identify protocol timeout", Type: "identify_timeout"}
 )
