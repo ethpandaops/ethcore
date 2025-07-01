@@ -747,13 +747,6 @@ func (c *Crawler) fetchAndSetStatus(ctx context.Context) error {
 
 // handleCrawlFailure handles a crawl failure by either scheduling a retry or emitting a failure event.
 func (c *Crawler) handleCrawlFailure(peerID peer.ID, err CrawlError) {
-	// Retry disabled, emit failure immediately
-	if !c.config.EnableRetry {
-		c.emitFailedCrawl(peerID, err)
-
-		return
-	}
-
 	// Check if error is retryable, if not, emit failure.
 	if !c.isRetryableError(err) {
 		c.emitFailedCrawl(peerID, err)
@@ -808,10 +801,6 @@ func (c *Crawler) handleCrawlFailure(peerID peer.ID, err CrawlError) {
 
 // scheduleRetry schedules a peer for retry if conditions are met.
 func (c *Crawler) scheduleRetry(peerID peer.ID, peer *discovery.ConnectablePeer, enr *enode.Node, err error) {
-	if !c.config.EnableRetry {
-		return
-	}
-
 	// Check if error is retryable
 	if !c.isRetryableError(err) {
 		c.log.WithFields(logrus.Fields{

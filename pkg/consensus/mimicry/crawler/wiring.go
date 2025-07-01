@@ -429,12 +429,6 @@ func (c *Crawler) startDialer(ctx context.Context) error {
 
 // startRetryWorker starts a worker that processes retry requests.
 func (c *Crawler) startRetryWorker(ctx context.Context) error {
-	if !c.config.EnableRetry {
-		c.log.Info("Retry mechanism is disabled")
-
-		return nil
-	}
-
 	c.log.WithFields(logrus.Fields{
 		"max_attempts": c.config.MaxRetryAttempts,
 		"backoff":      c.config.RetryBackoff,

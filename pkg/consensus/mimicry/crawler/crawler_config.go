@@ -18,7 +18,6 @@ type Config struct {
 	DialConcurrency  int              `yaml:"dialConcurrency" default:"10"`
 	DialTimeout      time.Duration    `yaml:"dialTimeout" default:"5s"`
 	CooloffDuration  time.Duration    `yaml:"cooloffDuration" default:"600s"`
-	EnableRetry      bool             `yaml:"enableRetry" default:"true"`
 	MaxRetryAttempts int              `yaml:"maxRetryAttempts" default:"3"`
 	RetryBackoff     time.Duration    `yaml:"retryBackoff" default:"10s"`
 }
