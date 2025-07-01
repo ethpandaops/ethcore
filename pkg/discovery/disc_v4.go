@@ -16,16 +16,12 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const (
-	topicNodeRecord = "node_record"
-)
-
-// DiscV5 implements the discovery v5 protocol for finding Ethereum nodes.
-type DiscV5 struct {
+// DiscV4 implements the discovery v4 protocol for finding Ethereum nodes.
+type DiscV4 struct {
 	log       logrus.FieldLogger
 	restart   time.Duration
 	bootNodes []*enode.Node
-	listener  *ListenerV5
+	listener  *ListenerV4
 	privKey   *ecdsa.PrivateKey
 	broker    *emission.Emitter
 	mu        sync.Mutex
@@ -33,26 +29,26 @@ type DiscV5 struct {
 	started   bool
 }
 
-// ListenerV5 manages the UDP connection and discovery protocol instance.
-type ListenerV5 struct {
+// ListenerV4 manages the UDP connection and discovery protocol instance.
+type ListenerV4 struct {
 	conn      *net.UDPConn
 	localNode *enode.LocalNode
-	discovery *discover.UDPv5
+	discovery *discover.UDPv4
 	mu        sync.Mutex
 }
 
-// NewDiscV5 creates a new discovery v5 instance.
-func NewDiscV5(_ context.Context, restart time.Duration, log logrus.FieldLogger) *DiscV5 {
-	return &DiscV5{
-		log:     log.WithField("module", "ethcore/discovery/discV5"),
+// NewDiscV4 creates a new discovery v4 instance.
+func NewDiscV4(_ context.Context, restart time.Duration, log logrus.FieldLogger) *DiscV4 {
+	return &DiscV4{
+		log:     log.WithField("module", "discovery/p2p/discV4"),
 		restart: restart,
 		broker:  emission.NewEmitter(),
 		started: false,
 	}
 }
 
-// Start initializes and starts the discovery v5 protocol.
-func (d *DiscV5) Start(ctx context.Context) error {
+// Start initializes and starts the discovery v4 protocol.
+func (d *DiscV4) Start(ctx context.Context) error {
 	d.mu.Lock()
 
 	if d.started {
@@ -72,7 +68,7 @@ func (d *DiscV5) Start(ctx context.Context) error {
 	return nil
 }
 
-func (d *DiscV5) startListener(ctx context.Context) error {
+func (d *DiscV4) startListener(ctx context.Context) error {
 	d.mu.Lock()
 	if d.listener != nil {
 		d.listener.Close()
@@ -103,8 +99,8 @@ func (d *DiscV5) startListener(ctx context.Context) error {
 	return nil
 }
 
-// Stop gracefully shuts down the discovery v5 protocol.
-func (d *DiscV5) Stop(_ context.Context) error {
+// Stop gracefully shuts down the discovery v4 protocol.
+func (d *DiscV4) Stop(_ context.Context) error {
 	d.mu.Lock()
 	listener := d.listener
 	scheduler := d.scheduler
@@ -126,43 +122,8 @@ func (d *DiscV5) Stop(_ context.Context) error {
 	return nil
 }
 
-// Close shuts down the listener and releases all resources.
-func (l *ListenerV5) Close() error {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	if l.discovery != nil {
-		l.discovery.Close()
-	}
-
-	if l.localNode != nil && l.localNode.Database() != nil {
-		l.localNode.Database().Close()
-		l.localNode = nil
-	}
-
-	if l.conn != nil {
-		return l.conn.Close()
-	}
-
-	return nil
-}
-
-// GetLocalNodeID returns the local node ID in a thread-safe manner.
-func (l *ListenerV5) GetLocalNodeID() *enode.ID {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	if l.localNode == nil {
-		return nil
-	}
-
-	id := l.localNode.ID()
-
-	return &id
-}
-
 // UpdateBootNodes updates the list of bootstrap nodes used for discovery.
-func (d *DiscV5) UpdateBootNodes(bootNodes []string) error {
+func (d *DiscV4) UpdateBootNodes(bootNodes []string) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -183,13 +144,48 @@ func (d *DiscV5) UpdateBootNodes(bootNodes []string) error {
 }
 
 // OnNodeRecord registers a handler to be called when new nodes are discovered.
-func (d *DiscV5) OnNodeRecord(ctx context.Context, handler func(ctx context.Context, reason *enode.Node) error) {
+func (d *DiscV4) OnNodeRecord(ctx context.Context, handler func(ctx context.Context, reason *enode.Node) error) {
 	d.broker.On(topicNodeRecord, func(reason *enode.Node) {
 		d.handleSubscriberError(handler(ctx, reason), topicNodeRecord)
 	})
 }
 
-func (d *DiscV5) startCrons(ctx context.Context) error {
+// Close shuts down the listener and releases all resources.
+func (l *ListenerV4) Close() error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	if l.discovery != nil {
+		l.discovery.Close()
+	}
+
+	if l.localNode != nil && l.localNode.Database() != nil {
+		l.localNode.Database().Close()
+		l.localNode = nil
+	}
+
+	if l.conn != nil {
+		return l.conn.Close()
+	}
+
+	return nil
+}
+
+// GetLocalNodeID returns the local node ID in a thread-safe manner.
+func (l *ListenerV4) GetLocalNodeID() *enode.ID {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	if l.localNode == nil {
+		return nil
+	}
+
+	id := l.localNode.ID()
+
+	return &id
+}
+
+func (d *DiscV4) startCrons(ctx context.Context) error {
 	d.mu.Lock()
 	if d.scheduler != nil {
 		d.mu.Unlock()
@@ -235,7 +231,7 @@ func (d *DiscV5) startCrons(ctx context.Context) error {
 	return nil
 }
 
-func (d *DiscV5) listenForNewNodes(ctx context.Context) {
+func (d *DiscV4) listenForNewNodes(ctx context.Context) {
 	d.mu.Lock()
 	listener := d.listener
 	d.mu.Unlock()
@@ -261,11 +257,11 @@ func (d *DiscV5) listenForNewNodes(ctx context.Context) {
 	}
 }
 
-func (d *DiscV5) createListener(
+func (d *DiscV4) createListener(
 	ctx context.Context,
 	privKey *ecdsa.PrivateKey,
-) (*ListenerV5, error) {
-	listener := &ListenerV5{}
+) (*ListenerV4, error) {
+	listener := &ListenerV4{}
 
 	var bindIP net.IP
 
@@ -297,18 +293,18 @@ func (d *DiscV5) createListener(
 
 	listener.localNode = localNode
 
-	dv5Cfg := discover.Config{
+	dv4Cfg := discover.Config{
 		PrivateKey: privKey,
 	}
 
-	dv5Cfg.Bootnodes = []*enode.Node{}
+	dv4Cfg.Bootnodes = []*enode.Node{}
 
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	dv5Cfg.Bootnodes = append(dv5Cfg.Bootnodes, d.bootNodes...)
+	dv4Cfg.Bootnodes = append(dv4Cfg.Bootnodes, d.bootNodes...)
 
-	discovery, err := discover.ListenV5(conn, localNode, dv5Cfg)
+	discovery, err := discover.ListenV4(conn, localNode, dv4Cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -318,7 +314,7 @@ func (d *DiscV5) createListener(
 	return listener, nil
 }
 
-func (d *DiscV5) createLocalNode(
+func (d *DiscV4) createLocalNode(
 	_ context.Context,
 	privKey *ecdsa.PrivateKey,
 	ipAddr net.IP,
@@ -344,22 +340,22 @@ func (d *DiscV5) createLocalNode(
 	return localNode, nil
 }
 
-func (d *DiscV5) startDiscovery(
+func (d *DiscV4) startDiscovery(
 	ctx context.Context,
 	privKey *ecdsa.PrivateKey,
-) (*ListenerV5, error) {
+) (*ListenerV4, error) {
 	listener, err := d.createListener(ctx, privKey)
 	if err != nil {
 		return nil, err
 	}
 
 	record := listener.discovery.Self()
-	d.log.WithField("ENR", record.String()).Info("Started discovery v5")
+	d.log.WithField("ENR", record.String()).Info("Started discovery v4")
 
 	return listener, nil
 }
 
-func (d *DiscV5) filterPeer(node *enode.Node) bool {
+func (d *DiscV4) filterPeer(node *enode.Node) bool {
 	// Ignore nil node entries passed in.
 	if node == nil {
 		return false
@@ -391,19 +387,14 @@ func (d *DiscV5) filterPeer(node *enode.Node) bool {
 		return false
 	}
 
-	// Do not bother if the node is private
-	if node.IP().IsPrivate() {
-		return false
-	}
-
 	return true
 }
 
-func (d *DiscV5) publishNodeRecord(_ context.Context, record *enode.Node) {
+func (d *DiscV4) publishNodeRecord(_ context.Context, record *enode.Node) {
 	d.broker.Emit(topicNodeRecord, record)
 }
 
-func (d *DiscV5) handleSubscriberError(err error, topic string) {
+func (d *DiscV4) handleSubscriberError(err error, topic string) {
 	if err != nil {
 		d.log.WithError(err).WithField("topic", topic).Error("Subscriber error")
 	}
