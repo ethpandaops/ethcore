@@ -84,10 +84,10 @@ type Crawler struct {
 }
 
 // New creates a new Crawler.
-func New(log logrus.FieldLogger, config *Config, userAgent, namespace string, f discovery.NodeFinder) *Crawler {
+func New(log logrus.FieldLogger, config *Config, f discovery.NodeFinder) *Crawler {
 	return &Crawler{
-		log:       log,
-		userAgent: userAgent,
+		log:       log.WithField("module", "ethcore/consensus/crawler"),
+		userAgent: config.UserAgent,
 		config:    config,
 		statusMu:  sync.Mutex{},
 		broker:    emission.NewEmitter(),
@@ -113,7 +113,7 @@ func (c *Crawler) Start(ctx context.Context) error {
 	c.log.WithFields(logrus.Fields{
 		"user_agent": c.userAgent,
 		"cooloff":    c.config.CooloffDuration,
-	}).Info("Starting Ethereum Mimicry crawler")
+	}).Info("Starting crawler")
 
 	// Create internal context for cancellation
 	c.ctx, c.cancel = context.WithCancel(ctx)
@@ -209,8 +209,6 @@ func (c *Crawler) Start(ctx context.Context) error {
 		if err := c.wireUpComponents(ctx); err != nil {
 			c.log.WithError(err).Fatal("Failed to wire up components")
 		}
-
-		c.log.Info("Successfully wired up components")
 
 		// Start the node dialer
 		if err := c.startDialer(ctx); err != nil {
@@ -491,8 +489,10 @@ func (c *Crawler) ConnectToPeer(ctx context.Context, p peer.AddrInfo, n *enode.N
 	}
 
 	c.log.WithFields(logrus.Fields{
-		"peer": p.ID,
-	}).Debug("Connecting to peer")
+		"peer_id": p.ID.String(),
+		"enr":     n.String(),
+		"node_id": n.ID().String(),
+	}).Debug("Crawler: Dialing peer")
 
 	// Check if we're already connected to the peer
 	if status := c.node.Connectedness(p.ID); status == network.Connected {
@@ -503,6 +503,12 @@ func (c *Crawler) ConnectToPeer(ctx context.Context, p peer.AddrInfo, n *enode.N
 	c.peerENRsMu.Lock()
 	c.peerENRs[p.ID] = n
 	c.peerENRsMu.Unlock()
+
+	c.log.WithFields(logrus.Fields{
+		"peer_id": p.ID.String(),
+		"enr":     n.String(),
+		"node_id": n.ID().String(),
+	}).Debug("Crawler: Stored ENR for peer")
 
 	// Connect to the peer
 	timeoutCtx, cancel := context.WithTimeout(ctx, c.config.DialTimeout)
@@ -697,7 +703,7 @@ func (c *Crawler) fetchAndSetStatus(ctx context.Context) error {
 			"head_root":       status.HeadRoot,
 			"fork_digest":     status.ForkDigest,
 			"current_fork":    currentFork.Name,
-		}).Info("New eth2 status set")
+		}).Debug("New eth2 status set")
 	}
 
 	// Set our status

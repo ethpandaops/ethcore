@@ -108,10 +108,23 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 	}
 	c.shutdownMu.RUnlock()
 
+	peerID := conn.RemotePeer()
+
+	// Check if we've recently processed this peer to prevent duplicate handling
+	if c.duplicateCache.GetCache().Get(peerID.String()) != nil {
+		c.log.WithFields(logrus.Fields{
+			"peer": peerID.String(),
+		}).Debug("Skipping duplicate connection event - peer recently processed")
+
+		_ = conn.Close()
+
+		return
+	}
+
 	goodbyeReason := eth.GoodbyeReasonClientShutdown
 
 	c.log.WithFields(logrus.Fields{
-		"peer": conn.RemotePeer().String(),
+		"peer": peerID.String(),
 	}).Info("Peer connected")
 
 	// Wait for libp2p identify protocol to complete.
@@ -189,6 +202,10 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 		return
 	}
 
+	// Add peer to duplicate cache to prevent processing duplicate connection events
+	c.duplicateCache.GetCache().Set(peerID.String(), time.Now(), c.config.CooloffDuration)
+	logCtx.WithField("cooloff_duration", c.config.CooloffDuration).Debug("Added peer to duplicate cache")
+
 	defer func() {
 		// Disconnect them regardless of what happens
 		// Use a fresh context with timeout for cleanup
@@ -246,7 +263,7 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 	}
 
 	if err != nil {
-		logCtx.WithError(err).Error("Failed to request status from peer after retries")
+		logCtx.WithError(err).Debug("Failed to request status from peer after retries")
 
 		c.emitFailedCrawl(conn.RemotePeer(), ErrCrawlFailedToRequestStatus)
 
@@ -300,7 +317,7 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 				"attempt":     retries + 1,
 				"error":       err.Error(),
 				"retry_delay": metadataRetryDelay,
-			}).Error("Metadata request failed, retrying")
+			}).Debug("Metadata request failed, retrying")
 
 			select {
 			case <-time.After(metadataRetryDelay):
@@ -420,9 +437,15 @@ func (c *Crawler) handleNewDiscoveryNode(_ context.Context, node *enode.Node) er
 	}
 	c.shutdownMu.RUnlock()
 
+	enr := ""
+	if node != nil {
+		enr = node.String()
+	}
+
 	c.log.WithFields(logrus.Fields{
-		"node": node.String(),
-	}).Trace("Enode received")
+		"enr":     enr,
+		"node_id": node.ID().String(),
+	}).Debug("Crawler: Received node from discovery")
 
 	n, err := discovery.DeriveDetailsFromNode(node)
 	if err != nil {
@@ -435,9 +458,10 @@ func (c *Crawler) handleNewDiscoveryNode(_ context.Context, node *enode.Node) er
 	// Check if they're on our network
 	if err := c.nodeIsOnOurNetwork(n.Enode); err != nil {
 		c.log.WithFields(logrus.Fields{
-			"node":  n.Enode.String(),
-			"error": err.Error(),
-		}).Trace("Node is not on our network")
+			"enr":     enr,
+			"node_id": node.ID().String(),
+			"error":   err.Error(),
+		}).Debug("Crawler: Node is not on our network, skipping")
 
 		//nolint:nilerr // We don't care about this node
 		return nil
@@ -457,9 +481,16 @@ func (c *Crawler) handleNewDiscoveryNode(_ context.Context, node *enode.Node) er
 
 	select {
 	case c.peersToDial <- n:
+		c.log.WithFields(logrus.Fields{
+			"enr":       n.Enode.String(),
+			"node_id":   n.Enode.ID().String(),
+			"peer_id":   n.AddrInfo.ID.String(),
+			"num_addrs": len(n.AddrInfo.Addrs),
+		}).Debug("Crawler: Added node to dial queue")
 	default:
 		c.log.WithFields(logrus.Fields{
-			"node": n.Enode.String(),
+			"enr":     n.Enode.String(),
+			"node_id": n.Enode.ID().String(),
 		}).Warn("Dropping potential peer: pending peers channel is full. Consider increasing the dial concurrency")
 	}
 
