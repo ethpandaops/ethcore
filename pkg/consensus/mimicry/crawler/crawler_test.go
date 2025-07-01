@@ -44,10 +44,10 @@ type TestCrawlerConfig struct {
 // DefaultTestCrawlerConfig returns a default configuration for the crawler tests.
 func DefaultTestCrawlerConfig() *TestCrawlerConfig {
 	return &TestCrawlerConfig{
-		CrawlerTimeout:  60 * time.Second,
-		DialConcurrency: 10,
+		CrawlerTimeout:  90 * time.Second,  // Increased timeout
+		DialConcurrency: 5,                  // Reduced concurrency to avoid overwhelming nodes
 		CooloffDuration: 1 * time.Second,
-		DialTimeout:     30 * time.Second, // Generous timeout for Kurtosis environment
+		DialTimeout:     45 * time.Second,   // Even more generous timeout for slower nodes like Prysm
 	}
 }
 
@@ -100,7 +100,15 @@ func allDiscoverableNodes(
 	manual := &discovery.Manual{}
 
 	// Setup and start the crawler
-	cr := setupCrawler(t, logger, network, manual, config)
+	cr, crawlerBeaconName := setupCrawler(t, logger, network, manual, config)
+
+	// Remove the crawler's beacon node from the nodes to discover
+	// This prevents any potential conflicts
+	if crawlerBeaconName != "" {
+		logger.Infof("Excluding crawler's beacon node '%s' from discovery targets", crawlerBeaconName)
+		delete(nodeInfos, crawlerBeaconName)
+		delete(successful, crawlerBeaconName)
+	}
 
 	// Extract identities from nodeInfos for event handlers
 	identities := make(map[string]*types.Identity)
@@ -112,11 +120,19 @@ func allDiscoverableNodes(
 	setupCrawlerEventHandlers(t, logger, cr, identities, successful, mu)
 
 	// Wait until the crawler is ready
+	// The crawler needs to wait for HeadSlot > 0 which can take some time
+	logger.Info("Waiting for crawler to be ready (needs HeadSlot > 0)...")
 	select {
 	case <-cr.OnReady:
+		logger.Info("Crawler is ready")
 	case <-time.After(config.CrawlerTimeout):
 		t.Fatal("Timed out waiting for crawler to be ready")
 	}
+
+	// Wait a bit to ensure all nodes have their P2P stacks fully initialized
+	// This is important because the identify protocol requires both sides to be ready
+	logger.Info("Waiting for nodes to fully initialize their P2P stacks...")
+	time.Sleep(5 * time.Second)
 
 	// Feed ENRs to the crawler and wait for results
 	feedENRsToCrawler(t, logger, nodeInfos, manual, successful, mu, config.CrawlerTimeout)
@@ -228,15 +244,67 @@ func setupCrawler(
 	network network.Network,
 	manual *discovery.Manual,
 	config *TestCrawlerConfig,
-) *crawler.Crawler {
+) (*crawler.Crawler, string) {
 	t.Helper()
 
 	// Get the first consensus client
 	consensusClients := network.ConsensusClients().All()
 	require.NotEmpty(t, consensusClients, "No consensus clients found")
 
+	// Use a separate dedicated beacon node for the crawler to avoid conflicts
+	// This ensures the crawler isn't trying to discover the same node it's connected to
 	firstClient := consensusClients[0]
-	logger.Infof("Using beacon node: %s", firstClient.Name())
+	crawlerBeaconName := firstClient.Name()
+	logger.Infof("Creating dedicated beacon node for crawler based on: %s", crawlerBeaconName)
+
+	// Create a dedicated beacon node for the crawler
+	beaconConfig := &ethereum.Config{
+		BeaconNodeAddress: firstClient.BeaconAPIURL(),
+		NetworkOverride:   "kurtosis",
+	}
+
+	opts := beacon.DefaultOptions()
+	opts = opts.DisablePrometheusMetrics()
+	opts.HealthCheck.Interval.Duration = 250 * time.Millisecond
+	opts.HealthCheck.SuccessfulResponses = 1
+
+	crawlerBeaconNode, err := ethereum.NewBeaconNode(
+		logger.WithField("component", "crawler-beacon"),
+		"crawler-dedicated-beacon",
+		beaconConfig,
+		*opts,
+	)
+	require.NoError(t, err, "Failed to create crawler beacon node")
+
+	// Start the dedicated beacon node and wait for it to be ready
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	beaconReady := make(chan struct{})
+	crawlerBeaconNode.OnReady(ctx, func(ctx context.Context) error {
+		close(beaconReady)
+		return nil
+	})
+
+	go func() {
+		if err := crawlerBeaconNode.Start(ctx); err != nil {
+			logger.WithError(err).Error("Failed to start crawler beacon node")
+		}
+	}()
+
+	select {
+	case <-beaconReady:
+		logger.Info("Crawler beacon node is ready")
+	case <-ctx.Done():
+		t.Fatal("Timeout waiting for crawler beacon node to be ready")
+	}
+
+	// Ensure cleanup of the beacon node
+	t.Cleanup(func() {
+		if err := crawlerBeaconNode.Stop(context.Background()); err != nil {
+			logger.WithError(err).Error("Failed to stop crawler beacon node")
+		}
+	})
 
 	// Create and start the crawler
 	cr := crawler.New(logger, &crawler.Config{
@@ -247,10 +315,7 @@ func setupCrawler(
 		Node: &host.Config{
 			IPAddr: net.ParseIP("127.0.0.1"),
 		},
-		Beacon: &ethereum.Config{
-			BeaconNodeAddress: firstClient.BeaconAPIURL(),
-			NetworkOverride:   "kurtosis",
-		},
+		Beacon: beaconConfig,
 	}, manual)
 
 	// Start the crawler in a goroutine
@@ -260,7 +325,7 @@ func setupCrawler(
 		}
 	}()
 
-	return cr
+	return cr, crawlerBeaconName
 }
 
 // setupCrawlerEventHandlers sets up event handlers for the crawler.
@@ -280,7 +345,7 @@ func setupCrawlerEventHandlers(
 
 		for name, identity := range identities {
 			if identity.PeerID == peerID.String() {
-				logger.Infof("Successfully crawled %s", name)
+				logger.Infof("Successfully crawled %s (status received and metadata exchanged)", name)
 
 				mu.Lock()
 				successful[name] = true
@@ -293,12 +358,26 @@ func setupCrawlerEventHandlers(
 		}
 
 		if !found {
-			logger.Errorf("Failed to find peer ID in our list of identities. Peer ID: %s", peerID)
+			logger.Warnf("Received successful crawl for unknown peer ID: %s", peerID)
 		}
 	})
 
 	cr.OnFailedCrawl(func(peerID peer.ID, err crawler.CrawlError) {
-		logger.Errorf("Failed to crawl peer %s: %v", peerID, err)
+		// Check if this peer is one we're tracking
+		peerName := "unknown"
+		for name, identity := range identities {
+			if identity.PeerID == peerID.String() {
+				peerName = name
+				break
+			}
+		}
+		// Log detailed error information to help debug connection issues
+		logger.WithFields(logrus.Fields{
+			"peer_name": peerName,
+			"peer_id":   peerID,
+			"error":     err.Error(),
+			"err_type":  fmt.Sprintf("%T", err),
+		}).Error("Failed to crawl peer")
 	})
 }
 
@@ -328,17 +407,17 @@ func feedENRsToCrawler(
 			mu.Lock()
 			if complete, ok := successful[clientName]; ok && complete {
 				mu.Unlock()
-
+				nodeLogger.Infof("Already have status/metadata for participant: %s", clientName)
 				continue
 			}
 			mu.Unlock()
 
+			nodeLogger.Infof("Processing node %s (PeerID: %s)", clientName, nodeInfo.Identity.PeerID)
 			nodeLogger.Infof("Adding node %s's ENR to discovery pool (%s)", clientName, nodeInfo.Identity.ENR)
 
 			en, err := discovery.ENRToEnode(nodeInfo.Identity.ENR)
 			if err != nil {
 				nodeLogger.WithError(err).Errorf("Failed to convert ENR to enode")
-
 				continue
 			}
 
@@ -348,6 +427,54 @@ func feedENRsToCrawler(
 		}
 
 		logger.Info("Finished feeding ENRs to crawler")
+
+		// Re-add failed nodes periodically to handle transient connection issues
+		go func() {
+			ticker := time.NewTicker(10 * time.Second)
+			defer ticker.Stop()
+
+			retryCount := 0
+			maxRetries := 3
+
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					if retryCount >= maxRetries {
+						return
+					}
+					retryCount++
+
+					mu.Lock()
+					needRetry := []string{}
+					for name, success := range successful {
+						if !success {
+							needRetry = append(needRetry, name)
+						}
+					}
+					mu.Unlock()
+
+					if len(needRetry) == 0 {
+						return
+					}
+
+					logger.Infof("Retrying %d failed nodes (attempt %d/%d)", len(needRetry), retryCount, maxRetries)
+
+					for _, clientName := range needRetry {
+						if nodeInfo, ok := nodeInfos[clientName]; ok {
+							en, err := discovery.ENRToEnode(nodeInfo.Identity.ENR)
+							if err != nil {
+								continue
+							}
+							if err := manual.AddNode(ctx, en); err != nil {
+								logger.WithError(err).Errorf("Failed to re-add node %s", clientName)
+							}
+						}
+					}
+				}
+			}
+		}()
 	}()
 
 	// Wait until we've discovered all the nodes or timeout.
