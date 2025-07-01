@@ -114,7 +114,6 @@ func allDiscoverableNodes(
 	// Wait until the crawler is ready
 	select {
 	case <-cr.OnReady:
-		logger.Info("Crawler is ready")
 	case <-time.After(config.CrawlerTimeout):
 		t.Fatal("Timed out waiting for crawler to be ready")
 	}
@@ -276,14 +275,12 @@ func setupCrawlerEventHandlers(
 	t.Helper()
 
 	cr.OnSuccessfulCrawl(func(peerID peer.ID, enr *enode.Node, status *common.Status, metadata *common.MetaData) {
-		logger.Infof("Got status/metadata: %s", peerID)
-
 		// Get the service name
 		found := false
 
 		for name, identity := range identities {
 			if identity.PeerID == peerID.String() {
-				logger.Infof("Got a successful crawl for %s", name)
+				logger.Infof("Successfully crawled %s", name)
 
 				mu.Lock()
 				successful[name] = true
