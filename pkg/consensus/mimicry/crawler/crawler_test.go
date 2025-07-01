@@ -44,10 +44,10 @@ type TestCrawlerConfig struct {
 // DefaultTestCrawlerConfig returns a default configuration for the crawler tests.
 func DefaultTestCrawlerConfig() *TestCrawlerConfig {
 	return &TestCrawlerConfig{
-		CrawlerTimeout:  90 * time.Second, // Increased timeout
-		DialConcurrency: 5,                // Reduced concurrency to avoid overwhelming nodes
+		CrawlerTimeout:  60 * time.Second,
+		DialConcurrency: 10,
 		CooloffDuration: 1 * time.Second,
-		DialTimeout:     45 * time.Second, // Even more generous timeout for slower nodes like Prysm
+		DialTimeout:     30 * time.Second,
 	}
 }
 
@@ -433,54 +433,6 @@ func feedENRsToCrawler(
 		}
 
 		logger.Info("Finished feeding ENRs to crawler")
-
-		// Re-add failed nodes periodically to handle transient connection issues
-		/*		go func() {
-				ticker := time.NewTicker(10 * time.Second)
-				defer ticker.Stop()
-
-				retryCount := 0
-				maxRetries := 3
-
-				for {
-					select {
-					case <-ctx.Done():
-						return
-					case <-ticker.C:
-						if retryCount >= maxRetries {
-							return
-						}
-						retryCount++
-
-						mu.Lock()
-						needRetry := []string{}
-						for name, success := range successful {
-							if !success {
-								needRetry = append(needRetry, name)
-							}
-						}
-						mu.Unlock()
-
-						if len(needRetry) == 0 {
-							return
-						}
-
-						logger.Infof("Retrying %d failed nodes (attempt %d/%d)", len(needRetry), retryCount, maxRetries)
-
-						for _, clientName := range needRetry {
-							if nodeInfo, ok := nodeInfos[clientName]; ok {
-								en, err := discovery.ENRToEnode(nodeInfo.Identity.ENR)
-								if err != nil {
-									continue
-								}
-								if err := manual.AddNode(ctx, en); err != nil {
-									logger.WithError(err).Errorf("Failed to re-add node %s", clientName)
-								}
-							}
-						}
-					}
-				}
-			}()*/
 	}()
 
 	// Wait until we've discovered all the nodes or timeout.
