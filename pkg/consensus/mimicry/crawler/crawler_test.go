@@ -44,10 +44,10 @@ type TestCrawlerConfig struct {
 // DefaultTestCrawlerConfig returns a default configuration for the crawler tests.
 func DefaultTestCrawlerConfig() *TestCrawlerConfig {
 	return &TestCrawlerConfig{
-		CrawlerTimeout:  90 * time.Second,  // Increased timeout
-		DialConcurrency: 5,                  // Reduced concurrency to avoid overwhelming nodes
+		CrawlerTimeout:  90 * time.Second, // Increased timeout
+		DialConcurrency: 5,                // Reduced concurrency to avoid overwhelming nodes
 		CooloffDuration: 1 * time.Second,
-		DialTimeout:     45 * time.Second,   // Even more generous timeout for slower nodes like Prysm
+		DialTimeout:     45 * time.Second, // Even more generous timeout for slower nodes like Prysm
 	}
 }
 
@@ -283,6 +283,7 @@ func setupCrawler(
 	beaconReady := make(chan struct{})
 	crawlerBeaconNode.OnReady(ctx, func(ctx context.Context) error {
 		close(beaconReady)
+
 		return nil
 	})
 
@@ -368,9 +369,11 @@ func setupCrawlerEventHandlers(
 		for name, identity := range identities {
 			if identity.PeerID == peerID.String() {
 				peerName = name
+
 				break
 			}
 		}
+
 		// Log detailed error information to help debug connection issues
 		logger.WithFields(logrus.Fields{
 			"peer_name": peerName,
@@ -407,7 +410,9 @@ func feedENRsToCrawler(
 			mu.Lock()
 			if complete, ok := successful[clientName]; ok && complete {
 				mu.Unlock()
+
 				nodeLogger.Infof("Already have status/metadata for participant: %s", clientName)
+
 				continue
 			}
 			mu.Unlock()
@@ -418,6 +423,7 @@ func feedENRsToCrawler(
 			en, err := discovery.ENRToEnode(nodeInfo.Identity.ENR)
 			if err != nil {
 				nodeLogger.WithError(err).Errorf("Failed to convert ENR to enode")
+
 				continue
 			}
 
@@ -429,52 +435,52 @@ func feedENRsToCrawler(
 		logger.Info("Finished feeding ENRs to crawler")
 
 		// Re-add failed nodes periodically to handle transient connection issues
-		go func() {
-			ticker := time.NewTicker(10 * time.Second)
-			defer ticker.Stop()
+		/*		go func() {
+				ticker := time.NewTicker(10 * time.Second)
+				defer ticker.Stop()
 
-			retryCount := 0
-			maxRetries := 3
+				retryCount := 0
+				maxRetries := 3
 
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case <-ticker.C:
-					if retryCount >= maxRetries {
+				for {
+					select {
+					case <-ctx.Done():
 						return
-					}
-					retryCount++
-
-					mu.Lock()
-					needRetry := []string{}
-					for name, success := range successful {
-						if !success {
-							needRetry = append(needRetry, name)
+					case <-ticker.C:
+						if retryCount >= maxRetries {
+							return
 						}
-					}
-					mu.Unlock()
+						retryCount++
 
-					if len(needRetry) == 0 {
-						return
-					}
-
-					logger.Infof("Retrying %d failed nodes (attempt %d/%d)", len(needRetry), retryCount, maxRetries)
-
-					for _, clientName := range needRetry {
-						if nodeInfo, ok := nodeInfos[clientName]; ok {
-							en, err := discovery.ENRToEnode(nodeInfo.Identity.ENR)
-							if err != nil {
-								continue
+						mu.Lock()
+						needRetry := []string{}
+						for name, success := range successful {
+							if !success {
+								needRetry = append(needRetry, name)
 							}
-							if err := manual.AddNode(ctx, en); err != nil {
-								logger.WithError(err).Errorf("Failed to re-add node %s", clientName)
+						}
+						mu.Unlock()
+
+						if len(needRetry) == 0 {
+							return
+						}
+
+						logger.Infof("Retrying %d failed nodes (attempt %d/%d)", len(needRetry), retryCount, maxRetries)
+
+						for _, clientName := range needRetry {
+							if nodeInfo, ok := nodeInfos[clientName]; ok {
+								en, err := discovery.ENRToEnode(nodeInfo.Identity.ENR)
+								if err != nil {
+									continue
+								}
+								if err := manual.AddNode(ctx, en); err != nil {
+									logger.WithError(err).Errorf("Failed to re-add node %s", clientName)
+								}
 							}
 						}
 					}
 				}
-			}
-		}()
+			}()*/
 	}()
 
 	// Wait until we've discovered all the nodes or timeout.

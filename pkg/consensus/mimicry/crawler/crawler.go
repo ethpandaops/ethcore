@@ -36,6 +36,15 @@ var sszNetworkEncoder = encoder.SszNetworkEncoder{}
 
 const unknown = "unknown"
 
+// RetryInfo contains information about a peer to be retried.
+type RetryInfo struct {
+	Peer         *discovery.ConnectablePeer
+	ENR          *enode.Node
+	Attempts     int
+	LastAttempt  time.Time
+	BackoffDelay time.Duration
+}
+
 // Crawler is a Mimicry client that connects to Ethereum beacon nodes and
 // requests status updates from them. It depends on an upstream beacon node
 // to provide it with the current Ethereum network state, and never
@@ -65,6 +74,11 @@ type Crawler struct {
 	// ENR storage
 	peerENRs   map[peer.ID]*enode.Node
 	peerENRsMu sync.RWMutex
+
+	// Retry tracking
+	retryQueue   chan *RetryInfo
+	retryTracker map[peer.ID]*RetryInfo
+	retryMu      sync.RWMutex
 
 	// Scheduler for cron jobs
 	scheduler gocron.Scheduler
@@ -105,6 +119,9 @@ func New(log logrus.FieldLogger, config *Config, f discovery.NodeFinder) *Crawle
 		OnReady:            make(chan struct{}),
 		peerENRs:           make(map[peer.ID]*enode.Node, 1000),
 		peerENRsMu:         sync.RWMutex{},
+		retryQueue:         make(chan *RetryInfo, 1000),
+		retryTracker:       make(map[peer.ID]*RetryInfo, 1000),
+		retryMu:            sync.RWMutex{},
 	}
 }
 
@@ -217,6 +234,11 @@ func (c *Crawler) Start(ctx context.Context) error {
 
 		c.log.Info("Successfully started node dialer")
 
+		// Start the retry worker
+		if err := c.startRetryWorker(ctx); err != nil {
+			c.log.WithError(err).Fatal("Failed to start retry worker")
+		}
+
 		// We now have a valid status and can start discovering peers.
 		if err := c.discovery.Start(ctx); err != nil {
 			c.log.WithError(err).Fatal("Failed to start discovery")
@@ -311,6 +333,12 @@ func (c *Crawler) Stop(ctx context.Context) error {
 			}
 		}
 
+		// Close the retry queue channel to stop retry worker
+		if c.retryQueue != nil {
+			c.log.Info("Closing retry queue channel...")
+			close(c.retryQueue)
+		}
+
 		// Close the dialer channel to stop dialer workers
 		if c.peersToDial != nil {
 			c.log.Info("Closing dialer channel...")
@@ -362,6 +390,11 @@ func (c *Crawler) Stop(ctx context.Context) error {
 		c.peerENRsMu.Lock()
 		c.peerENRs = make(map[peer.ID]*enode.Node)
 		c.peerENRsMu.Unlock()
+
+		// Clear retry tracker
+		c.retryMu.Lock()
+		c.retryTracker = make(map[peer.ID]*RetryInfo)
+		c.retryMu.Unlock()
 
 		c.log.Info("Crawler stopped")
 
@@ -473,7 +506,7 @@ func (c *Crawler) nodeIsOnOurNetwork(node *enode.Node) error {
 
 func (c *Crawler) ConnectToPeer(ctx context.Context, p peer.AddrInfo, n *enode.Node) error {
 	if err := c.nodeIsOnOurNetwork(n); err != nil {
-		c.emitFailedCrawl(p.ID, newCrawlError(err.Error()))
+		c.handleCrawlFailure(p.ID, newCrawlError(err.Error()))
 
 		return nil
 	}
@@ -483,7 +516,7 @@ func (c *Crawler) ConnectToPeer(ctx context.Context, p peer.AddrInfo, n *enode.N
 			"peer": p.ID,
 		}).Debug("We've already connected to this peer previously")
 
-		c.emitFailedCrawl(p.ID, ErrCrawlTooSoon)
+		c.handleCrawlFailure(p.ID, ErrCrawlTooSoon)
 
 		return nil
 	}
@@ -710,4 +743,162 @@ func (c *Crawler) fetchAndSetStatus(ctx context.Context) error {
 	c.SetStatus(status)
 
 	return nil
+}
+
+// handleCrawlFailure handles a crawl failure by either scheduling a retry or emitting a failure event.
+func (c *Crawler) handleCrawlFailure(peerID peer.ID, err CrawlError) {
+	// Retry disabled, emit failure immediately
+	if !c.config.EnableRetry {
+		c.emitFailedCrawl(peerID, err)
+
+		return
+	}
+
+	// Check if error is retryable, if not, emit failure.
+	if !c.isRetryableError(err) {
+		c.emitFailedCrawl(peerID, err)
+
+		return
+	}
+
+	// Check existing retry info
+	c.retryMu.RLock()
+	retryInfo, exists := c.retryTracker[peerID]
+	c.retryMu.RUnlock()
+
+	// Check if we've exceeded max attempts
+	if exists && retryInfo.Attempts >= c.config.MaxRetryAttempts {
+		// Max attempts reached, emit failure
+		c.log.WithFields(logrus.Fields{
+			"peer":     peerID,
+			"attempts": retryInfo.Attempts,
+			"error":    err,
+		}).Info("Max retry attempts reached, emitting failure")
+
+		c.emitFailedCrawl(peerID, err)
+
+		return
+	}
+
+	// Try to schedule a retry; if no ENR is stored, can't retry, emit failure
+	enr := c.GetPeerENR(peerID)
+	if enr == nil {
+		c.emitFailedCrawl(peerID, err)
+
+		return
+	}
+
+	// Create a ConnectablePeer from the ENR, if we can't derive peer details, emit failure.
+	peer, convErr := discovery.DeriveDetailsFromNode(enr)
+	if convErr != nil {
+		c.emitFailedCrawl(peerID, err)
+
+		return
+	}
+
+	// Schedule retry - this will handle the retry logic.
+	c.scheduleRetry(peerID, peer, enr, err)
+
+	// Don't emit failure event - as we're retrying.
+	c.log.WithFields(logrus.Fields{
+		"peer":  peerID,
+		"error": err,
+	}).Info("Scheduling retry instead of emitting failure")
+}
+
+// scheduleRetry schedules a peer for retry if conditions are met.
+func (c *Crawler) scheduleRetry(peerID peer.ID, peer *discovery.ConnectablePeer, enr *enode.Node, err error) {
+	if !c.config.EnableRetry {
+		return
+	}
+
+	// Check if error is retryable
+	if !c.isRetryableError(err) {
+		c.log.WithFields(logrus.Fields{
+			"peer":  peerID,
+			"error": err,
+		}).Info("Error is not retryable, skipping retry")
+
+		return
+	}
+
+	// Check existing retry info
+	c.retryMu.Lock()
+	defer c.retryMu.Unlock()
+
+	retryInfo, exists := c.retryTracker[peerID]
+	if !exists {
+		// First retry attempt
+		retryInfo = &RetryInfo{
+			Peer:         peer,
+			ENR:          enr,
+			Attempts:     0,
+			LastAttempt:  time.Now(),
+			BackoffDelay: c.config.RetryBackoff,
+		}
+
+		c.retryTracker[peerID] = retryInfo
+	}
+
+	// Check if we've exceeded max attempts
+	if retryInfo.Attempts >= c.config.MaxRetryAttempts {
+		c.log.WithFields(logrus.Fields{
+			"peer":     peerID,
+			"attempts": retryInfo.Attempts,
+		}).Debug("Max retry attempts reached, not scheduling retry")
+
+		delete(c.retryTracker, peerID)
+
+		return
+	}
+
+	// Update retry info
+	retryInfo.Attempts++
+	retryInfo.LastAttempt = time.Now()
+	retryInfo.BackoffDelay = time.Duration(float64(c.config.RetryBackoff) * float64(retryInfo.Attempts))
+
+	// Remove from duplicate cache to allow immediate retry
+	c.duplicateCache.GetCache().Delete(peerID.String())
+
+	// Schedule retry
+	select {
+	case c.retryQueue <- retryInfo:
+		c.log.WithFields(logrus.Fields{
+			"peer":     peerID,
+			"attempts": retryInfo.Attempts,
+			"backoff":  retryInfo.BackoffDelay,
+		}).Info("Scheduled peer for retry")
+	default:
+		c.log.WithField("peer", peerID).Warn("Retry queue full, dropping retry request")
+	}
+}
+
+// isRetryableError determines if an error should trigger a retry.
+func (c *Crawler) isRetryableError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	var crawlErr CrawlError
+	if errors.As(err, &crawlErr) {
+		switch crawlErr.Type() {
+		case ErrCrawlNetworkMismatchType:
+			// Different network; don't retry.
+			return false
+		case ErrCrawlProtocolNotSupportedType:
+			// Protocol isn't supported; don't retry.
+			return false
+		default:
+			// Default to retry for ErrCrawlIdentifyTimeoutType, ErrCrawlTimeoutType and unknowns.
+			return true
+		}
+	}
+
+	// Check for context errors.
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return false
+	}
+
+	// Default to retry for other errors.
+	return true
 }
