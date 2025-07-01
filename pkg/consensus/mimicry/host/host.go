@@ -68,7 +68,7 @@ type Node struct {
 
 func NewNode(ctx context.Context, log logrus.FieldLogger, config *Config, userAgent string) (*Node, error) {
 	return &Node{
-		log:       log.WithField("module", "mimicry/host"),
+		log:       log.WithField("module", "ethcore/consensus/host"),
 		config:    config,
 		broker:    emission.NewEmitter(),
 		userAgent: userAgent,

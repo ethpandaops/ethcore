@@ -65,7 +65,7 @@ func NewDuplicateCacheWithConfig[K comparable, V any](log logrus.FieldLogger, co
 
 	return &duplicateCache[K, V]{
 		cache: cache,
-		log:   log.WithField("component", "cache"),
+		log:   log.WithField("module", "ethcore/cache"),
 	}
 }
 
@@ -83,19 +83,17 @@ func (d *duplicateCache[K, V]) Start(ctx context.Context) error {
 	_, d.cancel = context.WithCancel(ctx)
 
 	go func() {
-		d.log.Debug("Starting cache")
 		d.cache.Start()
-		d.log.Debug("Cache stopped")
 	}()
 
-	d.log.Info("Cache started")
+	d.log.Info("Duplicate cache started")
 
 	return nil
 }
 
 // Stop gracefully shuts down the cache and its background operations.
 func (d *duplicateCache[K, V]) Stop() error {
-	d.log.Info("Stopping cache")
+	d.log.Info("Stopping duplicate cache")
 
 	if d.cancel != nil {
 		d.cancel()
@@ -103,7 +101,7 @@ func (d *duplicateCache[K, V]) Stop() error {
 
 	d.cache.Stop()
 
-	d.log.Info("Cache stopped")
+	d.log.Info("Duplicate cache stopped")
 
 	return nil
 }

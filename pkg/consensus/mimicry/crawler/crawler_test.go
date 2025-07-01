@@ -88,7 +88,7 @@ func allDiscoverableNodes(t *testing.T, tf *kurtosis.TestFoundation, network net
 	manual := &discovery.Manual{}
 
 	// Setup and start the crawler
-	cr := setupCrawler(t, tf, network, logger, manual, config)
+	cr := setupCrawler(t, network, logger, manual, config)
 
 	// Create a sink of the crawler's events
 	setupCrawlerEventHandlers(t, cr, logger, identities, successful, mu)
@@ -164,7 +164,7 @@ func setupNodeTracking(t *testing.T, tf *kurtosis.TestFoundation, network networ
 }
 
 // setupCrawler creates and starts a crawler instance.
-func setupCrawler(t *testing.T, tf *kurtosis.TestFoundation, network network.Network, logger *logrus.Logger, manual *discovery.Manual, config *TestCrawlerConfig) *crawler.Crawler {
+func setupCrawler(t *testing.T, network network.Network, logger *logrus.Logger, manual *discovery.Manual, config *TestCrawlerConfig) *crawler.Crawler {
 	t.Helper()
 
 	// Get the first consensus client
@@ -179,6 +179,7 @@ func setupCrawler(t *testing.T, tf *kurtosis.TestFoundation, network network.Net
 		DialConcurrency: config.DialConcurrency,
 		CooloffDuration: config.CooloffDuration,
 		DialTimeout:     config.DialTimeout,
+		UserAgent:       "ethcore/crawler-test",
 		Node: &host.Config{
 			IPAddr: net.ParseIP("127.0.0.1"),
 		},
@@ -186,7 +187,7 @@ func setupCrawler(t *testing.T, tf *kurtosis.TestFoundation, network network.Net
 			BeaconNodeAddress: firstClient.BeaconAPIURL(),
 			NetworkOverride:   "kurtosis",
 		},
-	}, "mimicry/crawler", "mimicry", manual)
+	}, manual)
 
 	// Start the crawler in a goroutine
 	go func() {
