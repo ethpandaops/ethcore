@@ -65,6 +65,22 @@ type Crawler struct {
 	// ENR storage
 	peerENRs   map[peer.ID]*enode.Node
 	peerENRsMu sync.RWMutex
+
+	// Scheduler for cron jobs
+	scheduler gocron.Scheduler
+
+	// Shutdown tracking
+	shutdownOnce sync.Once
+	isShutdown   bool
+	shutdownMu   sync.RWMutex
+
+	// Context for cancellation
+	//nolint:containedctx // Would require big refactor into channels, leaving for now.
+	ctx    context.Context
+	cancel context.CancelFunc
+
+	// Wait group for dialer workers
+	dialerWg sync.WaitGroup
 }
 
 // New creates a new Crawler.
@@ -99,13 +115,16 @@ func (c *Crawler) Start(ctx context.Context) error {
 		"cooloff":    c.config.CooloffDuration,
 	}).Info("Starting Ethereum Mimicry crawler")
 
+	// Create internal context for cancellation
+	c.ctx, c.cancel = context.WithCancel(ctx)
+
 	// Start the duplicate cache
-	if err := c.duplicateCache.Start(ctx); err != nil {
+	if err := c.duplicateCache.Start(c.ctx); err != nil {
 		return fmt.Errorf("failed to start duplicate cache: %w", err)
 	}
 
 	// Create the host
-	h, err := host.NewNode(ctx, c.log, c.config.Node, c.userAgent)
+	h, err := host.NewNode(c.ctx, c.log, c.config.Node, c.userAgent)
 	if err != nil {
 		return fmt.Errorf("failed to create host: %w", err)
 	}
@@ -142,7 +161,7 @@ func (c *Crawler) Start(ctx context.Context) error {
 	// - Start node discovery
 	// - Start our node dialer
 	// - Start the crons
-	c.beacon.OnReady(ctx, func(ctx context.Context) error {
+	c.beacon.OnReady(c.ctx, func(ctx context.Context) error {
 		c.log.Info("Beacon node is ready")
 
 		operation := func() (string, error) {
@@ -237,7 +256,7 @@ func (c *Crawler) Start(ctx context.Context) error {
 	})
 
 	// Start the beacon node
-	if err := c.beacon.Start(ctx); err != nil {
+	if err := c.beacon.Start(c.ctx); err != nil {
 		return fmt.Errorf("failed to start beacon node: %w", err)
 	}
 
@@ -245,22 +264,115 @@ func (c *Crawler) Start(ctx context.Context) error {
 }
 
 func (c *Crawler) Stop(ctx context.Context) error {
-	if err := c.duplicateCache.Stop(); err != nil {
-		c.log.WithError(err).Error("Failed to stop duplicate cache")
-	}
+	var finalErr error
 
-	// Tell all our peers we're disconnecting
-	for _, p := range c.node.Peerstore().Peers() {
-		if err := c.DisconnectFromPeer(ctx, p, eth.GoodbyeReasonClientShutdown); err != nil {
-			c.log.WithError(err).Error("Failed to disconnect from peer on shutdown")
+	c.shutdownOnce.Do(func() {
+		c.log.Info("Stopping crawler...")
+
+		// Mark as shutting down
+		c.shutdownMu.Lock()
+		c.isShutdown = true
+		c.shutdownMu.Unlock()
+
+		// Cancel the context to stop all operations
+		if c.cancel != nil {
+			c.cancel()
 		}
-	}
 
-	if err := c.node.Stop(ctx); err != nil {
-		return fmt.Errorf("failed to close host: %w", err)
-	}
+		var errs []error
 
-	return nil
+		// Stop the beacon node first to prevent any more head events
+		if c.beacon != nil {
+			c.log.Info("Stopping beacon node...")
+
+			if err := c.beacon.Stop(ctx); err != nil {
+				errs = append(errs, fmt.Errorf("failed to stop beacon node: %w", err))
+			}
+		}
+
+		// Stop the cron scheduler
+		if c.scheduler != nil {
+			c.log.Info("Stopping cron scheduler...")
+
+			if err := c.scheduler.StopJobs(); err != nil {
+				errs = append(errs, fmt.Errorf("failed to stop scheduler jobs: %w", err))
+			}
+
+			// Shutdown waits for running jobs to complete
+			if err := c.scheduler.Shutdown(); err != nil {
+				errs = append(errs, fmt.Errorf("failed to shutdown scheduler: %w", err))
+			}
+		}
+
+		// Stop discovery
+		if c.discovery != nil {
+			c.log.Info("Stopping discovery...")
+
+			if err := c.discovery.Stop(ctx); err != nil {
+				errs = append(errs, fmt.Errorf("failed to stop discovery: %w", err))
+			}
+		}
+
+		// Close the dialer channel to stop dialer workers
+		if c.peersToDial != nil {
+			c.log.Info("Closing dialer channel...")
+
+			close(c.peersToDial)
+		}
+
+		// Wait for dialer workers to finish with timeout
+		dialerDone := make(chan struct{})
+		go func() {
+			c.dialerWg.Wait()
+			close(dialerDone)
+		}()
+
+		select {
+		case <-dialerDone:
+			c.log.Info("All dialer workers stopped")
+		case <-time.After(5 * time.Second):
+			c.log.Warn("Timeout waiting for dialer workers to stop")
+		}
+
+		// Stop the duplicate cache
+		if c.duplicateCache != nil {
+			if err := c.duplicateCache.Stop(); err != nil {
+				errs = append(errs, fmt.Errorf("failed to stop duplicate cache: %w", err))
+			}
+		}
+
+		// Tell all our peers we're disconnecting
+		if c.node != nil {
+			peerstore := c.node.Peerstore()
+			if peerstore != nil {
+				for _, p := range peerstore.Peers() {
+					if err := c.DisconnectFromPeer(ctx, p, eth.GoodbyeReasonClientShutdown); err != nil {
+						c.log.WithError(err).Debug("Failed to disconnect from peer on shutdown")
+					}
+				}
+			}
+		}
+
+		// Stop the libp2p node
+		if c.node != nil {
+			if err := c.node.Stop(ctx); err != nil {
+				errs = append(errs, fmt.Errorf("failed to stop node: %w", err))
+			}
+		}
+
+		// Clear ENR storage
+		c.peerENRsMu.Lock()
+		c.peerENRs = make(map[peer.ID]*enode.Node)
+		c.peerENRsMu.Unlock()
+
+		c.log.Info("Crawler stopped")
+
+		if len(errs) > 0 {
+			finalErr = fmt.Errorf("errors during shutdown: %v", errs)
+		}
+	})
+
+	return finalErr
 }
 
 func (c *Crawler) startCrons(ctx context.Context) error {
@@ -272,18 +384,35 @@ func (c *Crawler) startCrons(ctx context.Context) error {
 	if _, err := s.NewJob(
 		gocron.DurationJob(1*time.Minute),
 		gocron.NewTask(
-			func(ctx context.Context) {
-				if err := c.fetchAndSetStatus(ctx); err != nil {
+			func() {
+				// Check if we're shutting down
+				c.shutdownMu.RLock()
+				if c.isShutdown {
+					c.shutdownMu.RUnlock()
+
+					return
+				}
+				c.shutdownMu.RUnlock()
+
+				// Use a timeout context for the status fetch.
+				fetchCtx, cancel := context.WithTimeout(c.ctx, 30*time.Second)
+				defer cancel()
+
+				if err := c.fetchAndSetStatus(fetchCtx); err != nil {
+					if errors.Is(err, context.Canceled) {
+						return
+					}
+
 					c.log.WithError(err).Error("Failed to fetch and set status")
 				}
 			},
-			ctx,
 		),
 		gocron.WithStartAt(gocron.WithStartImmediately()),
 	); err != nil {
 		return err
 	}
 
+	c.scheduler = s
 	s.Start()
 
 	return nil
