@@ -76,31 +76,31 @@ func Test_RunKurtosisTests(t *testing.T) {
 	require.NotNil(t, epgNetwork, "EPG network must be available")
 
 	t.Run("discover-crawlable-nodes", func(t *testing.T) {
-		allDiscoverableNodes(t, epgNetwork, crawlerConfig, logger)
+		allDiscoverableNodes(t, logger, epgNetwork, crawlerConfig)
 	})
 }
 
 // allDiscoverableNodes tests that all nodes are discoverable.
 func allDiscoverableNodes(
 	t *testing.T,
+	logger *logrus.Logger,
 	network network.Network,
 	config *TestCrawlerConfig,
-	logger *logrus.Logger,
 ) {
 	t.Helper()
 
 	// Setup beacon nodes and get their identities.
-	nodeInfos, successful := setupBeaconNodes(t, network, logger)
-	defer cleanupBeaconNodes(nodeInfos, logger)
+	nodeInfos, successful := setupBeaconNodes(t, logger, network)
+	defer cleanupBeaconNodes(logger, nodeInfos)
 
 	// Create mutex for synchronizing access to the successful map
 	mu := &sync.Mutex{}
 
-	// Create our discovery instance which we'll use to manually add peers
+	// Create our discovery instance, which we'll use to manually add peers
 	manual := &discovery.Manual{}
 
 	// Setup and start the crawler
-	cr := setupCrawler(t, network, logger, manual, config)
+	cr := setupCrawler(t, logger, network, manual, config)
 
 	// Extract identities from nodeInfos for event handlers
 	identities := make(map[string]*types.Identity)
@@ -109,7 +109,7 @@ func allDiscoverableNodes(
 	}
 
 	// Create a sink of the crawler's events
-	setupCrawlerEventHandlers(t, cr, logger, identities, successful, mu)
+	setupCrawlerEventHandlers(t, logger, cr, identities, successful, mu)
 
 	// Wait until the crawler is ready
 	select {
@@ -120,11 +120,15 @@ func allDiscoverableNodes(
 	}
 
 	// Feed ENRs to the crawler and wait for results
-	feedENRsToCrawler(t, nodeInfos, logger, manual, successful, mu, config.CrawlerTimeout)
+	feedENRsToCrawler(t, logger, nodeInfos, manual, successful, mu, config.CrawlerTimeout)
 }
 
 // setupBeaconNodes creates and starts beacon nodes for all consensus clients.
-func setupBeaconNodes(t *testing.T, network network.Network, logger *logrus.Logger) (map[string]*NodeInfo, map[string]bool) {
+func setupBeaconNodes(
+	t *testing.T,
+	logger *logrus.Logger,
+	network network.Network,
+) (map[string]*NodeInfo, map[string]bool) {
 	t.Helper()
 
 	var (
@@ -219,7 +223,13 @@ func setupBeaconNodes(t *testing.T, network network.Network, logger *logrus.Logg
 }
 
 // setupCrawler creates and starts a crawler instance.
-func setupCrawler(t *testing.T, network network.Network, logger *logrus.Logger, manual *discovery.Manual, config *TestCrawlerConfig) *crawler.Crawler {
+func setupCrawler(
+	t *testing.T,
+	logger *logrus.Logger,
+	network network.Network,
+	manual *discovery.Manual,
+	config *TestCrawlerConfig,
+) *crawler.Crawler {
 	t.Helper()
 
 	// Get the first consensus client
@@ -257,8 +267,8 @@ func setupCrawler(t *testing.T, network network.Network, logger *logrus.Logger, 
 // setupCrawlerEventHandlers sets up event handlers for the crawler.
 func setupCrawlerEventHandlers(
 	t *testing.T,
-	cr *crawler.Crawler,
 	logger *logrus.Logger,
+	cr *crawler.Crawler,
 	identities map[string]*types.Identity,
 	successful map[string]bool,
 	mu *sync.Mutex,
@@ -298,8 +308,8 @@ func setupCrawlerEventHandlers(
 // feedENRsToCrawler feeds ENRs to the crawler and waits for results.
 func feedENRsToCrawler(
 	t *testing.T,
-	nodeInfos map[string]*NodeInfo,
 	logger *logrus.Logger,
+	nodeInfos map[string]*NodeInfo,
 	manual *discovery.Manual,
 	successful map[string]bool,
 	mu *sync.Mutex,
@@ -381,7 +391,7 @@ func feedENRsToCrawler(
 }
 
 // cleanupBeaconNodes stops all beacon nodes.
-func cleanupBeaconNodes(nodeInfos map[string]*NodeInfo, logger *logrus.Logger) {
+func cleanupBeaconNodes(logger *logrus.Logger, nodeInfos map[string]*NodeInfo) {
 	var wg sync.WaitGroup
 	ctx := context.Background()
 
