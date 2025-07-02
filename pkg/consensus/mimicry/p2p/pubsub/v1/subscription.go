@@ -344,22 +344,8 @@ func (p *processor[T]) processMessage(ctx context.Context, msg *pubsub.Message) 
 		return
 	}
 
-	// Validate the message if validator is configured
-	if p.handler.validator != nil {
-		startTime := time.Now()
-		result := p.handler.validator(ctx, decoded, msg.ReceivedFrom)
-
-		if p.metrics != nil {
-			p.metrics.RecordValidationDuration(topicName, time.Since(startTime))
-			p.metrics.RecordMessageValidated(topicName, result)
-		}
-
-		switch result {
-		case ValidationReject, ValidationIgnore:
-			// Don't process rejected or ignored messages
-			return
-		}
-	}
+	// Note: Validation is now handled at the libp2p level via RegisterTopicValidator
+	// Messages that reach this point have already been validated and accepted
 
 	// Process the message if processor is configured
 	if p.handler.processor != nil {

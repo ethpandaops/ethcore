@@ -40,7 +40,10 @@
 //	// Create gossipsub instance
 //	gs, err := v1.New(context.Background(), host,
 //		v1.WithLogger(logrus.StandardLogger()),
-//		v1.WithValidationConcurrency(100),
+//		v1.WithPubsubOptions(
+//			pubsub.WithValidateWorkers(100),
+//			pubsub.WithValidateThrottle(100),
+//		),
 //	)
 //	if err != nil {
 //		panic(err)
@@ -313,10 +316,13 @@
 //	gs, err := v1.New(ctx, host,
 //		v1.WithLogger(logger),                    // Custom logger
 //		v1.WithMetrics(metrics),                  // Metrics collection
-//		v1.WithMaxMessageSize(10*1024*1024),      // Max message size
-//		v1.WithValidationConcurrency(200),        // Validation workers
 //		v1.WithPublishTimeout(5*time.Second),     // Publish timeout
 //		v1.WithGossipSubParams(customParams),     // Custom gossipsub params
+//		v1.WithPubsubOptions(                     // libp2p pubsub options
+//			pubsub.WithMaxMessageSize(10*1024*1024),
+//			pubsub.WithValidateWorkers(200),
+//			pubsub.WithValidateThrottle(200),
+//		),
 //	)
 //
 // Handler configuration options:

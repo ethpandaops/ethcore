@@ -26,18 +26,9 @@ func WithLogger(log logrus.FieldLogger) Option {
 		if log == nil {
 			return fmt.Errorf("logger cannot be nil")
 		}
-		g.log = log
-		return nil
-	}
-}
 
-// WithMaxMessageSize sets the maximum message size.
-func WithMaxMessageSize(size int) Option {
-	return func(g *Gossipsub) error {
-		if size <= 0 {
-			return fmt.Errorf("max message size must be positive, got %d", size)
-		}
-		g.maxMessageSize = size
+		g.log = log.WithField("component", "ethcore/gossipsub-v1")
+
 		return nil
 	}
 }
@@ -57,19 +48,6 @@ func WithPublishTimeout(timeout time.Duration) Option {
 func WithGossipSubParams(params pubsub.GossipSubParams) Option {
 	return func(g *Gossipsub) error {
 		g.gossipSubParams = params
-		return nil
-	}
-}
-
-// WithValidationConcurrency sets the number of concurrent validators.
-func WithValidationConcurrency(concurrency int) Option {
-	return func(g *Gossipsub) error {
-		if concurrency <= 0 {
-			return fmt.Errorf("validation concurrency must be positive, got %d", concurrency)
-		}
-
-		g.validationConcurrency = concurrency
-
 		return nil
 	}
 }
@@ -97,6 +75,15 @@ func WithGlobalInvalidPayloadHandler(handler func(ctx context.Context, data []by
 	}
 }
 
+// WithPubsubOptions sets additional libp2p pubsub options.
+// These options will be appended to the default options when creating the pubsub instance.
+func WithPubsubOptions(opts ...pubsub.Option) Option {
+	return func(g *Gossipsub) error {
+		g.pubsubOpts = append(g.pubsubOpts, opts...)
+		return nil
+	}
+}
+
 // Gossipsub provides a type-safe gossipsub implementation with support for
 // regular topics and subnet-based topics.
 type Gossipsub struct {
@@ -107,10 +94,11 @@ type Gossipsub struct {
 	cancel context.CancelFunc
 
 	// Configuration
-	maxMessageSize        int
-	publishTimeout        time.Duration
-	gossipSubParams       pubsub.GossipSubParams
-	validationConcurrency int
+	publishTimeout  time.Duration
+	gossipSubParams pubsub.GossipSubParams
+
+	// Pubsub options
+	pubsubOpts []pubsub.Option
 
 	// Handler registry
 	registry *Registry
@@ -148,18 +136,17 @@ func New(ctx context.Context, host host.Host, opts ...Option) (*Gossipsub, error
 	gossipCtx, cancel := context.WithCancel(ctx)
 
 	g := &Gossipsub{
-		log:                   logrus.StandardLogger().WithField("component", "gossipsub-v1"),
-		host:                  host,
-		cancel:                cancel,
-		maxMessageSize:        10 << 20, // 10MB default
-		publishTimeout:        5 * time.Second,
-		validationConcurrency: 1000,
-		registry:              NewRegistry(),
-		subscriptions:         make(map[string]*Subscription),
-		processors:            make(map[string]*processor[any]),
+		log:            logrus.StandardLogger().WithField("component", "gossipsub-v1"),
+		host:           host,
+		cancel:         cancel,
+		publishTimeout: 5 * time.Second,
+		registry:       NewRegistry(),
+		subscriptions:  make(map[string]*Subscription),
+		processors:     make(map[string]*processor[any]),
+		pubsubOpts:     []pubsub.Option{}, // Start with empty options
 	}
 
-	// Apply options
+	// Apply options (which may add more pubsub options)
 	for _, opt := range opts {
 		if err := opt(g); err != nil {
 			cancel()
@@ -174,24 +161,23 @@ func New(ctx context.Context, host host.Host, opts ...Option) (*Gossipsub, error
 	}
 
 	g.started = true
+
+	g.log.Info("Gossipsub started")
+
 	return g, nil
 }
 
 // initializePubSub creates the underlying libp2p pubsub instance.
 func (g *Gossipsub) initializePubSub(ctx context.Context) error {
-	opts := []pubsub.Option{
-		pubsub.WithMaxMessageSize(g.maxMessageSize),
-		pubsub.WithValidateWorkers(g.validationConcurrency),
-		pubsub.WithValidateThrottle(g.validationConcurrency),
-	}
-
 	// Add custom gossipsub params if provided
 	// Note: We always have gossipSubParams initialized, check if it's not the zero value
 	if g.gossipSubParams.D > 0 {
-		opts = append(opts, pubsub.WithGossipSubParams(g.gossipSubParams))
+		g.pubsubOpts = append(g.pubsubOpts, pubsub.WithGossipSubParams(g.gossipSubParams))
 	}
 
-	ps, err := pubsub.NewGossipSub(ctx, g.host, opts...)
+	g.log.Info("Creating pubsub")
+
+	ps, err := pubsub.NewGossipSub(ctx, g.host, g.pubsubOpts...)
 	if err != nil {
 		return fmt.Errorf("failed to create gossipsub: %w", err)
 	}
@@ -205,6 +191,9 @@ func (g *Gossipsub) Register(topic *Topic[any], handler *HandlerConfig[any]) err
 	if !g.started {
 		return fmt.Errorf("gossipsub not started")
 	}
+
+	g.log.WithField("topic", topic.Name()).Info("Registering topic")
+
 	return Register(g.registry, topic, handler)
 }
 
@@ -213,6 +202,9 @@ func (g *Gossipsub) RegisterSubnet(subnetTopic *SubnetTopic[any], handler *Handl
 	if !g.started {
 		return fmt.Errorf("gossipsub not started")
 	}
+
+	g.log.WithField("topics", subnetTopic.pattern).Info("Registering subnet topic")
+
 	return RegisterSubnet(g.registry, subnetTopic, handler)
 }
 
@@ -221,6 +213,8 @@ func Subscribe[T any](ctx context.Context, g *Gossipsub, topic *Topic[T]) (*Subs
 	if !g.started {
 		return nil, fmt.Errorf("gossipsub not started")
 	}
+
+	g.log.WithField("topic", topic.Name()).Info("Subscribing to topic")
 
 	topicName := topic.Name()
 
@@ -238,12 +232,34 @@ func Subscribe[T any](ctx context.Context, g *Gossipsub, topic *Topic[T]) (*Subs
 		return nil, fmt.Errorf("already subscribed to topic %s", topicName)
 	}
 
+	// Create anyTopic early for validator registration
+	anyTopic := &Topic[any]{
+		name:    topic.name,
+		encoder: wrapEncoder(topic.encoder),
+	}
+
+	// Register validator with libp2p if handler has one
+	if handler.validator != nil {
+		// Create a wrapper that converts our validator to libp2p's validator format
+		libp2pValidator := g.createLibp2pValidator(anyTopic, handler)
+		if err := g.pubsub.RegisterTopicValidator(topicName, libp2pValidator); err != nil {
+			return nil, fmt.Errorf("failed to register validator for topic %s: %w", topicName, err)
+		}
+	}
+
 	// Join the topic first
 	topicHandle, err := g.pubsub.Join(topicName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to join topic %s: %w", topicName, err)
 	}
-	
+
+	// Apply score parameters if configured
+	if handler.scoreParams != nil {
+		if err := topicHandle.SetScoreParams(handler.scoreParams); err != nil {
+			return nil, fmt.Errorf("failed to set score params for topic %s: %w", topicName, err)
+		}
+	}
+
 	// Subscribe to the topic
 	libp2pSub, err := topicHandle.Subscribe()
 	if err != nil {
@@ -251,10 +267,6 @@ func Subscribe[T any](ctx context.Context, g *Gossipsub, topic *Topic[T]) (*Subs
 	}
 
 	// Create processor
-	anyTopic := &Topic[any]{
-		name:    topic.name,
-		encoder: wrapEncoder(topic.encoder),
-	}
 	proc, procCtx, err := g.createProcessor(ctx, anyTopic, handler, libp2pSub)
 	if err != nil {
 		libp2pSub.Cancel()
@@ -290,7 +302,11 @@ func Subscribe[T any](ctx context.Context, g *Gossipsub, topic *Topic[T]) (*Subs
 	// Start the processor
 	proc.start(procCtx)
 
-	g.log.WithField("topic", topicName).Debug("Subscribed to topic")
+	g.log.WithFields(logrus.Fields{
+		"topic":         topicName,
+		"has_validator": handler.validator != nil,
+	}).Info("Subscribed to topic")
+
 	return sub, nil
 }
 
@@ -362,6 +378,8 @@ func Publish[T any](g *Gossipsub, topic *Topic[T], msg T) error {
 
 // createProcessor creates a new processor for a topic.
 func (g *Gossipsub) createProcessor(ctx context.Context, topic *Topic[any], handler *HandlerConfig[any], sub *pubsub.Subscription) (*processor[any], context.Context, error) {
+	g.log.WithField("topic", topic.Name()).Debug("Creating processor")
+
 	proc, procCtx, err := newProcessor(ctx, topic, handler, sub, g.metrics, g.globalInvalidPayloadHandler)
 	if err != nil {
 		return nil, nil, err
@@ -385,6 +403,11 @@ func (g *Gossipsub) removeProcessor(topicName string) {
 
 	if exists && proc != nil {
 		proc.stop()
+	}
+
+	// Unregister the topic validator
+	if err := g.pubsub.UnregisterTopicValidator(topicName); err != nil {
+		g.log.WithError(err).WithField("topic", topicName).Warn("Failed to unregister topic validator")
 	}
 
 	// Remove subscription
@@ -445,6 +468,75 @@ func (g *Gossipsub) Stop() error {
 	g.log.Info("Gossipsub stopped")
 
 	return nil
+}
+
+// createLibp2pValidator creates a libp2p validator function from our handler's validator.
+// This allows our validation logic to run at the libp2p level before messages are propagated.
+func (g *Gossipsub) createLibp2pValidator(topic *Topic[any], handler *HandlerConfig[any]) pubsub.ValidatorEx {
+	g.log.WithField("topic", topic.Name()).Info("Creating libp2p gossipsub validator")
+
+	return func(ctx context.Context, pid peer.ID, msg *pubsub.Message) (result pubsub.ValidationResult) {
+		defer func() {
+			g.log.WithFields(logrus.Fields{
+				"topic":  topic.Name(),
+				"pid":    pid,
+				"result": result,
+			}).Info("Validated message")
+		}()
+		// Record validation start
+		if g.metrics != nil {
+			g.metrics.RecordMessageReceived(topic.Name())
+		}
+
+		// Decode the message
+		decoder := handler.decoder
+		if decoder == nil {
+			decoder = topic.encoder.Decode
+		}
+
+		decoded, err := decoder(msg.Data)
+		if err != nil {
+			// Call invalid payload handler if configured
+			if handler.invalidPayloadHandler != nil {
+				handler.invalidPayloadHandler(ctx, msg.Data, err, pid)
+			}
+
+			// Call global invalid payload handler if configured
+			if g.globalInvalidPayloadHandler != nil {
+				g.globalInvalidPayloadHandler(ctx, msg.Data, err, pid, topic.Name())
+			}
+
+			// Reject messages that can't be decoded
+			if g.metrics != nil {
+				g.metrics.RecordMessageValidated(topic.Name(), ValidationReject)
+			}
+
+			return pubsub.ValidationReject
+		}
+
+		// Run the validator
+		startTime := time.Now()
+		res := handler.validator(ctx, decoded, pid)
+
+		// Record validation metrics
+		if g.metrics != nil {
+			g.metrics.RecordValidationDuration(topic.Name(), time.Since(startTime))
+			g.metrics.RecordMessageValidated(topic.Name(), res)
+		}
+
+		// Convert our validation result to libp2p's format
+		switch res {
+		case ValidationAccept:
+			return pubsub.ValidationAccept
+		case ValidationReject:
+			return pubsub.ValidationReject
+		case ValidationIgnore:
+			return pubsub.ValidationIgnore
+		default:
+			// Default to reject for unknown results
+			return pubsub.ValidationReject
+		}
+	}
 }
 
 // wrapEncoder wraps a typed encoder to work with any type.

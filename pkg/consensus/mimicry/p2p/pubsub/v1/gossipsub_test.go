@@ -10,6 +10,7 @@ import (
 
 	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub/v1"
 	"github.com/libp2p/go-libp2p"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
@@ -65,19 +66,19 @@ func (e *TestEncoder) Encode(msg GossipTestMessage) ([]byte, error) {
 func (e *TestEncoder) Decode(data []byte) (GossipTestMessage, error) {
 	// Simple decoding
 	str := string(data)
-	
+
 	// Split by pipe delimiter
 	parts := strings.Split(str, "|")
 	if len(parts) != 3 {
 		return GossipTestMessage{}, fmt.Errorf("invalid message format: expected 3 parts, got %d", len(parts))
 	}
-	
+
 	msg := GossipTestMessage{
 		ID:      parts[0],
 		Content: parts[1],
 		From:    parts[2],
 	}
-	
+
 	return msg, nil
 }
 
@@ -119,11 +120,14 @@ func (ti *TestInfrastructure) CreateNode(ctx context.Context, opts ...v1.Option)
 	// Create gossipsub instance with default options
 	defaultOpts := []v1.Option{
 		v1.WithLogger(logrus.StandardLogger().WithField("test", "node").WithField("peer", h.ID().ShortString())),
-		v1.WithMaxMessageSize(1 << 20), // 1MB
 		v1.WithPublishTimeout(5 * time.Second),
-		v1.WithValidationConcurrency(10),
+		v1.WithPubsubOptions(
+			pubsub.WithMaxMessageSize(1<<20), // 1MB
+			pubsub.WithValidateWorkers(10),
+			pubsub.WithValidateThrottle(10),
+		),
 	}
-	
+
 	// Append user options
 	defaultOpts = append(defaultOpts, opts...)
 
@@ -331,7 +335,7 @@ func TestGossipsubThreeNodeMessagePropagation(t *testing.T) {
 	for i, node := range nodes {
 		// Create handler with collector
 		handler := CreateTestHandler(collector.CreateProcessor(node.ID))
-		
+
 		// Register handler
 		err := v1.Register(node.Gossipsub.Registry(), topic, handler)
 		require.NoError(t, err)
@@ -341,14 +345,14 @@ func TestGossipsubThreeNodeMessagePropagation(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, sub)
 		subscriptions[i] = sub
-		
+
 		t.Logf("Node %d (%s) subscribed to topic %s", i, node.ID.ShortString(), topic.Name())
 	}
-	
+
 	// Give subscriptions time to propagate
 	time.Sleep(1 * time.Second)
 
-	// Wait for gossipsub mesh to stabilize  
+	// Wait for gossipsub mesh to stabilize
 	t.Log("Waiting for gossipsub mesh to stabilize...")
 	WaitForGossipsubReady(t, nodes, topic.Name(), 3)
 	t.Log("Gossipsub mesh is ready")
@@ -373,13 +377,13 @@ func TestGossipsubThreeNodeMessagePropagation(t *testing.T) {
 
 	// Get all messages and check if sender received its own message
 	messages := collector.GetMessages()
-	
+
 	// Count messages by node
 	messagesByNode := make(map[peer.ID][]ReceivedMessage)
 	for _, msg := range messages {
 		messagesByNode[msg.Node] = append(messagesByNode[msg.Node], msg)
 	}
-	
+
 	// Check if the sender received its own message
 	if msgs, ok := messagesByNode[nodes[0].ID]; ok && len(msgs) > 0 {
 		// This is expected behavior in libp2p gossipsub - nodes receive their own messages
@@ -393,7 +397,7 @@ func TestGossipsubThreeNodeMessagePropagation(t *testing.T) {
 		}
 		messages = filteredMessages
 	}
-	
+
 	assert.Len(t, messages, 2, "Expected 2 nodes (excluding sender) to receive the message")
 
 	// Verify that nodes 1 and 2 received the message, but not node 0 (the sender)
@@ -403,7 +407,7 @@ func TestGossipsubThreeNodeMessagePropagation(t *testing.T) {
 		assert.Equal(t, testMsg.ID, msg.Message.ID)
 		assert.Equal(t, testMsg.Content, msg.Message.Content)
 		assert.Equal(t, testMsg.From, msg.Message.From)
-		
+
 		if msg.Node == nodes[1].ID {
 			receivedByNode1 = true
 		} else if msg.Node == nodes[2].ID {
@@ -457,7 +461,7 @@ func TestGossipsubMultipleMessages(t *testing.T) {
 
 		err := v1.Publish(node.Gossipsub, topic, msg)
 		require.NoError(t, err)
-		
+
 		// Small delay between messages
 		time.Sleep(100 * time.Millisecond)
 	}
@@ -487,7 +491,7 @@ func TestGossipsubMultipleMessages(t *testing.T) {
 	for i := range nodes {
 		msgID := fmt.Sprintf("msg-%d", i)
 		receipts := messageReceipts[msgID]
-		
+
 		// Count receipts
 		receiptCount := 0
 		for _, received := range receipts {
@@ -522,7 +526,7 @@ func TestGossipsubUnsubscribe(t *testing.T) {
 	for i, node := range nodes {
 		collectors[i] = NewMessageCollector(5)
 		handler := CreateTestHandler(collectors[i].CreateProcessor(node.ID))
-		
+
 		err := v1.Register(node.Gossipsub.Registry(), topic, handler)
 		require.NoError(t, err)
 
@@ -575,7 +579,7 @@ func TestGossipsubTopicIsolation(t *testing.T) {
 	// Create two different topics
 	topicA, err := CreateTestTopic("topic-a")
 	require.NoError(t, err)
-	
+
 	topicB, err := CreateTestTopic("topic-b")
 	require.NoError(t, err)
 

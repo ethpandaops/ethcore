@@ -24,6 +24,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/core/protocol"
+	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
 	"github.com/libp2p/go-libp2p/p2p/security/noise"
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 	ma "github.com/multiformats/go-multiaddr"
@@ -105,6 +106,19 @@ func (n *Node) Start(ctx context.Context) (host.Host, error) {
 		return nil, fmt.Errorf("failed to derive private key: %w", errr)
 	}
 
+	str, err := rcmgr.NewStatsTraceReporter()
+	if err != nil {
+		return nil, err
+	}
+
+	rmgr, err := rcmgr.NewResourceManager(
+		rcmgr.NewFixedLimiter(rcmgr.DefaultLimits.AutoScale()),
+		rcmgr.WithTraceReporter(str),
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	libp2pOptions := []libp2p.Option{
 		libp2p.ListenAddrStrings(addrStrings...),
 		libp2p.UserAgent(n.userAgent),
@@ -113,8 +127,9 @@ func (n *Node) Start(ctx context.Context) (host.Host, error) {
 		libp2p.DefaultMuxers,
 		libp2p.Security(noise.ID, noise.New),
 		libp2p.Ping(true),
+		libp2p.DisableRelay(),
 		libp2p.Identity(n.DerivedPrivKey),
-		libp2p.ResourceManager(&network.NullResourceManager{}),
+		libp2p.ResourceManager(rmgr),
 	}
 
 	h, err := libp2p.New(libp2pOptions...)
