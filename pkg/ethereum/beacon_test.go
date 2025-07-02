@@ -176,17 +176,23 @@ func multiNoteTest(t *testing.T, logger *logrus.Logger, epgNetwork network.Netwo
 
 		// Register callback for when node is ready
 		nodeIndex := i
+		started := make(chan struct{})
 		node.OnReady(ctx, func(ctx context.Context) error {
-			defer wg.Done()
+			select {
+			case <-started:
+				defer wg.Done()
 
-			nodeLogger.Info("Node is ready")
+				nodeLogger.Info("Node is ready")
 
-			// Log network information
-			metadata := node.Metadata()
-			nodeLogger.WithFields(logrus.Fields{
-				"network":    metadata.Network.Name,
-				"node_index": nodeIndex,
-			}).Info("Node connected to network")
+				// Log network information
+				metadata := node.Metadata()
+				nodeLogger.WithFields(logrus.Fields{
+					"network":    metadata.Network.Name,
+					"node_index": nodeIndex,
+				}).Info("Node connected to network")
+			default:
+				// Node wasn't properly started, don't call wg.Done()
+			}
 
 			return nil
 		})
@@ -197,6 +203,8 @@ func multiNoteTest(t *testing.T, logger *logrus.Logger, epgNetwork network.Netwo
 			if err := n.Start(ctx); err != nil {
 				nodeLogger.WithError(err).Error("Failed to start beacon node")
 				wg.Done() // Ensure we decrease the counter even on error
+			} else {
+				close(started) // Signal that node started successfully
 			}
 		}(node, i)
 	}
