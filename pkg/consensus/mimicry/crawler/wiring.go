@@ -273,6 +273,11 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 		return
 	}
 
+	// Clean up any retry tracking for this peer
+	c.retryMu.Lock()
+	delete(c.retryTracker, conn.RemotePeer())
+	c.retryMu.Unlock()
+
 	c.emitSuccessfulCrawl(conn.RemotePeer(), status, metadata)
 }
 
@@ -404,11 +409,6 @@ func (c *Crawler) startRetryWorker(ctx context.Context) error {
 				case <-ctx.Done():
 					return
 				}
-
-				// Remove from retry tracker
-				c.retryMu.Lock()
-				delete(c.retryTracker, retryInfo.Peer.AddrInfo.ID)
-				c.retryMu.Unlock()
 
 				// Re-add to dialer queue
 				select {

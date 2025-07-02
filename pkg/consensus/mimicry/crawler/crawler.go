@@ -754,6 +754,18 @@ func (c *Crawler) handleCrawlFailure(peerID peer.ID, err CrawlError) {
 		return
 	}
 
+	// If max retry attempts is 0, don't retry at all
+	if c.config.MaxRetryAttempts == 0 {
+		c.log.WithFields(logrus.Fields{
+			"peer":  peerID,
+			"error": err,
+		}).Debug("Max retry attempts is 0, emitting failure without retry")
+
+		c.emitFailedCrawl(peerID, err)
+
+		return
+	}
+
 	// Check existing retry info
 	c.retryMu.RLock()
 	retryInfo, exists := c.retryTracker[peerID]
@@ -767,6 +779,11 @@ func (c *Crawler) handleCrawlFailure(peerID peer.ID, err CrawlError) {
 			"attempts": retryInfo.Attempts,
 			"error":    err,
 		}).Info("Max retry attempts reached, emitting failure")
+
+		// Clean up retry tracking
+		c.retryMu.Lock()
+		delete(c.retryTracker, peerID)
+		c.retryMu.Unlock()
 
 		c.emitFailedCrawl(peerID, err)
 
@@ -807,6 +824,13 @@ func (c *Crawler) scheduleRetry(peerID peer.ID, peer *discovery.ConnectablePeer,
 			"peer":  peerID,
 			"error": err,
 		}).Info("Error is not retryable, skipping retry")
+
+		return
+	}
+
+	// If max retry attempts is 0, don't schedule any retries
+	if c.config.MaxRetryAttempts == 0 {
+		c.log.WithField("peer", peerID).Debug("Max retry attempts is 0, not scheduling retry")
 
 		return
 	}
