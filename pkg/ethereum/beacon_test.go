@@ -196,7 +196,7 @@ func multiNoteTest(t *testing.T, logger *logrus.Logger, epgNetwork network.Netwo
 			nodeLogger.Info("Starting beacon node")
 			if err := n.Start(ctx); err != nil {
 				nodeLogger.WithError(err).Error("Failed to start beacon node")
-				wg.Done() // Ensure we decrease the counter even on error
+				wg.Done() // Decrement counter since OnReady won't be called for failed nodes
 			}
 		}(node, i)
 	}
