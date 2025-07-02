@@ -185,36 +185,40 @@ func setupBeaconNodes(
 
 		wg.Add(1)
 
-		// Register callback for when node is ready
-		beaconNode.OnReady(ctx, func(ctx context.Context) error {
-			defer wg.Done()
-
-			// Fetch node identity
-			identity, err := beaconNode.Node().FetchNodeIdentity(ctx)
-			if err != nil {
-				return fmt.Errorf("failed to fetch node identity for %s: %w", clientName, err)
-			}
-
-			mu.Lock()
-			nodeInfos[clientName] = &NodeInfo{
-				Node:     beaconNode,
-				Identity: identity,
-			}
-
-			successful[clientName] = false
-			mu.Unlock()
-
-			nodeLogger.Infof("Identified peer ID for %s: %s", clientName, identity.PeerID)
-
-			return nil
-		})
-
 		// Start the node in a goroutine
 		go func(bn *ethereum.BeaconNode, name string) {
+			defer wg.Done() // Always call Done when this goroutine exits
+
+			// Register callback for when node is ready
+			readyHandled := false
+			beaconNode.OnReady(ctx, func(ctx context.Context) error {
+				if readyHandled {
+					return nil // Prevent double execution
+				}
+				readyHandled = true
+
+				// Fetch node identity
+				identity, err := beaconNode.Node().FetchNodeIdentity(ctx)
+				if err != nil {
+					return fmt.Errorf("failed to fetch node identity for %s: %w", clientName, err)
+				}
+
+				mu.Lock()
+				nodeInfos[clientName] = &NodeInfo{
+					Node:     beaconNode,
+					Identity: identity,
+				}
+
+				successful[clientName] = false
+				mu.Unlock()
+
+				nodeLogger.Infof("Identified peer ID for %s: %s", clientName, identity.PeerID)
+
+				return nil
+			})
+
 			if err := bn.Start(ctx); err != nil {
 				nodeLogger.WithError(err).Errorf("Failed to start beacon node %s", name)
-
-				wg.Done() // Ensure we decrease the counter even on error
 			}
 		}(beaconNode, clientName)
 	}
