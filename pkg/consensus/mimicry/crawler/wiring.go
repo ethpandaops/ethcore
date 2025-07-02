@@ -153,10 +153,7 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 					"peer": conn.RemotePeer(),
 				}).Debug("Identify protocol cancelled due to shutdown")
 			default:
-				c.log.WithFields(logrus.Fields{
-					"peer":    conn.RemotePeer(),
-					"timeout": identifyTimeout,
-				}).Warn("Timeout waiting for identify protocol")
+				c.handleCrawlFailure(conn.RemotePeer(), ErrCrawlIdentifyTimeout)
 			}
 
 			break
