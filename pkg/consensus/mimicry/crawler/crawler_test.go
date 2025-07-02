@@ -316,7 +316,9 @@ func setupCrawler(
 		Node: &host.Config{
 			IPAddr: net.ParseIP("127.0.0.1"),
 		},
-		Beacon: beaconConfig,
+		MaxRetryAttempts: 3,
+		RetryBackoff:     2 * time.Second,
+		Beacon:           beaconConfig,
 	}, manual)
 
 	// Start the crawler in a goroutine
