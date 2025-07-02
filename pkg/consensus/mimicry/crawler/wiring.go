@@ -192,8 +192,6 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 		default:
 		}
 
-		logCtx.Error("Failed to complete identify protocol")
-
 		c.handleCrawlFailure(conn.RemotePeer(), ErrCrawlIdentifyTimeout)
 
 		return
@@ -214,26 +212,14 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 		}
 	}()
 
-	// Request status with retry logic.
-	// Different beacon node implementations have varying initialization times after connection.
-	// This retry mechanism ensures we don't prematurely fail connections to slower-initializing clients.
-	// We use generous delays to accommodate all client types.
-	var (
-		retryDelay = 5 * time.Second
-		status     *common.Status
-		err        error
-	)
+	// Request status from peer.
+	statusCtx, statusCancel := context.WithTimeout(c.ctx, 30*time.Second)
 
-	for retries := 0; retries < 3; retries++ {
-		statusCtx, statusCancel := context.WithTimeout(c.ctx, 30*time.Second)
-		status, err = c.RequestStatusFromPeer(statusCtx, conn.RemotePeer())
+	status, err := c.RequestStatusFromPeer(statusCtx, conn.RemotePeer())
 
-		statusCancel()
+	statusCancel()
 
-		if err == nil {
-			break
-		}
-
+	if err != nil {
 		// Check if the error is due to context cancellation (shutdown)
 		if errors.Is(err, context.Canceled) {
 			logCtx.Debug("Status request cancelled due to shutdown")
@@ -241,26 +227,7 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 			return
 		}
 
-		if retries < 2 {
-			logCtx.WithFields(logrus.Fields{
-				"attempt":     retries + 1,
-				"error":       err.Error(),
-				"retry_delay": retryDelay,
-			}).Info("Status request failed, retrying")
-
-			select {
-			case <-time.After(retryDelay):
-				// Continue with retry
-			case <-c.ctx.Done():
-				logCtx.Debug("Retry cancelled due to shutdown")
-
-				return
-			}
-		}
-	}
-
-	if err != nil {
-		logCtx.WithError(err).Debug("Failed to request status from peer after retries")
+		logCtx.WithError(err).Debug("Failed to request status from peer")
 
 		c.handleCrawlFailure(conn.RemotePeer(), ErrCrawlFailedToRequestStatus)
 
@@ -287,21 +254,13 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 		"connected":       c.node.Connectedness(conn.RemotePeer()),
 	}).Debug("Received status from peer")
 
-	// Request metadata from the peer with retry logic
+	// Request metadata from the peer.
 	// Metadata contains information about attestation subnet participation and sync committee duties.
 	metadataCtx, metadataCancel := context.WithTimeout(c.ctx, 30*time.Second)
 	defer metadataCancel()
 
-	// Retry metadata requests with generous delays for all clients
-	metadataRetryDelay := 3 * time.Second
-
-	var metadata *common.MetaData
-	for retries := 0; retries < 3; retries++ {
-		metadata, err = c.RequestMetadataFromPeer(metadataCtx, conn.RemotePeer())
-		if err == nil {
-			break
-		}
-
+	metadata, err := c.RequestMetadataFromPeer(metadataCtx, conn.RemotePeer())
+	if err != nil {
 		// Check if the error is due to context cancellation (shutdown)
 		if errors.Is(err, context.Canceled) {
 			logCtx.Debug("Metadata request cancelled due to shutdown")
@@ -309,26 +268,7 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 			return
 		}
 
-		if retries < 2 {
-			logCtx.WithFields(logrus.Fields{
-				"attempt":     retries + 1,
-				"error":       err.Error(),
-				"retry_delay": metadataRetryDelay,
-			}).Debug("Metadata request failed, retrying")
-
-			select {
-			case <-time.After(metadataRetryDelay):
-				// Continue with retry
-			case <-c.ctx.Done():
-				logCtx.Debug("Metadata retry cancelled due to shutdown")
-
-				return
-			}
-		}
-	}
-
-	if err != nil {
-		logCtx.WithError(err).Error("Failed to request metadata from peer after retries")
+		logCtx.WithError(err).Debug("Failed to request metadata from peer")
 
 		c.handleCrawlFailure(conn.RemotePeer(), ErrCrawlFailedToRequestMetadata)
 
