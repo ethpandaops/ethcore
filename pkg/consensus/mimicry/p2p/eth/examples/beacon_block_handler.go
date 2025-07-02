@@ -85,11 +85,13 @@ func ExampleBeaconBlockSetup(ctx context.Context, db *sql.DB, log logrus.FieldLo
 	// Create a Gossipsub instance with production-ready settings
 	gs, err := v1.New(ctx, h,
 		v1.WithLogger(log),
-		v1.WithMetrics(metrics),                     // Enable metrics collection
-		v1.WithMaxMessageSize(10*1024*1024),         // 10 MB max for beacon blocks
-		v1.WithValidationConcurrency(100),           // Process up to 100 messages concurrently
-		v1.WithPublishTimeout(10*time.Second),       // Timeout for publishing
+		v1.WithMetrics(metrics),               // Enable metrics collection
+		v1.WithPublishTimeout(10*time.Second), // Timeout for publishing
 		v1.WithGossipSubParams(pubsub.DefaultGossipSubParams()),
+		v1.WithPubsubOptions(
+			pubsub.WithMaxMessageSize(10*1024*1024), // 10 MB max for beacon blocks
+			pubsub.WithValidateWorkers(100),         // Process up to 100 messages concurrently
+		),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create gossipsub: %w", err)
@@ -100,18 +102,21 @@ func ExampleBeaconBlockSetup(ctx context.Context, db *sql.DB, log logrus.FieldLo
 	events := make(chan v1.Event, 1000)
 	go handler.monitorEvents(ctx, events)
 
-	// Create the beacon block topic with fork digest and SSZ encoder
+	// Create the beacon block topic with fork digest
 	topic := topics.BeaconBlock.WithForkDigest(forkDigest)
-	encoder := topics.NewSSZSnappyEncoderWithMaxLen[*eth.SignedBeaconBlock](10 * 1024 * 1024)
 
-	// Create a typed topic with the encoder
-	typedTopic, err := v1.NewTopic[*eth.SignedBeaconBlock](topic.Name(), encoder)
+	// Create a typed topic
+	typedTopic, err := v1.NewTopic[*eth.SignedBeaconBlock](topic.Name())
 	if err != nil {
 		return fmt.Errorf("failed to create typed topic: %w", err)
 	}
 
-	// Create handler configuration with validator and processor
+	// Create encoder for beacon blocks
+	encoder := topics.NewSSZSnappyEncoderWithMaxLen[*eth.SignedBeaconBlock](10 * 1024 * 1024)
+
+	// Create handler configuration with encoder, validator and processor
 	handlerConfig := v1.NewHandlerConfig[*eth.SignedBeaconBlock](
+		v1.WithEncoder[*eth.SignedBeaconBlock](encoder),
 		v1.WithValidator[*eth.SignedBeaconBlock](handler.validateBeaconBlock),
 		v1.WithProcessor[*eth.SignedBeaconBlock](handler.processBeaconBlock),
 		v1.WithScoreParams[*eth.SignedBeaconBlock](createTopicScoreParams()),
@@ -467,8 +472,8 @@ func getBlockBodyRoot(body *eth.BeaconBlockBody) [32]byte {
 // These parameters help protect against spam and encourage good behavior.
 func createTopicScoreParams() *pubsub.TopicScoreParams {
 	return &pubsub.TopicScoreParams{
-		TopicWeight:                     0.5,  // Weight of this topic in overall peer score
-		TimeInMeshWeight:                1,    // Reward for staying in the mesh
+		TopicWeight:                     0.5, // Weight of this topic in overall peer score
+		TimeInMeshWeight:                1,   // Reward for staying in the mesh
 		TimeInMeshQuantum:               time.Second,
 		TimeInMeshCap:                   3600, // Cap the time in mesh score
 		FirstMessageDeliveriesWeight:    1,    // Reward for first delivery
@@ -477,12 +482,12 @@ func createTopicScoreParams() *pubsub.TopicScoreParams {
 		MeshMessageDeliveriesWeight:     -1,   // Penalty for not delivering in mesh
 		MeshMessageDeliveriesDecay:      0.5,
 		MeshMessageDeliveriesCap:        100,
-		MeshMessageDeliveriesThreshold:  20,   // Threshold for mesh deliveries
+		MeshMessageDeliveriesThreshold:  20, // Threshold for mesh deliveries
 		MeshMessageDeliveriesWindow:     10 * time.Millisecond,
 		MeshMessageDeliveriesActivation: time.Second,
-		MeshFailurePenaltyWeight:        -1,   // Penalty for mesh failures
+		MeshFailurePenaltyWeight:        -1, // Penalty for mesh failures
 		MeshFailurePenaltyDecay:         0.5,
-		InvalidMessageDeliveriesWeight:  -1,   // Penalty for invalid messages
+		InvalidMessageDeliveriesWeight:  -1, // Penalty for invalid messages
 		InvalidMessageDeliveriesDecay:   0.3,
 	}
 }

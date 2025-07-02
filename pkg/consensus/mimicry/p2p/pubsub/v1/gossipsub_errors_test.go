@@ -40,8 +40,9 @@ func TestGossipsubErrorHandling(t *testing.T) {
 		}
 
 		err = v1.Publish(node.Gossipsub, topic, msg)
-		// Publishing to unregistered topic should succeed in libp2p
-		assert.NoError(t, err, "Publishing to unregistered topic should succeed")
+		// Publishing to unregistered topic should fail because no handler/encoder is registered
+		assert.Error(t, err, "Publishing to unregistered topic should fail")
+		assert.Contains(t, err.Error(), "no handler registered")
 	})
 
 	t.Run("SubscribeToUnregisteredTopic", func(t *testing.T) {
@@ -146,8 +147,7 @@ func TestGossipsubErrorHandling(t *testing.T) {
 		assert.False(t, node.Gossipsub.IsStarted(), "Gossipsub should be stopped")
 
 		// Try to create a subnet subscription on stopped gossipsub
-		encoder := &TestEncoder{}
-		subnetTopic, err := v1.NewSubnetTopic[GossipTestMessage]("test_subnet_%d", 64, encoder)
+		subnetTopic, err := v1.NewSubnetTopic[GossipTestMessage]("test_subnet_%d", 64)
 		require.NoError(t, err)
 		_, err = v1.CreateSubnetSubscription(node.Gossipsub, subnetTopic)
 		assert.Error(t, err, "CreateSubnetSubscription on stopped gossipsub should fail")
@@ -320,18 +320,18 @@ func TestGossipsubErrorHandling(t *testing.T) {
 		node, err := ti.CreateNode(ctx)
 		require.NoError(t, err)
 
-		// Create a topic with a faulty encoder
-		faultyEncoder := &FaultyEncoder{shouldFailEncode: true}
-		topic := &v1.Topic[GossipTestMessage]{}
-		// We need to use reflection or a constructor that allows setting the encoder
-		// Since Topic fields are private, we'll create it through NewTopic
-		topic, err = v1.NewTopic("faulty-topic", faultyEncoder)
+		// Create a topic
+		topic, err := v1.NewTopic[GossipTestMessage]("faulty-topic")
 		require.NoError(t, err)
 
-		// Register handler
-		handler := CreateTestHandler(func(ctx context.Context, msg GossipTestMessage, from peer.ID) error {
-			return nil
-		})
+		// Create handler with faulty encoder
+		faultyEncoder := &FaultyEncoder{shouldFailEncode: true}
+		handler := v1.NewHandlerConfig[GossipTestMessage](
+			v1.WithEncoder[GossipTestMessage](faultyEncoder),
+			v1.WithProcessor[GossipTestMessage](func(ctx context.Context, msg GossipTestMessage, from peer.ID) error {
+				return nil
+			}),
+		)
 		err = v1.Register(node.Gossipsub.Registry(), topic, handler)
 		require.NoError(t, err)
 
@@ -425,8 +425,7 @@ func TestSubnetTopicErrors(t *testing.T) {
 
 	t.Run("InvalidSubnetNumber", func(t *testing.T) {
 		// Create a subnet topic with max 64 subnets
-		encoder := &TestEncoder{}
-		subnetTopic, err := v1.NewSubnetTopic[GossipTestMessage]("test_subnet_%d", 64, encoder)
+		subnetTopic, err := v1.NewSubnetTopic[GossipTestMessage]("test_subnet_%d", 64)
 		require.NoError(t, err)
 
 		// Try to subscribe to subnet beyond max
@@ -443,8 +442,7 @@ func TestSubnetTopicErrors(t *testing.T) {
 		assert.Contains(t, err.Error(), "subnet topic is nil", "Error should mention nil subnet topic")
 
 		// Create valid subnet topic
-		encoder := &TestEncoder{}
-		subnetTopic, err := v1.NewSubnetTopic[GossipTestMessage]("test_subnet_%d", 64, encoder)
+		subnetTopic, err := v1.NewSubnetTopic[GossipTestMessage]("test_subnet_%d", 64)
 		require.NoError(t, err)
 
 		// Test registering with nil handler
@@ -714,16 +712,15 @@ func TestGlobalInvalidPayloadHandler(t *testing.T) {
 // Additional test for specific error scenarios
 func TestSpecificErrorScenarios(t *testing.T) {
 	t.Run("TopicNameValidation", func(t *testing.T) {
-		encoder := &TestEncoder{}
 
 		// Test empty topic name
-		topic, err := v1.NewTopic[GossipTestMessage]("", encoder)
+		topic, err := v1.NewTopic[GossipTestMessage]("")
 		assert.Error(t, err, "Creating topic with empty name should fail")
 		assert.Nil(t, topic, "Topic should be nil on error")
 
 		// Test topic name with invalid characters
 		// Note: libp2p may have its own validation rules
-		topic, err = v1.NewTopic("topic with spaces", encoder)
+		topic, err = v1.NewTopic[GossipTestMessage]("topic with spaces")
 		// This might actually succeed depending on libp2p's validation
 		if err == nil {
 			assert.NotNil(t, topic, "Topic should not be nil if no error")
@@ -731,10 +728,10 @@ func TestSpecificErrorScenarios(t *testing.T) {
 	})
 
 	t.Run("EncoderErrors", func(t *testing.T) {
-		// Test nil encoder
-		topic, err := v1.NewTopic[GossipTestMessage]("test-topic", nil)
-		assert.Error(t, err, "Creating topic with nil encoder should fail")
-		assert.Nil(t, topic, "Topic should be nil on error")
+		// Test nil encoder - now handled in handler config validation
+		handler := v1.NewHandlerConfig[GossipTestMessage]()
+		err := handler.Validate()
+		assert.Error(t, err, "Handler with no encoder or decoder should fail validation")
 	})
 
 	t.Run("HandlerConfigurationErrors", func(t *testing.T) {
@@ -778,8 +775,19 @@ func BenchmarkErrorHandling(b *testing.B) {
 	})
 
 	b.Run("PublishWithEncodingError", func(b *testing.B) {
+		// Create topic
+		faultyTopic, _ := v1.NewTopic[GossipTestMessage]("faulty-bench-topic")
+
+		// Register handler with faulty encoder
 		faultyEncoder := &FaultyEncoder{shouldFailEncode: true}
-		faultyTopic, _ := v1.NewTopic("faulty-bench-topic", faultyEncoder)
+		handler := v1.NewHandlerConfig[GossipTestMessage](
+			v1.WithEncoder[GossipTestMessage](faultyEncoder),
+			v1.WithProcessor[GossipTestMessage](func(ctx context.Context, msg GossipTestMessage, from peer.ID) error {
+				return nil
+			}),
+		)
+		_ = v1.Register(node.Gossipsub.Registry(), faultyTopic, handler)
+
 		msg := GossipTestMessage{ID: "bench", Content: "benchmark", From: "bench"}
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {

@@ -16,22 +16,17 @@ type Encoder[T any] interface {
 
 // Topic represents a type-safe gossipsub topic.
 type Topic[T any] struct {
-	name    string
-	encoder Encoder[T]
+	name string
 }
 
 // NewTopic creates a new type-safe topic.
-func NewTopic[T any](name string, encoder Encoder[T]) (*Topic[T], error) {
+func NewTopic[T any](name string) (*Topic[T], error) {
 	if name == "" {
 		return nil, fmt.Errorf("topic name cannot be empty")
 	}
-	if encoder == nil {
-		return nil, fmt.Errorf("encoder cannot be nil")
-	}
 
 	return &Topic[T]{
-		name:    name,
-		encoder: encoder,
+		name: name,
 	}, nil
 }
 
@@ -45,25 +40,18 @@ func (t *Topic[T]) WithForkDigest(forkDigest [4]byte) *Topic[T] {
 	// Format: /eth2/<fork_digest>/<topic_name>/ssz_snappy
 	name := fmt.Sprintf("/eth2/%x/%s/ssz_snappy", forkDigest, t.name)
 	return &Topic[T]{
-		name:    name,
-		encoder: t.encoder,
+		name: name,
 	}
-}
-
-// Encoder returns the topic's encoder.
-func (t *Topic[T]) Encoder() Encoder[T] {
-	return t.encoder
 }
 
 // SubnetTopic represents a type-safe gossipsub topic with subnet support.
 type SubnetTopic[T any] struct {
 	pattern    string
 	maxSubnets uint64
-	encoder    Encoder[T]
 }
 
 // NewSubnetTopic creates a new type-safe subnet topic.
-func NewSubnetTopic[T any](pattern string, maxSubnets uint64, encoder Encoder[T]) (*SubnetTopic[T], error) {
+func NewSubnetTopic[T any](pattern string, maxSubnets uint64) (*SubnetTopic[T], error) {
 	if pattern == "" {
 		return nil, fmt.Errorf("subnet topic pattern cannot be empty")
 	}
@@ -73,14 +61,10 @@ func NewSubnetTopic[T any](pattern string, maxSubnets uint64, encoder Encoder[T]
 	if maxSubnets == 0 {
 		return nil, fmt.Errorf("maxSubnets must be greater than 0")
 	}
-	if encoder == nil {
-		return nil, fmt.Errorf("encoder cannot be nil")
-	}
 
 	return &SubnetTopic[T]{
 		pattern:    pattern,
 		maxSubnets: maxSubnets,
-		encoder:    encoder,
 	}, nil
 }
 
@@ -95,8 +79,7 @@ func (st *SubnetTopic[T]) TopicForSubnet(subnet uint64, forkDigest [4]byte) (*To
 
 	// Create topic and apply fork digest
 	topic := &Topic[T]{
-		name:    baseName,
-		encoder: st.encoder,
+		name: baseName,
 	}
 
 	return topic.WithForkDigest(forkDigest), nil
@@ -152,9 +135,4 @@ func (st *SubnetTopic[T]) ParseSubnet(topicName string) (uint64, error) {
 // MaxSubnets returns the maximum number of subnets.
 func (st *SubnetTopic[T]) MaxSubnets() uint64 {
 	return st.maxSubnets
-}
-
-// Encoder returns the subnet topic's encoder.
-func (st *SubnetTopic[T]) Encoder() Encoder[T] {
-	return st.encoder
 }

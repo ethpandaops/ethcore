@@ -46,7 +46,7 @@ func TestSimpleMalformedMessage(t *testing.T) {
 		decodeError: errors.New("always fails"),
 	}
 
-	topic, err := v1.NewTopic("fail-topic", failEncoder)
+	topic, err := v1.NewTopic[GossipTestMessage]("fail-topic")
 	require.NoError(t, err)
 
 	// Track if handler was called on each node
@@ -57,6 +57,7 @@ func TestSimpleMalformedMessage(t *testing.T) {
 
 	// Register handler with invalid payload handler on node 0
 	handler0 := v1.NewHandlerConfig[GossipTestMessage](
+		v1.WithEncoder[GossipTestMessage](failEncoder),
 		v1.WithProcessor(func(ctx context.Context, msg GossipTestMessage, from peer.ID) error {
 			t.Fatal("Node 0 processor should not be called for invalid messages")
 			return nil
@@ -71,6 +72,7 @@ func TestSimpleMalformedMessage(t *testing.T) {
 
 	// Register handler with invalid payload handler on node 1
 	handler1 := v1.NewHandlerConfig[GossipTestMessage](
+		v1.WithEncoder[GossipTestMessage](failEncoder),
 		v1.WithProcessor(func(ctx context.Context, msg GossipTestMessage, from peer.ID) error {
 			t.Fatal("Node 1 processor should not be called for invalid messages")
 			return nil
@@ -102,7 +104,7 @@ func TestSimpleMalformedMessage(t *testing.T) {
 	// Verify connectivity
 	t.Logf("Node 0 peers: %v", nodes[0].Host.Network().Peers())
 	t.Logf("Node 1 peers: %v", nodes[1].Host.Network().Peers())
-	
+
 	// Check topic peers
 	ps0 := nodes[0].Gossipsub.GetPubSub()
 	ps1 := nodes[1].Gossipsub.GetPubSub()

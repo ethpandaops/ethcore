@@ -95,31 +95,24 @@ func TestSubnetTopicParsing(t *testing.T) {
 	})
 }
 
-func TestCreateTopicWithEncoder(t *testing.T) {
-	t.Run("create topic with custom encoder", func(t *testing.T) {
-		// Create a custom encoder
-		encoder := topics.NewSSZSnappyEncoder[*eth.SignedBeaconBlock]()
+func TestEncoderCompatibility(t *testing.T) {
+	t.Run("verify SSZ encoder creation", func(t *testing.T) {
+		// Verify we can create encoders for handler configuration
+		blockEncoder := topics.NewSSZSnappyEncoder[*eth.SignedBeaconBlock]()
+		assert.NotNil(t, blockEncoder)
 
-		// Create a new topic with the encoder
-		topic, err := topics.CreateTopicWithEncoder(topics.BeaconBlock, encoder)
-		require.NoError(t, err)
-		assert.Equal(t, "beacon_block", topic.Name())
-		assert.NotNil(t, topic.Encoder())
+		attestationEncoder := topics.NewSSZSnappyEncoder[*eth.Attestation]()
+		assert.NotNil(t, attestationEncoder)
+
+		// Verify topics exist without encoders
+		assert.Equal(t, "beacon_block", topics.BeaconBlock.Name())
+		assert.Equal(t, uint64(64), topics.Attestation.MaxSubnets())
 	})
 
-	t.Run("create subnet topic with custom encoder", func(t *testing.T) {
-		// Create a custom encoder
-		encoder := topics.NewSSZSnappyEncoder[*eth.Attestation]()
-
-		// Create a new subnet topic with the encoder
-		subnetTopic, err := topics.CreateSubnetTopicWithEncoder[*eth.Attestation](
-			topics.BeaconAttestationTopicPattern,
-			topics.AttestationSubnetCount,
-			encoder,
-		)
-		require.NoError(t, err)
-		assert.Equal(t, uint64(64), subnetTopic.MaxSubnets())
-		assert.NotNil(t, subnetTopic.Encoder())
+	t.Run("verify encoder with max length", func(t *testing.T) {
+		// Create encoder with max length for handler configuration
+		encoder := topics.NewSSZSnappyEncoderWithMaxLen[*eth.SignedBeaconBlock](10 * 1024 * 1024)
+		assert.NotNil(t, encoder)
 	})
 }
 

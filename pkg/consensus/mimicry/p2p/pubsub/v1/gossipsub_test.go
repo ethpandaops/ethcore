@@ -279,13 +279,13 @@ func (mc *MessageCollector) GetMessageCount() int {
 
 // CreateTestTopic creates a test topic with the given name
 func CreateTestTopic(name string) (*v1.Topic[GossipTestMessage], error) {
-	encoder := &TestEncoder{}
-	return v1.NewTopic(name, encoder)
+	return v1.NewTopic[GossipTestMessage](name)
 }
 
 // CreateTestHandler creates a handler config with the given processor
 func CreateTestHandler(processor v1.Processor[GossipTestMessage]) *v1.HandlerConfig[GossipTestMessage] {
 	return v1.NewHandlerConfig(
+		v1.WithEncoder(&TestEncoder{}),
 		v1.WithProcessor(processor),
 		v1.WithValidator(func(ctx context.Context, msg GossipTestMessage, from peer.ID) v1.ValidationResult {
 			// Accept all messages in tests

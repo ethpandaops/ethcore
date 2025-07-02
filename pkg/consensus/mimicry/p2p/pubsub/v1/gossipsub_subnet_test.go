@@ -59,8 +59,7 @@ func (e *SubnetTestEncoder) Decode(data []byte) (SubnetTestMessage, error) {
 
 // CreateTestSubnetTopic creates a test subnet topic with the given pattern and max subnets
 func CreateTestSubnetTopic(pattern string, maxSubnets uint64) (*v1.SubnetTopic[SubnetTestMessage], error) {
-	encoder := &SubnetTestEncoder{}
-	return v1.NewSubnetTopic(pattern, maxSubnets, encoder)
+	return v1.NewSubnetTopic[SubnetTestMessage](pattern, maxSubnets)
 }
 
 // TestSubnetTopicCreation tests the creation and configuration of subnet topics
@@ -133,10 +132,10 @@ func TestSubnetTopicForSubnet(t *testing.T) {
 	require.NoError(t, err)
 
 	tests := []struct {
-		name        string
-		subnet      uint64
-		forkDigest  [4]byte
-		expectError bool
+		name         string
+		subnet       uint64
+		forkDigest   [4]byte
+		expectError  bool
 		expectedName string
 	}{
 		{
@@ -301,10 +300,11 @@ func TestSubnetSubscriptionLifecycle(t *testing.T) {
 
 		// Create handler
 		handler := v1.NewHandlerConfig(
+			v1.WithEncoder(&SubnetTestEncoder{}),
 			v1.WithProcessor(func(ctx context.Context, msg SubnetTestMessage, from peer.ID) error {
 				select {
 				case collector.messages <- ReceivedMessage{
-					Node:    node.ID,
+					Node: node.ID,
 					Message: GossipTestMessage{
 						ID:      msg.ID,
 						Content: msg.Content,
@@ -981,18 +981,11 @@ func TestSubnetTopicEncoderValidation(t *testing.T) {
 	pattern := "test_%d"
 	maxSubnets := uint64(10)
 
-	// Test with nil encoder
-	st, err := v1.NewSubnetTopic[SubnetTestMessage](pattern, maxSubnets, nil)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "encoder cannot be nil")
-	assert.Nil(t, st)
+	// Note: encoder is now part of handler config, not topic
+	// This test is no longer relevant
 
-	// Test with valid encoder
-	encoder := &SubnetTestEncoder{}
-	st, err = v1.NewSubnetTopic(pattern, maxSubnets, encoder)
+	// Test with valid pattern
+	st, err := v1.NewSubnetTopic[SubnetTestMessage](pattern, maxSubnets)
 	require.NoError(t, err)
 	require.NotNil(t, st)
-
-	// Verify encoder is accessible
-	assert.Equal(t, encoder, st.Encoder())
 }

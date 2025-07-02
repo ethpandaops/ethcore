@@ -219,7 +219,7 @@ func Subscribe[T any](ctx context.Context, g *Gossipsub, topic *Topic[T]) (*Subs
 	topicName := topic.Name()
 
 	// Check if handler is registered
-	handler := g.registry.getHandler(topicName)
+	handler := g.registry.GetHandler(topicName)
 	if handler == nil {
 		return nil, fmt.Errorf("no handler registered for topic %s", topicName)
 	}
@@ -234,8 +234,7 @@ func Subscribe[T any](ctx context.Context, g *Gossipsub, topic *Topic[T]) (*Subs
 
 	// Create anyTopic early for validator registration
 	anyTopic := &Topic[any]{
-		name:    topic.name,
-		encoder: wrapEncoder(topic.encoder),
+		name: topic.name,
 	}
 
 	// Register validator with libp2p if handler has one
@@ -344,13 +343,34 @@ func Publish[T any](g *Gossipsub, topic *Topic[T], msg T) error {
 	topicName := topic.Name()
 	startTime := time.Now()
 
+	// Get handler to get encoder and compression configuration
+	handler := g.registry.GetHandler(topicName)
+	if handler == nil {
+		return fmt.Errorf("no handler registered for topic %s", topicName)
+	}
+	if handler.encoder == nil {
+		return fmt.Errorf("no encoder configured for topic %s", topicName)
+	}
+
 	// Encode the message
-	data, err := topic.encoder.Encode(msg)
+	data, err := handler.encoder.Encode(any(msg))
 	if err != nil {
 		if g.metrics != nil {
 			g.metrics.RecordPublishError(topicName)
 		}
 		return fmt.Errorf("failed to encode message: %w", err)
+	}
+
+	// Apply compression if configured
+	if handler.Compressor != nil {
+		compressed, err := handler.Compressor.Compress(data)
+		if err != nil {
+			if g.metrics != nil {
+				g.metrics.RecordPublishError(topicName)
+			}
+			return fmt.Errorf("failed to compress message for topic %s: %w", topicName, err)
+		}
+		data = compressed
 	}
 
 	// Publish to the topic
@@ -488,22 +508,54 @@ func (g *Gossipsub) createLibp2pValidator(topic *Topic[any], handler *HandlerCon
 			g.metrics.RecordMessageReceived(topic.Name())
 		}
 
-		// Decode the message
-		decoder := handler.decoder
-		if decoder == nil {
-			decoder = topic.encoder.Decode
+		// Decompress the message if a compressor is configured
+		data := msg.Data
+		if handler.Compressor != nil {
+			decompressed, err := handler.Compressor.Decompress(data)
+			if err != nil {
+				// Call invalid payload handler if configured
+				if handler.invalidPayloadHandler != nil {
+					handler.invalidPayloadHandler(ctx, data, err, pid)
+				}
+
+				// Call global invalid payload handler if configured
+				if g.globalInvalidPayloadHandler != nil {
+					g.globalInvalidPayloadHandler(ctx, data, err, pid, topic.Name())
+				}
+
+				// Reject messages that can't be decompressed
+				if g.metrics != nil {
+					g.metrics.RecordMessageValidated(topic.Name(), ValidationReject)
+				}
+
+				return pubsub.ValidationReject
+			}
+			data = decompressed
 		}
 
-		decoded, err := decoder(msg.Data)
+		// Decode the message
+		decoder := handler.decoder
+		if decoder == nil && handler.encoder != nil {
+			decoder = handler.encoder.Decode
+		}
+		if decoder == nil {
+			// No decoder available
+			if g.metrics != nil {
+				g.metrics.RecordMessageValidated(topic.Name(), ValidationReject)
+			}
+			return pubsub.ValidationReject
+		}
+
+		decoded, err := decoder(data)
 		if err != nil {
 			// Call invalid payload handler if configured
 			if handler.invalidPayloadHandler != nil {
-				handler.invalidPayloadHandler(ctx, msg.Data, err, pid)
+				handler.invalidPayloadHandler(ctx, data, err, pid)
 			}
 
 			// Call global invalid payload handler if configured
 			if g.globalInvalidPayloadHandler != nil {
-				g.globalInvalidPayloadHandler(ctx, msg.Data, err, pid, topic.Name())
+				g.globalInvalidPayloadHandler(ctx, data, err, pid, topic.Name())
 			}
 
 			// Reject messages that can't be decoded

@@ -30,46 +30,25 @@ const (
 // Topic definitions for regular (non-subnet) topics.
 var (
 	// BeaconBlock represents signed beacon blocks broadcasted to all peers.
-	BeaconBlock = mustCreateTopic[*eth.SignedBeaconBlock](
-		BeaconBlockTopicName,
-		nil, // Encoder will be set by the application
-	)
+	BeaconBlock = mustCreateTopic[*eth.SignedBeaconBlock](BeaconBlockTopicName)
 
 	// BeaconAggregateAndProof represents aggregated attestations.
-	BeaconAggregateAndProof = mustCreateTopic[*eth.SignedAggregateAttestationAndProof](
-		BeaconAggregateAndProofName,
-		nil, // Encoder will be set by the application
-	)
+	BeaconAggregateAndProof = mustCreateTopic[*eth.SignedAggregateAttestationAndProof](BeaconAggregateAndProofName)
 
 	// VoluntaryExit represents voluntary validator exits.
-	VoluntaryExit = mustCreateTopic[*eth.SignedVoluntaryExit](
-		VoluntaryExitTopicName,
-		nil, // Encoder will be set by the application
-	)
+	VoluntaryExit = mustCreateTopic[*eth.SignedVoluntaryExit](VoluntaryExitTopicName)
 
 	// ProposerSlashing represents proposer slashing events.
-	ProposerSlashing = mustCreateTopic[*eth.ProposerSlashing](
-		ProposerSlashingTopicName,
-		nil, // Encoder will be set by the application
-	)
+	ProposerSlashing = mustCreateTopic[*eth.ProposerSlashing](ProposerSlashingTopicName)
 
 	// AttesterSlashing represents attester slashing events.
-	AttesterSlashing = mustCreateTopic[*eth.AttesterSlashing](
-		AttesterSlashingTopicName,
-		nil, // Encoder will be set by the application
-	)
+	AttesterSlashing = mustCreateTopic[*eth.AttesterSlashing](AttesterSlashingTopicName)
 
 	// BlsToExecutionChange represents BLS to execution address change messages.
-	BlsToExecutionChange = mustCreateTopic[*eth.SignedBLSToExecutionChange](
-		BlsToExecutionChangeTopicName,
-		nil, // Encoder will be set by the application
-	)
+	BlsToExecutionChange = mustCreateTopic[*eth.SignedBLSToExecutionChange](BlsToExecutionChangeTopicName)
 
 	// SyncContributionAndProof represents sync committee contribution and proof messages.
-	SyncContributionAndProof = mustCreateTopic[*eth.SignedContributionAndProof](
-		SyncContributionAndProofTopicPattern,
-		nil, // Encoder will be set by the application
-	)
+	SyncContributionAndProof = mustCreateTopic[*eth.SignedContributionAndProof](SyncContributionAndProofTopicPattern)
 )
 
 // Subnet topic definitions.
@@ -78,14 +57,12 @@ var (
 	Attestation = mustCreateSubnetTopic[*eth.Attestation](
 		BeaconAttestationTopicPattern,
 		AttestationSubnetCount,
-		nil, // Encoder will be set by the application
 	)
 
 	// SyncCommittee represents sync committee subnet topics.
 	SyncCommittee = mustCreateSubnetTopic[*eth.SyncCommitteeMessage](
 		SyncCommitteeTopicPattern,
 		SyncCommitteeSubnetCount,
-		nil, // Encoder will be set by the application
 	)
 )
 
@@ -97,14 +74,8 @@ func WithFork[T any](topic *v1.Topic[T], forkDigest [4]byte) *v1.Topic[T] {
 
 // mustCreateTopic creates a new topic and panics if there's an error.
 // This is used for compile-time topic definitions where we control the inputs.
-func mustCreateTopic[T any](name string, encoder v1.Encoder[T]) *v1.Topic[T] {
-	// During initialization, encoder can be nil as it will be set later by the application
-	if encoder == nil {
-		// Create a placeholder encoder that will be replaced
-		encoder = &placeholderEncoder[T]{}
-	}
-
-	topic, err := v1.NewTopic[T](name, encoder)
+func mustCreateTopic[T any](name string) *v1.Topic[T] {
+	topic, err := v1.NewTopic[T](name)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create topic %s: %v", name, err))
 	}
@@ -113,41 +84,10 @@ func mustCreateTopic[T any](name string, encoder v1.Encoder[T]) *v1.Topic[T] {
 
 // mustCreateSubnetTopic creates a new subnet topic and panics if there's an error.
 // This is used for compile-time topic definitions where we control the inputs.
-func mustCreateSubnetTopic[T any](pattern string, maxSubnets uint64, encoder v1.Encoder[T]) *v1.SubnetTopic[T] {
-	// During initialization, encoder can be nil as it will be set later by the application
-	if encoder == nil {
-		// Create a placeholder encoder that will be replaced
-		encoder = &placeholderEncoder[T]{}
-	}
-
-	topic, err := v1.NewSubnetTopic[T](pattern, maxSubnets, encoder)
+func mustCreateSubnetTopic[T any](pattern string, maxSubnets uint64) *v1.SubnetTopic[T] {
+	topic, err := v1.NewSubnetTopic[T](pattern, maxSubnets)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create subnet topic %s: %v", pattern, err))
 	}
 	return topic
-}
-
-// placeholderEncoder is a temporary encoder used during topic initialization.
-// It should be replaced with a real encoder before use.
-type placeholderEncoder[T any] struct{}
-
-func (p *placeholderEncoder[T]) Encode(msg T) ([]byte, error) {
-	return nil, fmt.Errorf("placeholder encoder: real encoder must be set before use")
-}
-
-func (p *placeholderEncoder[T]) Decode(data []byte) (T, error) {
-	var zero T
-	return zero, fmt.Errorf("placeholder encoder: real encoder must be set before use")
-}
-
-// CreateTopicWithEncoder creates a new topic with the specified encoder.
-// This is useful when you need to create topics dynamically with specific encoders.
-func CreateTopicWithEncoder[T any](baseTopic *v1.Topic[T], encoder v1.Encoder[T]) (*v1.Topic[T], error) {
-	return v1.NewTopic[T](baseTopic.Name(), encoder)
-}
-
-// CreateSubnetTopicWithEncoder creates a new subnet topic with the specified encoder.
-// This is useful when you need to create subnet topics dynamically with specific encoders.
-func CreateSubnetTopicWithEncoder[T any](pattern string, maxSubnets uint64, encoder v1.Encoder[T]) (*v1.SubnetTopic[T], error) {
-	return v1.NewSubnetTopic[T](pattern, maxSubnets, encoder)
 }

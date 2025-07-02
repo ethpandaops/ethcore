@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/compression"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
 	fastssz "github.com/prysmaticlabs/fastssz"
@@ -39,8 +40,16 @@ type InvalidPayloadHandler[T any] func(ctx context.Context, data []byte, err err
 // HandlerConfig contains the configuration for message handling.
 // It defines how messages of type T should be decoded, validated, and processed.
 type HandlerConfig[T any] struct {
+	// encoder is the encoder used for encoding/decoding messages.
+	// If nil and decoder is also nil, an error will occur during registration.
+	encoder Encoder[T]
+
+	// Compressor is the optional compressor used for message compression/decompression.
+	// If nil, no compression is applied.
+	Compressor compression.Compressor
+
 	// decoder is the function used to decode raw bytes into messages of type T.
-	// If nil, the topic's encoder.Decode method will be used.
+	// If nil, the encoder.Decode method will be used.
 	decoder Decoder[T]
 
 	// validator is the function used to validate decoded messages.
@@ -153,6 +162,22 @@ func WithEvents[T any](events chan<- Event) HandlerOption[T] {
 	}
 }
 
+// WithCompressor sets the compressor for the handler.
+// If set, messages will be decompressed before decoding and compressed after encoding.
+func WithCompressor[T any](compressor compression.Compressor) HandlerOption[T] {
+	return func(h *HandlerConfig[T]) {
+		h.Compressor = compressor
+	}
+}
+
+// WithEncoder sets the encoder for the handler.
+// The encoder is used for both encoding and decoding messages unless a custom decoder is provided.
+func WithEncoder[T any](encoder Encoder[T]) HandlerOption[T] {
+	return func(h *HandlerConfig[T]) {
+		h.encoder = encoder
+	}
+}
+
 // NewHandlerConfig creates a new HandlerConfig with the provided options.
 func NewHandlerConfig[T any](opts ...HandlerOption[T]) *HandlerConfig[T] {
 	h := &HandlerConfig[T]{}
@@ -168,6 +193,11 @@ func (h *HandlerConfig[T]) Validate() error {
 	// At minimum, we need either a validator or processor to do something useful
 	if h.validator == nil && h.processor == nil {
 		return ErrNoHandler
+	}
+
+	// We need either an encoder or decoder to decode messages
+	if h.encoder == nil && h.decoder == nil {
+		return fmt.Errorf("either encoder or decoder must be configured")
 	}
 
 	return nil

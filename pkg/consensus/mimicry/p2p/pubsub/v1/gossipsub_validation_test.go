@@ -225,7 +225,7 @@ func TestValidationBeforeDecoding(t *testing.T) {
 			return string(data) == "INVALID"
 		},
 	}
-	topic, err := v1.NewTopic("/test/broken-decode/1.0.0", brokenEncoder)
+	topic, err := v1.NewTopic[GossipTestMessage]("/test/broken-decode/1.0.0")
 	require.NoError(t, err)
 
 	// Track invalid payload handler calls
@@ -233,6 +233,7 @@ func TestValidationBeforeDecoding(t *testing.T) {
 
 	// Create handler with invalid payload handler
 	handler := v1.NewHandlerConfig(
+		v1.WithEncoder[GossipTestMessage](brokenEncoder),
 		v1.WithInvalidPayloadHandler[GossipTestMessage](func(ctx context.Context, data []byte, err error, from peer.ID) {
 			invalidPayloadCount.Add(1)
 			t.Logf("Invalid payload handler called from %s: data=%q, err=%v", from, string(data), err)

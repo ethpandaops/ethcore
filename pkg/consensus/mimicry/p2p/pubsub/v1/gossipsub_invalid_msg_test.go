@@ -137,7 +137,7 @@ func TestMalformedMessageHandling(t *testing.T) {
 		DecodeError:      errors.New("custom decode error"),
 		ProduceMalformed: true,
 	}
-	topic, err := v1.NewTopic("malformed-topic", malformedEncoder)
+	topic, err := v1.NewTopic[GossipTestMessage]("malformed-topic")
 	require.NoError(t, err)
 
 	// Create invalid payload collector
@@ -148,6 +148,7 @@ func TestMalformedMessageHandling(t *testing.T) {
 
 	// Register handler on node 1 with invalid payload handler
 	handler := v1.NewHandlerConfig[GossipTestMessage](
+		v1.WithEncoder[GossipTestMessage](malformedEncoder),
 		v1.WithProcessor(messageCollector.CreateProcessor(nodes[1].ID)),
 		v1.WithValidator(func(ctx context.Context, msg GossipTestMessage, from peer.ID) v1.ValidationResult {
 			return v1.ValidationAccept
@@ -177,6 +178,7 @@ func TestMalformedMessageHandling(t *testing.T) {
 	// Since node 0 isn't subscribed, we need to publish raw data directly
 	// First, subscribe node 0 temporarily just to establish the topic
 	handler0 := v1.NewHandlerConfig[GossipTestMessage](
+		v1.WithEncoder[GossipTestMessage](malformedEncoder),
 		v1.WithProcessor(func(ctx context.Context, msg GossipTestMessage, from peer.ID) error {
 			return nil
 		}),
@@ -225,10 +227,10 @@ func TestTopicSpecificInvalidPayloadHandler(t *testing.T) {
 		DecodeError:   errors.New("topic-specific decode error"),
 	}
 
-	topicA, err := v1.NewTopic("topic-a", goodEncoder)
+	topicA, err := v1.NewTopic[GossipTestMessage]("topic-a")
 	require.NoError(t, err)
 
-	topicB, err := v1.NewTopic("topic-b", badEncoder)
+	topicB, err := v1.NewTopic[GossipTestMessage]("topic-b")
 	require.NoError(t, err)
 
 	// Create collectors for each topic
@@ -239,6 +241,7 @@ func TestTopicSpecificInvalidPayloadHandler(t *testing.T) {
 	for i := 1; i < 3; i++ {
 		// Topic A handler
 		handlerA := v1.NewHandlerConfig[GossipTestMessage](
+			v1.WithEncoder[GossipTestMessage](goodEncoder),
 			v1.WithProcessor(func(ctx context.Context, msg GossipTestMessage, from peer.ID) error {
 				return nil
 			}),
@@ -253,6 +256,7 @@ func TestTopicSpecificInvalidPayloadHandler(t *testing.T) {
 
 		// Topic B handler
 		handlerB := v1.NewHandlerConfig[GossipTestMessage](
+			v1.WithEncoder[GossipTestMessage](badEncoder),
 			v1.WithProcessor(func(ctx context.Context, msg GossipTestMessage, from peer.ID) error {
 				return nil
 			}),
@@ -271,6 +275,7 @@ func TestTopicSpecificInvalidPayloadHandler(t *testing.T) {
 
 	// Register publishers on node 0
 	handlerA0 := v1.NewHandlerConfig[GossipTestMessage](
+		v1.WithEncoder[GossipTestMessage](goodEncoder),
 		v1.WithProcessor(func(ctx context.Context, msg GossipTestMessage, from peer.ID) error {
 			return nil
 		}),
@@ -279,6 +284,7 @@ func TestTopicSpecificInvalidPayloadHandler(t *testing.T) {
 	require.NoError(t, err)
 
 	handlerB0 := v1.NewHandlerConfig[GossipTestMessage](
+		v1.WithEncoder[GossipTestMessage](badEncoder),
 		v1.WithProcessor(func(ctx context.Context, msg GossipTestMessage, from peer.ID) error {
 			return nil
 		}),
@@ -349,11 +355,12 @@ func TestGlobalInvalidPayloadHandlerOnly(t *testing.T) {
 		DecodeSuccess: false,
 		DecodeError:   errors.New("global handler test error"),
 	}
-	topic, err := v1.NewTopic("global-handler-topic", badEncoder)
+	topic, err := v1.NewTopic[GossipTestMessage]("global-handler-topic")
 	require.NoError(t, err)
 
 	// Register handler without invalid payload handler on node 1
 	handler := v1.NewHandlerConfig[GossipTestMessage](
+		v1.WithEncoder[GossipTestMessage](badEncoder),
 		v1.WithProcessor(func(ctx context.Context, msg GossipTestMessage, from peer.ID) error {
 			return nil
 		}),
@@ -365,6 +372,7 @@ func TestGlobalInvalidPayloadHandlerOnly(t *testing.T) {
 
 	// Register on node 0 for publishing
 	handler0 := v1.NewHandlerConfig[GossipTestMessage](
+		v1.WithEncoder[GossipTestMessage](badEncoder),
 		v1.WithProcessor(func(ctx context.Context, msg GossipTestMessage, from peer.ID) error {
 			return nil
 		}),
@@ -428,11 +436,12 @@ func TestGlobalAndTopicHandlerInteraction(t *testing.T) {
 		DecodeSuccess: false,
 		DecodeError:   errors.New("both handlers test"),
 	}
-	topic, err := v1.NewTopic("both-handlers-topic", badEncoder)
+	topic, err := v1.NewTopic[GossipTestMessage]("both-handlers-topic")
 	require.NoError(t, err)
 
 	// Register handler with topic-specific invalid payload handler
 	handler := v1.NewHandlerConfig[GossipTestMessage](
+		v1.WithEncoder[GossipTestMessage](badEncoder),
 		v1.WithProcessor(func(ctx context.Context, msg GossipTestMessage, from peer.ID) error {
 			return nil
 		}),
@@ -447,6 +456,7 @@ func TestGlobalAndTopicHandlerInteraction(t *testing.T) {
 
 	// Register on publisher
 	publisherHandler := v1.NewHandlerConfig[GossipTestMessage](
+		v1.WithEncoder[GossipTestMessage](badEncoder),
 		v1.WithProcessor(func(ctx context.Context, msg GossipTestMessage, from peer.ID) error {
 			return nil
 		}),
@@ -540,7 +550,7 @@ func TestVariousDecodingErrors(t *testing.T) {
 			require.NoError(t, err)
 
 			// Create topic with specific encoder
-			topic, err := v1.NewTopic(fmt.Sprintf("error-topic-%s", tc.name), tc.encoder)
+			topic, err := v1.NewTopic[GossipTestMessage](fmt.Sprintf("error-topic-%s", tc.name))
 			require.NoError(t, err)
 
 			// Create collector
@@ -548,6 +558,7 @@ func TestVariousDecodingErrors(t *testing.T) {
 
 			// Register handler
 			handler := v1.NewHandlerConfig[GossipTestMessage](
+				v1.WithEncoder[GossipTestMessage](tc.encoder),
 				v1.WithProcessor(func(ctx context.Context, msg GossipTestMessage, from peer.ID) error {
 					return nil
 				}),
@@ -562,6 +573,7 @@ func TestVariousDecodingErrors(t *testing.T) {
 
 			// Register on publisher
 			publisherHandler := v1.NewHandlerConfig[GossipTestMessage](
+				v1.WithEncoder[GossipTestMessage](tc.encoder),
 				v1.WithProcessor(func(ctx context.Context, msg GossipTestMessage, from peer.ID) error {
 					return nil
 				}),
@@ -629,7 +641,7 @@ func TestInvalidMessageMetricsRecording(t *testing.T) {
 		DecodeSuccess: false,
 		DecodeError:   errors.New("metrics test error"),
 	}
-	badTopic, err := v1.NewTopic("bad-topic", badEncoder)
+	badTopic, err := v1.NewTopic[GossipTestMessage]("bad-topic")
 	require.NoError(t, err)
 
 	// Track metrics state
@@ -666,6 +678,7 @@ func TestInvalidMessageMetricsRecording(t *testing.T) {
 
 		// Bad topic
 		badHandler := v1.NewHandlerConfig[GossipTestMessage](
+			v1.WithEncoder[GossipTestMessage](badEncoder),
 			v1.WithProcessor(func(ctx context.Context, msg GossipTestMessage, from peer.ID) error {
 				return nil
 			}),
@@ -785,7 +798,7 @@ func TestInvalidPayloadHandlerConcurrency(t *testing.T) {
 		DecodeSuccess: false,
 		DecodeError:   errors.New("random failure"),
 	}
-	topic, err := v1.NewTopic("concurrent-topic", randomFailEncoder)
+	topic, err := v1.NewTopic[GossipTestMessage]("concurrent-topic")
 	require.NoError(t, err)
 
 	// Create thread-safe collector
@@ -794,6 +807,7 @@ func TestInvalidPayloadHandlerConcurrency(t *testing.T) {
 	// Subscribe all nodes
 	for i, node := range nodes {
 		handler := v1.NewHandlerConfig[GossipTestMessage](
+			v1.WithEncoder[GossipTestMessage](randomFailEncoder),
 			v1.WithProcessor(func(ctx context.Context, msg GossipTestMessage, from peer.ID) error {
 				return nil
 			}),
@@ -870,7 +884,7 @@ func TestInvalidPayloadHandlerPanic(t *testing.T) {
 		DecodeSuccess: false,
 		DecodeError:   errors.New("panic test"),
 	}
-	topic, err := v1.NewTopic("panic-topic", badEncoder)
+	topic, err := v1.NewTopic[GossipTestMessage]("panic-topic")
 	require.NoError(t, err)
 
 	// Track if panic recovery worked
@@ -879,6 +893,7 @@ func TestInvalidPayloadHandlerPanic(t *testing.T) {
 
 	// Register handler with panicking invalid payload handler
 	handler := v1.NewHandlerConfig[GossipTestMessage](
+		v1.WithEncoder[GossipTestMessage](badEncoder),
 		v1.WithProcessor(func(ctx context.Context, msg GossipTestMessage, from peer.ID) error {
 			return nil
 		}),
@@ -897,6 +912,7 @@ func TestInvalidPayloadHandlerPanic(t *testing.T) {
 
 	// Register on publisher
 	publisherHandler := v1.NewHandlerConfig[GossipTestMessage](
+		v1.WithEncoder[GossipTestMessage](badEncoder),
 		v1.WithProcessor(func(ctx context.Context, msg GossipTestMessage, from peer.ID) error {
 			return nil
 		}),

@@ -322,22 +322,47 @@ func (p *processor[T]) processMessage(ctx context.Context, msg *pubsub.Message) 
 		p.metrics.RecordMessageReceived(topicName)
 	}
 
-	// Decode the message
-	decoder := p.handler.decoder
-	if decoder == nil {
-		decoder = p.topic.encoder.Decode
+	// Decompress the message if a compressor is configured
+	data := msg.Data
+	if p.handler.Compressor != nil {
+		decompressed, err := p.handler.Compressor.Decompress(data)
+		if err != nil {
+			// Call topic-specific invalid payload handler if configured
+			if p.handler.invalidPayloadHandler != nil {
+				p.handler.invalidPayloadHandler(ctx, data, err, msg.ReceivedFrom)
+			}
+
+			// Call global invalid payload handler if configured
+			if p.globalInvalidPayloadHandler != nil {
+				p.globalInvalidPayloadHandler(ctx, data, err, msg.ReceivedFrom, topicName)
+			}
+
+			// Decompression error - ignore message after calling handlers
+			return
+		}
+		data = decompressed
 	}
 
-	decoded, err := decoder(msg.Data)
+	// Decode the message
+	decoder := p.handler.decoder
+	if decoder == nil && p.handler.encoder != nil {
+		decoder = p.handler.encoder.Decode
+	}
+	if decoder == nil {
+		// No decoder available - this should not happen if handler was validated
+		return
+	}
+
+	decoded, err := decoder(data)
 	if err != nil {
 		// Call topic-specific invalid payload handler if configured
 		if p.handler.invalidPayloadHandler != nil {
-			p.handler.invalidPayloadHandler(ctx, msg.Data, err, msg.ReceivedFrom)
+			p.handler.invalidPayloadHandler(ctx, data, err, msg.ReceivedFrom)
 		}
 
 		// Call global invalid payload handler if configured
 		if p.globalInvalidPayloadHandler != nil {
-			p.globalInvalidPayloadHandler(ctx, msg.Data, err, msg.ReceivedFrom, topicName)
+			p.globalInvalidPayloadHandler(ctx, data, err, msg.ReceivedFrom, topicName)
 		}
 
 		// Decoding error - ignore message after calling handlers

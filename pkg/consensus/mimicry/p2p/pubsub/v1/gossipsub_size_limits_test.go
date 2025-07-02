@@ -9,6 +9,7 @@ import (
 
 	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub/v1"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -511,13 +512,19 @@ func TestMessageSizeWithDifferentEncodings(t *testing.T) {
 
 	// Create topic with verbose encoder
 	verboseEncoder := &VerboseEncoder{}
-	verboseTopic, err := v1.NewTopic("verbose-encoding-topic", verboseEncoder)
+	verboseTopic, err := v1.NewTopic[GossipTestMessage]("verbose-encoding-topic")
 	require.NoError(t, err)
 
 	// Setup subscriptions
 	collector := NewMessageCollector(5)
 	for _, node := range nodes {
-		handler := CreateTestHandler(collector.CreateProcessor(node.ID))
+		handler := v1.NewHandlerConfig[GossipTestMessage](
+			v1.WithEncoder[GossipTestMessage](verboseEncoder),
+			v1.WithProcessor(collector.CreateProcessor(node.ID)),
+			v1.WithValidator(func(ctx context.Context, msg GossipTestMessage, from peer.ID) v1.ValidationResult {
+				return v1.ValidationAccept
+			}),
+		)
 		err := v1.Register(node.Gossipsub.Registry(), verboseTopic, handler)
 		require.NoError(t, err)
 

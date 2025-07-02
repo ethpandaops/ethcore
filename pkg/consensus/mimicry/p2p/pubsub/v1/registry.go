@@ -61,7 +61,9 @@ func Register[T any](r *Registry, topic *Topic[T], handler *HandlerConfig[T]) er
 	// Store the handler as HandlerConfig[any] for type erasure
 	// We need to create a new HandlerConfig[any] that wraps the typed handler
 	r.handlers[topicName] = &HandlerConfig[any]{
-		decoder:     wrapDecoder(handler.decoder, topic.Encoder()),
+		encoder:     wrapEncoder(handler.encoder),
+		Compressor:  handler.Compressor,
+		decoder:     wrapDecoder(handler.decoder, handler.encoder),
 		validator:   wrapValidator(handler.validator),
 		processor:   wrapProcessor(handler.processor),
 		scoreParams: handler.scoreParams,
@@ -101,7 +103,9 @@ func RegisterSubnet[T any](r *Registry, subnetTopic *SubnetTopic[T], handler *Ha
 	// Store the handler as HandlerConfig[any] for type erasure
 	// We need to create a new HandlerConfig[any] that wraps the typed handler
 	r.subnetHandlers[pattern] = &HandlerConfig[any]{
-		decoder:     wrapDecoder(handler.decoder, subnetTopic.Encoder()),
+		encoder:     wrapEncoder(handler.encoder),
+		Compressor:  handler.Compressor,
+		decoder:     wrapDecoder(handler.decoder, handler.encoder),
 		validator:   wrapValidator(handler.validator),
 		processor:   wrapProcessor(handler.processor),
 		scoreParams: handler.scoreParams,
@@ -110,10 +114,10 @@ func RegisterSubnet[T any](r *Registry, subnetTopic *SubnetTopic[T], handler *Ha
 	return nil
 }
 
-// getHandler retrieves a handler for the given topic name.
+// GetHandler retrieves a handler for the given topic name.
 // It first checks exact topic matches, then checks subnet patterns.
 // Returns nil if no handler is found.
-func (r *Registry) getHandler(topicName string) *HandlerConfig[any] {
+func (r *Registry) GetHandler(topicName string) *HandlerConfig[any] {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -141,10 +145,10 @@ func (r *Registry) getHandler(topicName string) *HandlerConfig[any] {
 	return nil
 }
 
-// hasHandler checks if a handler exists for the given topic name.
+// HasHandler checks if a handler exists for the given topic name.
 // Returns true if a handler is registered for the topic or if it matches a subnet pattern.
-func (r *Registry) hasHandler(topicName string) bool {
-	return r.getHandler(topicName) != nil
+func (r *Registry) HasHandler(topicName string) bool {
+	return r.GetHandler(topicName) != nil
 }
 
 // Clear removes all registered handlers from the registry.

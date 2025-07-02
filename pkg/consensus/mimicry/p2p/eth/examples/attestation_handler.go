@@ -106,10 +106,12 @@ func ExampleAttestationSetup(ctx context.Context, log logrus.FieldLogger) error 
 	gs, err := v1.New(ctx, h,
 		v1.WithLogger(log),
 		v1.WithMetrics(metrics),
-		v1.WithMaxMessageSize(1*1024*1024),  // 1 MB max for attestations
-		v1.WithValidationConcurrency(200),   // Higher concurrency for attestations
 		v1.WithPublishTimeout(5*time.Second), // Faster timeout for attestations
 		v1.WithGossipSubParams(pubsub.DefaultGossipSubParams()),
+		v1.WithPubsubOptions(
+			pubsub.WithMaxMessageSize(1*1024*1024), // 1 MB max for attestations
+			pubsub.WithValidateWorkers(200),        // Higher concurrency for attestations
+		),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create gossipsub: %w", err)
@@ -169,10 +171,9 @@ func (h *AttestationHandler) subscribeToSubnet(ctx context.Context, subnet uint6
 	if err != nil {
 		return fmt.Errorf("failed to create topic for subnet %d: %w", subnet, err)
 	}
-	encoder := topics.NewSSZSnappyEncoderWithMaxLen[*eth.Attestation](1 * 1024 * 1024)
 
 	// Create typed topic
-	typedTopic, err := v1.NewTopic[*eth.Attestation](topic.Name(), encoder)
+	typedTopic, err := v1.NewTopic[*eth.Attestation](topic.Name())
 	if err != nil {
 		return fmt.Errorf("failed to create typed topic for subnet %d: %w", subnet, err)
 	}
@@ -431,8 +432,8 @@ func (h *AttestationHandler) publishExampleAttestation(ctx context.Context, subn
 	exampleAtt := &eth.Attestation{
 		AggregationBits: []byte{0x01}, // Single bit set
 		Data: &eth.AttestationData{
-			Slot:            100,      // Example slot
-			CommitteeIndex:  1,        // Example committee index
+			Slot:            100, // Example slot
+			CommitteeIndex:  1,   // Example committee index
 			BeaconBlockRoot: make([]byte, 32),
 			Source: &eth.Checkpoint{
 				Epoch: 10,
@@ -451,8 +452,7 @@ func (h *AttestationHandler) publishExampleAttestation(ctx context.Context, subn
 	if err != nil {
 		return fmt.Errorf("failed to create topic for subnet %d: %w", subnet, err)
 	}
-	encoder := topics.NewSSZSnappyEncoderWithMaxLen[*eth.Attestation](1 * 1024 * 1024)
-	typedTopic, err := v1.NewTopic[*eth.Attestation](topic.Name(), encoder)
+	typedTopic, err := v1.NewTopic[*eth.Attestation](topic.Name())
 	if err != nil {
 		return fmt.Errorf("failed to create typed topic: %w", err)
 	}

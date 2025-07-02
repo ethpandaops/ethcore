@@ -16,7 +16,7 @@ func TestSSZSnappyEncoder(t *testing.T) {
 	// Create a test attestation
 	// Use bitlist format: the last byte contains the length marker
 	aggregationBits := bitfield.Bitlist{0xFF, 0x01} // 8 bits set, length marker
-	
+
 	attestation := &eth.Attestation{
 		AggregationBits: aggregationBits,
 		Data: &eth.AttestationData{
@@ -50,172 +50,79 @@ func TestSSZSnappyEncoder(t *testing.T) {
 	})
 
 	t.Run("decode invalid data", func(t *testing.T) {
-		// Try to decode invalid snappy data
+		// Try to decode invalid SSZ data
 		_, err := encoder.Decode([]byte{0xFF, 0xFE, 0xFD})
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to decompress snappy")
+		// The encoder no longer handles compression, so error is from SSZ
+		assert.Contains(t, err.Error(), "SSZ")
 	})
 }
 
-func TestSSZSnappyEncoderWithMaxLen(t *testing.T) {
-	maxLen := uint64(100) // Very small for testing
-	encoder := topics.NewSSZSnappyEncoderWithMaxLen[*eth.Attestation](maxLen)
+func TestSSZEncoderCompatibility(t *testing.T) {
+	// Note: NewSSZSnappyEncoderWithMaxLen now returns an SSZ-only encoder
+	// Max length enforcement should be done via compressor in handler configuration
 
-	// Create a test attestation that will exceed the limit when encoded
-	// Create a large bitfield that will push us over the limit
-	largeBits := make([]byte, 200)
-	for i := range largeBits {
-		largeBits[i] = 0xff
-	}
-	// Add length marker bit
-	largeBits = append(largeBits, 0x01)
-	
-	attestation := &eth.Attestation{
-		AggregationBits: bitfield.Bitlist(largeBits),
-		Data: &eth.AttestationData{
-			Slot:            100,
-			CommitteeIndex:  1,
-			BeaconBlockRoot: make([]byte, 32),
-			Source: &eth.Checkpoint{
-				Epoch: 10,
-				Root:  make([]byte, 32),
-			},
-			Target: &eth.Checkpoint{
-				Epoch: 11,
-				Root:  make([]byte, 32),
-			},
-		},
-		Signature: make([]byte, 96),
-	}
+	t.Run("create encoders", func(t *testing.T) {
+		// Create encoder without max length
+		encoder1 := topics.NewSSZSnappyEncoder[*eth.Attestation]()
+		assert.NotNil(t, encoder1)
 
-	t.Run("encode exceeds max length", func(t *testing.T) {
-		// First, let's encode without limit to see the actual size
-		unlimitedEncoder := topics.NewSSZSnappyEncoder[*eth.Attestation]()
-		encoded, err := unlimitedEncoder.Encode(attestation)
-		require.NoError(t, err)
-		t.Logf("Actual encoded size: %d bytes", len(encoded))
-		
-		// Now test with the limited encoder
-		_, err = encoder.Encode(attestation)
-		if len(encoded) > int(maxLen) {
-			assert.Error(t, err)
-			assert.Contains(t, err.Error(), "exceeds maximum length")
-		} else {
-			// If the test attestation is smaller than expected, skip this test
-			t.Skipf("Test attestation encoded size (%d) is smaller than max length (%d)", len(encoded), maxLen)
-		}
-	})
+		// Create encoder with max length (parameter is ignored)
+		encoder2 := topics.NewSSZSnappyEncoderWithMaxLen[*eth.Attestation](10 * 1024 * 1024)
+		assert.NotNil(t, encoder2)
 
-	t.Run("decode exceeds max length", func(t *testing.T) {
-		largeData := make([]byte, maxLen+1)
-		_, err := encoder.Decode(largeData)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "exceeds maximum length")
-	})
-
-	t.Run("within max length", func(t *testing.T) {
-		// Create a smaller attestation
-		smallBits := bitfield.Bitlist{0xFF, 0x01} // 8 bits, with length marker
-		
-		smallAttestation := &eth.Attestation{
-			AggregationBits: smallBits,
+		// Both should work the same way
+		attestation := &eth.Attestation{
+			AggregationBits: bitfield.Bitlist{0xFF, 0x01},
 			Data: &eth.AttestationData{
-				Slot:            1,
-				CommitteeIndex:  0,
+				Slot:            100,
+				CommitteeIndex:  1,
 				BeaconBlockRoot: make([]byte, 32),
 				Source: &eth.Checkpoint{
-					Epoch: 0,
+					Epoch: 10,
 					Root:  make([]byte, 32),
 				},
 				Target: &eth.Checkpoint{
-					Epoch: 1,
+					Epoch: 11,
 					Root:  make([]byte, 32),
 				},
 			},
 			Signature: make([]byte, 96),
 		}
 
-		// Use a larger max length
-		largeEncoder := topics.NewSSZSnappyEncoderWithMaxLen[*eth.Attestation](10 * 1024)
-
-		encoded, err := largeEncoder.Encode(smallAttestation)
+		encoded1, err := encoder1.Encode(attestation)
 		require.NoError(t, err)
 
-		decoded, err := largeEncoder.Decode(encoded)
+		encoded2, err := encoder2.Encode(attestation)
 		require.NoError(t, err)
-		assert.Equal(t, smallAttestation.Data.Slot, decoded.Data.Slot)
+
+		// Should produce the same output
+		assert.Equal(t, encoded1, encoded2)
 	})
 }
 
-func TestCreateEncoderForTopic(t *testing.T) {
-	tests := []struct {
-		name     string
-		topic    string
-		wantType string
-	}{
-		{
-			name:     "beacon block encoder",
-			topic:    topics.BeaconBlockTopicName,
-			wantType: "*topics.SSZSnappyEncoderWithMaxLen[T]",
-		},
-		{
-			name:     "attestation encoder",
-			topic:    "beacon_attestation",
-			wantType: "*topics.SSZSnappyEncoderWithMaxLen[T]",
-		},
-		{
-			name:     "unknown topic encoder",
-			topic:    "unknown_topic",
-			wantType: "*topics.SSZSnappyEncoderWithMaxLen[T]",
-		},
-	}
+func TestSnappyCompressor(t *testing.T) {
+	// Test the new Snappy compressor that should be used with handler configuration
+	maxLen := uint64(1000)
+	compressor := topics.NewSnappyCompressor(maxLen)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			encoder := topics.CreateEncoderForTopic[*eth.Attestation](tt.topic)
-			assert.NotNil(t, encoder)
-			// The encoder should always be SSZSnappyEncoderWithMaxLen
-			_, ok := encoder.(*topics.SSZSnappyEncoderWithMaxLen[*eth.Attestation])
-			assert.True(t, ok, "expected SSZSnappyEncoderWithMaxLen")
-		})
-	}
-}
+	t.Run("compress and decompress", func(t *testing.T) {
+		data := []byte("test data for compression")
 
-func TestPrysmSSZSnappyEncoder(t *testing.T) {
-	encoder := topics.NewPrysmSSZSnappyEncoder[*eth.Attestation]()
-
-	// Create a test attestation
-	aggregationBits := bitfield.Bitlist{0xFF, 0x01} // 8 bits set, length marker
-	
-	attestation := &eth.Attestation{
-		AggregationBits: aggregationBits,
-		Data: &eth.AttestationData{
-			Slot:            100,
-			CommitteeIndex:  1,
-			BeaconBlockRoot: make([]byte, 32),
-			Source: &eth.Checkpoint{
-				Epoch: 10,
-				Root:  make([]byte, 32),
-			},
-			Target: &eth.Checkpoint{
-				Epoch: 11,
-				Root:  make([]byte, 32),
-			},
-		},
-		Signature: make([]byte, 96),
-	}
-
-	t.Run("encode and decode", func(t *testing.T) {
-		// Encode
-		encoded, err := encoder.Encode(attestation)
+		// Compress
+		compressed, err := compressor.Compress(data)
 		require.NoError(t, err)
-		assert.NotEmpty(t, encoded)
+		assert.NotEmpty(t, compressed)
+		assert.NotEqual(t, data, compressed) // Should be different after compression
 
-		// Decode
-		decoded, err := encoder.Decode(encoded)
+		// Decompress
+		decompressed, err := compressor.Decompress(compressed)
 		require.NoError(t, err)
-		assert.Equal(t, attestation.Data.Slot, decoded.Data.Slot)
-		assert.Equal(t, attestation.Data.CommitteeIndex, decoded.Data.CommitteeIndex)
-		assert.Equal(t, attestation.AggregationBits, decoded.AggregationBits)
+		assert.Equal(t, data, decompressed)
+	})
+
+	t.Run("max length check", func(t *testing.T) {
+		// The max length is enforced during decompression
+		assert.Equal(t, maxLen, compressor.MaxLength())
 	})
 }
