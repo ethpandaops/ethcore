@@ -130,9 +130,8 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 	// Wait for libp2p identify protocol to complete.
 	// The identify protocol exchanges peer information like agent version, protocols, etc.
 	// Without this wait, we may see "unknown" agent versions which makes it hard to crawl/map.
-	// We use a generous timeout to accommodate clients that take longer to initialize
-	// in resource-constrained environments like test networks.
-	identifyTimeout := 120 * time.Second
+	// If it fails, we'll retry via handleCrawlFailure.
+	identifyTimeout := 15 * time.Second
 	identifyCtx, identifyCancel := context.WithTimeout(c.ctx, identifyTimeout)
 
 	defer identifyCancel()
@@ -153,7 +152,6 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 					"peer": conn.RemotePeer(),
 				}).Debug("Identify protocol cancelled due to shutdown")
 			default:
-				c.handleCrawlFailure(conn.RemotePeer(), ErrCrawlIdentifyTimeout)
 			}
 
 			break
@@ -183,7 +181,7 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 	})
 
 	// If we couldn't get the agent version through identify protocol,
-	// we mark this as a failed crawl since we can't properly identify the client.
+	// we'll let this retry via handleCrawlFailure.
 	if !identifyCompleted && agentVersion == unknown {
 		// Check if it was due to shutdown.
 		select {
