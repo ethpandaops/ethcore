@@ -26,6 +26,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
 	"github.com/libp2p/go-libp2p/p2p/security/noise"
+	libp2pquic "github.com/libp2p/go-libp2p/p2p/transport/quic"
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/sirupsen/logrus"
@@ -99,7 +100,14 @@ func (n *Node) Start(ctx context.Context) (host.Host, error) {
 		fmt.Sprintf("/ip4/%s/tcp/%d", n.listenIP.String(), n.config.TCPPort),
 	}
 
-	n.log.WithField("multiaddr", addrStrings[0]).Info("Listening on multiaddr")
+	// Add UDP address for QUIC transport if UDPPort is configured
+	if n.config.UDPPort > 0 {
+		addrStrings = append(addrStrings, fmt.Sprintf("/ip4/%s/udp/%d/quic-v1", n.listenIP.String(), n.config.UDPPort))
+	}
+
+	for _, addr := range addrStrings {
+		n.log.WithField("multiaddr", addr).Info("Listening on multiaddr")
+	}
 
 	// Start our libp2p host
 	if _, errr := n.derivePrivateKey(); errr != nil {
@@ -123,6 +131,7 @@ func (n *Node) Start(ctx context.Context) (host.Host, error) {
 		libp2p.ListenAddrStrings(addrStrings...),
 		libp2p.UserAgent(n.userAgent),
 		libp2p.Transport(tcp.NewTCPTransport),
+		libp2p.Transport(libp2pquic.NewTransport),
 		libp2p.Muxer(mplex.ID, mplex.DefaultTransport),
 		libp2p.DefaultMuxers,
 		libp2p.Security(noise.ID, noise.New),

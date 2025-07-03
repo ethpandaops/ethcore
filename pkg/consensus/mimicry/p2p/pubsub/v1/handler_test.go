@@ -18,6 +18,17 @@ type TestMessage struct {
 	Value   int
 }
 
+// TestMessageEncoder implements the Encoder interface for TestMessage
+type TestMessageEncoder struct{}
+
+func (e *TestMessageEncoder) Encode(msg TestMessage) ([]byte, error) {
+	return []byte(msg.Content), nil
+}
+
+func (e *TestMessageEncoder) Decode(data []byte) (TestMessage, error) {
+	return TestMessage{Content: string(data)}, nil
+}
+
 func TestHandlerConfig(t *testing.T) {
 	t.Run("NewHandlerConfig with options", func(t *testing.T) {
 		decoder := func(data []byte) (TestMessage, error) {
@@ -68,6 +79,7 @@ func TestHandlerConfig(t *testing.T) {
 
 		// Config with only validator should pass
 		config = v1.NewHandlerConfig[TestMessage](
+			v1.WithEncoder(&TestMessageEncoder{}),
 			v1.WithValidator(func(ctx context.Context, msg TestMessage, from peer.ID) v1.ValidationResult {
 				return v1.ValidationAccept
 			}),
@@ -77,6 +89,7 @@ func TestHandlerConfig(t *testing.T) {
 
 		// Config with only processor should pass
 		config = v1.NewHandlerConfig[TestMessage](
+			v1.WithEncoder(&TestMessageEncoder{}),
 			v1.WithProcessor(func(ctx context.Context, msg TestMessage, from peer.ID) error {
 				return nil
 			}),

@@ -122,9 +122,7 @@ func TestWithPubsubOptionsIntegration(t *testing.T) {
 
 	// Register handlers on both nodes
 	for _, node := range nodes {
-		handler := v1.NewHandlerConfig(
-			v1.WithProcessor(collector.CreateProcessor(node.ID)),
-		)
+		handler := CreateTestHandler(collector.CreateProcessor(node.ID))
 		err = v1.Register(node.Gossipsub.Registry(), topic, handler)
 		require.NoError(t, err)
 	}
