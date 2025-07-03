@@ -86,16 +86,21 @@ func WaitForBeaconNode(ctx context.Context, logger logrus.FieldLogger, beaconURL
 	}
 
 	// Create beacon options with shorter health check interval
-	opts := beacon.DefaultOptions()
-	opts = opts.DisablePrometheusMetrics()
-	opts.HealthCheck.Interval.Duration = 250 * time.Millisecond
+	beaconOpts := beacon.DefaultOptions()
+	beaconOpts = beaconOpts.DisablePrometheusMetrics()
+	beaconOpts.HealthCheck.Interval.Duration = 250 * time.Millisecond
+
+	// Create ethereum options with embedded beacon options
+	ethereumOpts := &ethcoreEthereum.Options{
+		Options: beaconOpts,
+	}
 
 	// Create the beacon node
 	beaconNode, err := ethcoreEthereum.NewBeaconNode(
 		logger,
 		"testing",
 		beaconConfig,
-		*opts,
+		ethereumOpts,
 	)
 	if err != nil {
 		return errors.Wrapf(err, "failed to create beacon node client for %s", name)

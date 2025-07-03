@@ -32,18 +32,21 @@ func NewBeaconNode(
 	log logrus.FieldLogger,
 	namespace string,
 	config *Config,
-	opts beacon.Options,
+	opts *Options,
 ) (*BeaconNode, error) {
-	// Give the ethpandaops/beacon a logger that is suppressed to warn level.
-	// We'll handle any beacon specific info-level logging ourselves.
-	beaconLogger := logrus.New()
-	beaconLogger.SetLevel(logrus.WarnLevel)
+	// Use provided options or defaults.
+	var beaconOpts *beacon.Options
+	if opts != nil && opts.Options != nil {
+		beaconOpts = opts.Options
+	} else {
+		beaconOpts = beacon.DefaultOptions()
+	}
 
 	// Create the beacon node.
-	node := beacon.NewNode(beaconLogger, &beacon.Config{
+	node := beacon.NewNode(log, &beacon.Config{
 		Addr:    config.BeaconNodeAddress,
 		Headers: config.BeaconNodeHeaders,
-	}, namespace, opts)
+	}, namespace, *beaconOpts)
 
 	// Initialize services.
 	metadata := services.NewMetadataService(log, node, config.NetworkOverride)
@@ -56,6 +59,7 @@ func NewBeaconNode(
 	}, nil
 }
 
+// Start starts the beacon node and waits for it to be ready.
 func (b *BeaconNode) Start(ctx context.Context) error {
 	errs := make(chan error, 1)
 	ready := make(chan struct{})
@@ -66,12 +70,14 @@ func (b *BeaconNode) Start(ctx context.Context) error {
 
 		b.healthy.Store(true)
 
-		// Ensure the beacon is actually reporting as healthy before starting services
+		// Ensure the beacon is actually reporting as healthy before proceeding
 		// This handles any timing issues between the event and the health status
+		b.log.Info("Awaiting healthy status from beacon node")
+
 		for !b.beacon.Healthy() {
 			select {
 			case <-time.After(100 * time.Millisecond):
-				b.log.Debug("Waiting for beacon health status to stabilize")
+				b.log.Debug("Awaiting healthy status from beacon node")
 			case <-ctx.Done():
 				return ctx.Err()
 			}
@@ -163,7 +169,8 @@ func (b *BeaconNode) Metadata() *services.MetadataService {
 	return b.metadataSvc
 }
 
-func (b *BeaconNode) OnReady(_ context.Context, callback func(ctx context.Context) error) {
+// OnReady registers a callback to be executed when the beacon node is ready.
+func (b *BeaconNode) OnReady(callback func(ctx context.Context) error) {
 	b.onReadyCallbacks = append(b.onReadyCallbacks, callback)
 }
 

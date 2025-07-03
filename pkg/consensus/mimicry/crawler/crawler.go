@@ -149,12 +149,10 @@ func (c *Crawler) Start(ctx context.Context) error {
 	c.node = h
 
 	// Create the beacon node
-	opts := beacon.DefaultOptions()
-	opts = opts.DisablePrometheusMetrics()
-
+	opts := &ethereum.Options{Options: beacon.DefaultOptions()}
+	opts.DisablePrometheusMetrics()
 	opts.HealthCheck.Interval.Duration = time.Second * 3
 	opts.HealthCheck.SuccessfulResponses = 1
-	opts.PrometheusMetrics = false
 	opts.BeaconSubscription.Enabled = true
 	opts.BeaconSubscription.Topics = []string{"head"}
 
@@ -162,7 +160,7 @@ func (c *Crawler) Start(ctx context.Context) error {
 		c.log,
 		"ethcore/crawler",
 		c.config.Beacon,
-		*opts,
+		opts,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create upstream beacon node: %w", err)
@@ -178,7 +176,7 @@ func (c *Crawler) Start(ctx context.Context) error {
 	// - Start node discovery
 	// - Start our node dialer
 	// - Start the crons
-	c.beacon.OnReady(c.ctx, func(ctx context.Context) error {
+	c.beacon.OnReady(func(ctx context.Context) error {
 		c.log.Info("Beacon node is ready")
 
 		operation := func() (string, error) {

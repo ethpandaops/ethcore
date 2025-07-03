@@ -169,17 +169,19 @@ func setupBeaconNodes(
 		}
 
 		// Set up beacon options
-		opts := beacon.DefaultOptions()
-		opts = opts.DisablePrometheusMetrics()
-		opts.HealthCheck.Interval.Duration = 250 * time.Millisecond
+		opts := &ethereum.Options{Options: beacon.DefaultOptions()}
+		opts.DisablePrometheusMetrics()
+		opts.HealthCheck.Interval.Duration = time.Millisecond * 250
 		opts.HealthCheck.SuccessfulResponses = 1
+		opts.BeaconSubscription.Enabled = true
+		opts.BeaconSubscription.Topics = []string{"head"}
 
 		// Create the beacon node using ethereum.NewBeaconNode
 		beaconNode, err := ethereum.NewBeaconNode(
 			nodeLogger,
 			fmt.Sprintf("crawler-test-%s-%v", clientName, i),
 			config,
-			*opts,
+			opts,
 		)
 		require.NoError(t, err, "Failed to create beacon node for %s", clientName)
 
@@ -191,7 +193,7 @@ func setupBeaconNodes(
 
 			// Register callback for when node is ready
 			readyHandled := false
-			beaconNode.OnReady(ctx, func(ctx context.Context) error {
+			beaconNode.OnReady(func(ctx context.Context) error {
 				if readyHandled {
 					return nil // Prevent double execution
 				}
@@ -267,16 +269,18 @@ func setupCrawler(
 		NetworkOverride:   "kurtosis",
 	}
 
-	opts := beacon.DefaultOptions()
-	opts = opts.DisablePrometheusMetrics()
-	opts.HealthCheck.Interval.Duration = 250 * time.Millisecond
+	opts := &ethereum.Options{Options: beacon.DefaultOptions()}
+	opts.DisablePrometheusMetrics()
+	opts.HealthCheck.Interval.Duration = time.Millisecond * 250
 	opts.HealthCheck.SuccessfulResponses = 1
+	opts.BeaconSubscription.Enabled = true
+	opts.BeaconSubscription.Topics = []string{"head"}
 
 	crawlerBeaconNode, err := ethereum.NewBeaconNode(
 		logger.WithField("component", "crawler-beacon"),
 		"crawler-dedicated-beacon",
 		beaconConfig,
-		*opts,
+		opts,
 	)
 	require.NoError(t, err, "Failed to create crawler beacon node")
 
@@ -285,7 +289,7 @@ func setupCrawler(
 	defer cancel()
 
 	beaconReady := make(chan struct{})
-	crawlerBeaconNode.OnReady(ctx, func(ctx context.Context) error {
+	crawlerBeaconNode.OnReady(func(ctx context.Context) error {
 		close(beaconReady)
 
 		return nil

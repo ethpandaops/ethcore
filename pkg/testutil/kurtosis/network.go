@@ -230,15 +230,21 @@ func waitForGenesis(ctx context.Context, tf *TestFoundation, epgNetwork network.
 		BeaconNodeHeaders: make(map[string]string),
 	}
 
-	opts := beacon.DefaultOptions()
-	opts = opts.DisablePrometheusMetrics()
-	opts.HealthCheck.Interval.Duration = 250 * time.Millisecond
+	// Create beacon options with shorter health check interval
+	beaconOpts := beacon.DefaultOptions()
+	beaconOpts = beaconOpts.DisablePrometheusMetrics()
+	beaconOpts.HealthCheck.Interval.Duration = 250 * time.Millisecond
+
+	// Create ethereum options with embedded beacon options
+	ethereumOpts := &ethcoreEthereum.Options{
+		Options: beaconOpts,
+	}
 
 	tempBeacon, err := ethcoreEthereum.NewBeaconNode(
 		tf.Logger,
 		fmt.Sprintf("genesis-check-%s", client.Name()),
 		beaconConfig,
-		*opts,
+		ethereumOpts,
 	)
 	if err != nil {
 		return errors.Wrap(err, "failed to create temporary beacon node")
@@ -331,17 +337,22 @@ func initializeBeaconClients(ctx context.Context, tf *TestFoundation, epgNetwork
 			BeaconNodeHeaders: make(map[string]string),
 		}
 
-		// Create beacon options
-		opts := beacon.DefaultOptions()
-		opts = opts.DisablePrometheusMetrics()
-		opts.HealthCheck.Interval.Duration = 250 * time.Millisecond
+		// Create beacon options with shorter health check interval
+		beaconOpts := beacon.DefaultOptions()
+		beaconOpts = beaconOpts.DisablePrometheusMetrics()
+		beaconOpts.HealthCheck.Interval.Duration = 250 * time.Millisecond
+
+		// Create ethereum options with embedded beacon options
+		ethereumOpts := &ethcoreEthereum.Options{
+			Options: beaconOpts,
+		}
 
 		// Create the beacon node using ethcore's ethereum package
 		beaconNode, err := ethcoreEthereum.NewBeaconNode(
 			tf.Logger.WithField("beacon", consensusClient.Name()),
 			fmt.Sprintf("beacon-%s", consensusClient.Name()),
 			beaconConfig,
-			*opts,
+			ethereumOpts,
 		)
 		if err != nil {
 			return errors.Wrapf(err, "failed to create beacon node for %s", consensusClient.Name())
