@@ -40,7 +40,7 @@ type ListenerV4 struct {
 // NewDiscV4 creates a new discovery v4 instance.
 func NewDiscV4(_ context.Context, restart time.Duration, log logrus.FieldLogger) *DiscV4 {
 	return &DiscV4{
-		log:     log.WithField("module", "discovery/p2p/discV4"),
+		log:     log.WithField("module", "ethcore/discovery/discV5"),
 		restart: restart,
 		broker:  emission.NewEmitter(),
 		started: false,

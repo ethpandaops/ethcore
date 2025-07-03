@@ -2,6 +2,7 @@ package crawler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -24,6 +25,16 @@ func (c *Crawler) wireUpComponents(ctx context.Context) error {
 
 	// Wire up the beacon node
 	c.beacon.Node().OnHead(ctx, func(ctx context.Context, event *v1.HeadEvent) error {
+		// If we're shutting down, we're done. Dont process any further.
+		c.shutdownMu.RLock()
+		if c.isShutdown {
+			c.shutdownMu.RUnlock()
+
+			return nil
+		}
+
+		c.shutdownMu.RUnlock()
+
 		return c.fetchAndSetStatus(ctx)
 	})
 
@@ -86,20 +97,42 @@ func (c *Crawler) wireUpComponents(ctx context.Context) error {
 }
 
 func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
+	// Don't process the peer any further if we're shutting down.
+	c.shutdownMu.RLock()
+	if c.isShutdown {
+		c.shutdownMu.RUnlock()
+
+		_ = conn.Close()
+
+		return
+	}
+	c.shutdownMu.RUnlock()
+
+	peerID := conn.RemotePeer()
+
+	// Check if we've recently processed this peer to prevent duplicate handling
+	if c.duplicateCache.GetCache().Get(peerID.String()) != nil {
+		c.log.WithFields(logrus.Fields{
+			"peer": peerID.String(),
+		}).Debug("Skipping duplicate connection event - peer recently processed")
+
+		_ = conn.Close()
+
+		return
+	}
+
 	goodbyeReason := eth.GoodbyeReasonClientShutdown
 
 	c.log.WithFields(logrus.Fields{
-		"peer":      conn.RemotePeer().String(),
-		"protocols": conn.RemoteMultiaddr().Protocols(),
+		"peer": peerID.String(),
 	}).Info("Peer connected")
 
 	// Wait for libp2p identify protocol to complete.
 	// The identify protocol exchanges peer information like agent version, protocols, etc.
 	// Without this wait, we may see "unknown" agent versions which makes it hard to crawl/map.
-	// We use a generous timeout to accommodate clients that take longer to initialize
-	// in resource-constrained environments like test networks.
-	identifyTimeout := 120 * time.Second
-	identifyCtx, identifyCancel := context.WithTimeout(context.Background(), identifyTimeout)
+	// If it fails, we'll retry via handleCrawlFailure.
+	identifyTimeout := 15 * time.Second
+	identifyCtx, identifyCancel := context.WithTimeout(c.ctx, identifyTimeout)
 
 	defer identifyCancel()
 
@@ -112,10 +145,14 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 	for {
 		select {
 		case <-identifyCtx.Done():
-			c.log.WithFields(logrus.Fields{
-				"peer":    conn.RemotePeer(),
-				"timeout": identifyTimeout,
-			}).Warn("Timeout waiting for identify protocol")
+			// Check if it's due to shutdown or actual timeout and log appropriately.
+			select {
+			case <-c.ctx.Done():
+				c.log.WithFields(logrus.Fields{
+					"peer": conn.RemotePeer(),
+				}).Debug("Identify protocol cancelled due to shutdown")
+			default:
+			}
 
 			break
 		case <-ticker.C:
@@ -144,53 +181,53 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 	})
 
 	// If we couldn't get the agent version through identify protocol,
-	// we mark this as a failed crawl since we can't properly identify the client.
+	// we'll let this retry via handleCrawlFailure.
 	if !identifyCompleted && agentVersion == unknown {
-		logCtx.Error("Failed to complete identify protocol - cannot determine client type")
+		// Check if it was due to shutdown.
+		select {
+		case <-c.ctx.Done():
+			return
+		default:
+		}
 
-		c.emitFailedCrawl(conn.RemotePeer(), ErrCrawlIdentifyTimeout)
+		c.handleCrawlFailure(conn.RemotePeer(), ErrCrawlIdentifyTimeout)
 
 		return
 	}
 
+	// Add peer to duplicate cache to prevent processing duplicate connection events
+	c.duplicateCache.GetCache().Set(peerID.String(), time.Now(), c.config.CooloffDuration)
+	logCtx.WithField("cooloff_duration", c.config.CooloffDuration).Debug("Added peer to duplicate cache")
+
 	defer func() {
 		// Disconnect them regardless of what happens
-		if err := c.DisconnectFromPeer(context.Background(), conn.RemotePeer(), goodbyeReason); err != nil {
+		// Use a fresh context with timeout for cleanup
+		disconnectCtx, disconnectCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer disconnectCancel()
+
+		if err := c.DisconnectFromPeer(disconnectCtx, conn.RemotePeer(), goodbyeReason); err != nil {
 			logCtx.WithError(err).Error("Failed to disconnect from peer")
 		}
 	}()
 
-	// Request status with retry logic.
-	// Different beacon node implementations have varying initialization times after connection.
-	// This retry mechanism ensures we don't prematurely fail connections to slower-initializing clients.
-	// We use generous delays to accommodate all client types.
-	var (
-		retryDelay = 5 * time.Second
-		status     *common.Status
-		err        error
-	)
+	// Request status from peer.
+	statusCtx, statusCancel := context.WithTimeout(c.ctx, 30*time.Second)
 
-	for retries := 0; retries < 3; retries++ {
-		status, err = c.RequestStatusFromPeer(context.Background(), conn.RemotePeer())
-		if err == nil {
-			break
-		}
+	status, err := c.RequestStatusFromPeer(statusCtx, conn.RemotePeer())
 
-		if retries < 2 {
-			logCtx.WithFields(logrus.Fields{
-				"attempt":     retries + 1,
-				"error":       err.Error(),
-				"retry_delay": retryDelay,
-			}).Info("Status request failed, retrying")
-
-			time.Sleep(retryDelay)
-		}
-	}
+	statusCancel()
 
 	if err != nil {
-		logCtx.WithError(err).Error("Failed to request status from peer after retries")
+		// Check if the error is due to context cancellation (shutdown)
+		if errors.Is(err, context.Canceled) {
+			logCtx.Debug("Status request cancelled due to shutdown")
 
-		c.emitFailedCrawl(conn.RemotePeer(), ErrCrawlFailedToRequestStatus)
+			return
+		}
+
+		logCtx.WithError(err).Debug("Failed to request status from peer")
+
+		c.handleCrawlFailure(conn.RemotePeer(), ErrCrawlFailedToRequestStatus)
 
 		return
 	}
@@ -201,7 +238,7 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 		// They're on a different fork
 		goodbyeReason = eth.GoodbyeReasonIrrelevantNetwork
 
-		c.emitFailedCrawl(conn.RemotePeer(), ErrCrawlStatusForkDigest.WithDetails(fmt.Sprintf("ours %s != theirs %s", ourStatus.ForkDigest, status.ForkDigest)))
+		c.handleCrawlFailure(conn.RemotePeer(), ErrCrawlStatusForkDigest.WithDetails(fmt.Sprintf("ours %s != theirs %s", ourStatus.ForkDigest, status.ForkDigest)))
 
 		return
 	}
@@ -215,41 +252,31 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 		"connected":       c.node.Connectedness(conn.RemotePeer()),
 	}).Debug("Received status from peer")
 
-	// Request metadata from the peer with retry logic
+	// Request metadata from the peer.
 	// Metadata contains information about attestation subnet participation and sync committee duties.
-	metadataCtx, metadataCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	metadataCtx, metadataCancel := context.WithTimeout(c.ctx, 30*time.Second)
 	defer metadataCancel()
 
-	// Retry metadata requests with generous delays for all clients
-	metadataRetryDelay := 3 * time.Second
-
-	var metadata *common.MetaData
-	for retries := 0; retries < 3; retries++ {
-		metadata, err = c.RequestMetadataFromPeer(metadataCtx, conn.RemotePeer())
-		if err == nil {
-			break
-		}
-
-		if retries < 2 {
-			logCtx.WithFields(logrus.Fields{
-				"attempt":     retries + 1,
-				"error":       err.Error(),
-				"retry_delay": metadataRetryDelay,
-			}).Error("Metadata request failed, retrying")
-
-			time.Sleep(metadataRetryDelay)
-		}
-	}
-
+	metadata, err := c.RequestMetadataFromPeer(metadataCtx, conn.RemotePeer())
 	if err != nil {
-		logCtx.WithError(err).Error("Failed to request metadata from peer after retries")
+		// Check if the error is due to context cancellation (shutdown)
+		if errors.Is(err, context.Canceled) {
+			logCtx.Debug("Metadata request cancelled due to shutdown")
 
-		// We still consider this a successful crawl if we got status
-		// The status exchange is the critical validation for network participation.
-		c.emitSuccessfulCrawl(conn.RemotePeer(), status, nil)
+			return
+		}
+
+		logCtx.WithError(err).Debug("Failed to request metadata from peer")
+
+		c.handleCrawlFailure(conn.RemotePeer(), ErrCrawlFailedToRequestMetadata)
 
 		return
 	}
+
+	// Clean up any retry tracking for this peer
+	c.retryMu.Lock()
+	delete(c.retryTracker, conn.RemotePeer())
+	c.retryMu.Unlock()
 
 	c.emitSuccessfulCrawl(conn.RemotePeer(), status, metadata)
 }
@@ -294,23 +321,44 @@ func (c *Crawler) startDialer(ctx context.Context) error {
 	for i := 0; i < c.config.DialConcurrency; i++ {
 		workerID := i
 
+		c.dialerWg.Add(1)
+
 		go func() {
+			defer c.dialerWg.Done()
+
 			for {
-				node, ok := <-c.peersToDial
-				if !ok {
+				select {
+				case node, ok := <-c.peersToDial:
+					if !ok {
+						return
+					}
+
+					c.log.WithFields(logrus.Fields{
+						"peer":      node.Enode.String(),
+						"worker_id": workerID,
+					}).Debug("Dialing new peer")
+
+					c.metrics.RecordNodeProcessed()
+					c.metrics.RecordPendingDials(len(c.peersToDial))
+
+					// Check if we're shutting down before connecting.
+					c.shutdownMu.RLock()
+					if c.isShutdown {
+						c.shutdownMu.RUnlock()
+
+						return
+					}
+					c.shutdownMu.RUnlock()
+
+					if err := c.ConnectToPeer(c.ctx, node.AddrInfo, node.Enode); err != nil {
+						if errors.Is(err, context.Canceled) {
+							return
+						}
+
+						c.log.WithError(err).Trace("Failed to connect to peer")
+					}
+				case <-c.ctx.Done():
 					return
-				}
-
-				c.log.WithFields(logrus.Fields{
-					"peer":      node.Enode.String(),
-					"worker_id": workerID,
-				}).Debug("Dialing new peer")
-
-				c.metrics.RecordNodeProcessed()
-				c.metrics.RecordPendingDials(len(c.peersToDial))
-
-				if err := c.ConnectToPeer(ctx, node.AddrInfo, node.Enode); err != nil {
-					c.log.WithError(err).Trace("Failed to connect to peer")
 				}
 			}
 		}()
@@ -319,10 +367,88 @@ func (c *Crawler) startDialer(ctx context.Context) error {
 	return nil
 }
 
-func (c *Crawler) handleNewDiscoveryNode(ctx context.Context, node *enode.Node) error {
+// startRetryWorker starts a worker that processes retry requests.
+func (c *Crawler) startRetryWorker(ctx context.Context) error {
 	c.log.WithFields(logrus.Fields{
-		"node": node.String(),
-	}).Trace("Enode received")
+		"max_attempts": c.config.MaxRetryAttempts,
+		"backoff":      c.config.RetryBackoff,
+	}).Info("Starting retry worker")
+
+	c.dialerWg.Add(1)
+
+	go func() {
+		defer c.dialerWg.Done()
+
+		for {
+			select {
+			case retryInfo, ok := <-c.retryQueue:
+				if !ok {
+					return
+				}
+
+				// Check if we're shutting down
+				c.shutdownMu.RLock()
+				if c.isShutdown {
+					c.shutdownMu.RUnlock()
+
+					return
+				}
+				c.shutdownMu.RUnlock()
+
+				// Wait for backoff period
+				backoffDuration := retryInfo.BackoffDelay
+				c.log.WithFields(logrus.Fields{
+					"peer":     retryInfo.Peer.AddrInfo.ID,
+					"attempts": retryInfo.Attempts,
+					"backoff":  backoffDuration,
+				}).Debug("Waiting before retry attempt")
+
+				select {
+				case <-time.After(backoffDuration):
+					// Continue with retry
+				case <-ctx.Done():
+					return
+				}
+
+				// Re-add to dialer queue
+				select {
+				case c.peersToDial <- retryInfo.Peer:
+					c.log.WithFields(logrus.Fields{
+						"peer":     retryInfo.Peer.AddrInfo.ID,
+						"attempts": retryInfo.Attempts,
+					}).Debug("Re-queued peer for retry")
+				case <-ctx.Done():
+					return
+				}
+
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	return nil
+}
+
+func (c *Crawler) handleNewDiscoveryNode(_ context.Context, node *enode.Node) error {
+	// Dont proceed further if we're shutting down.
+	c.shutdownMu.RLock()
+	if c.isShutdown {
+		c.shutdownMu.RUnlock()
+
+		return nil
+	}
+	c.shutdownMu.RUnlock()
+
+	enr := ""
+	if node != nil {
+		enr = node.String()
+	}
+
+	c.log.WithFields(logrus.Fields{
+		"enr":     enr,
+		"node_id": node.ID().String(),
+	}).Debug("Crawler: Received node from discovery")
 
 	n, err := discovery.DeriveDetailsFromNode(node)
 	if err != nil {
@@ -335,9 +461,10 @@ func (c *Crawler) handleNewDiscoveryNode(ctx context.Context, node *enode.Node) 
 	// Check if they're on our network
 	if err := c.nodeIsOnOurNetwork(n.Enode); err != nil {
 		c.log.WithFields(logrus.Fields{
-			"node":  n.Enode.String(),
-			"error": err.Error(),
-		}).Trace("Node is not on our network")
+			"enr":     enr,
+			"node_id": node.ID().String(),
+			"error":   err.Error(),
+		}).Debug("Crawler: Node is not on our network, skipping")
 
 		//nolint:nilerr // We don't care about this node
 		return nil
@@ -346,11 +473,27 @@ func (c *Crawler) handleNewDiscoveryNode(ctx context.Context, node *enode.Node) 
 	// If the channel is full, we drop the peer.
 	c.metrics.RecordPendingDials(len(c.peersToDial))
 
+	// Check again if we're shutting down before sending.
+	c.shutdownMu.RLock()
+	if c.isShutdown {
+		c.shutdownMu.RUnlock()
+
+		return nil
+	}
+	c.shutdownMu.RUnlock()
+
 	select {
 	case c.peersToDial <- n:
+		c.log.WithFields(logrus.Fields{
+			"enr":       n.Enode.String(),
+			"node_id":   n.Enode.ID().String(),
+			"peer_id":   n.AddrInfo.ID.String(),
+			"num_addrs": len(n.AddrInfo.Addrs),
+		}).Debug("Crawler: Added node to dial queue")
 	default:
 		c.log.WithFields(logrus.Fields{
-			"node": n.Enode.String(),
+			"enr":     n.Enode.String(),
+			"node_id": n.Enode.ID().String(),
 		}).Warn("Dropping potential peer: pending peers channel is full. Consider increasing the dial concurrency")
 	}
 

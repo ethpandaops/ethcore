@@ -12,6 +12,7 @@ import (
 	"github.com/ethpandaops/ethcore/pkg/testutil/kurtosis"
 	"github.com/ethpandaops/ethereum-package-go/pkg/network"
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -117,6 +118,16 @@ func singleNoteTest(t *testing.T, logger *logrus.Logger, epgNetwork network.Netw
 	// Verify node is healthy
 	require.True(t, beaconNode.IsHealthy(), "Beacon node should be healthy")
 
+	net := beaconNode.Metadata().GetNetwork()
+	assert.NotNil(t, net, "Network should not be nil")
+
+	spec := beaconNode.Metadata().GetSpec()
+	assert.NotNil(t, spec, "Spec should not be nil")
+
+	identity, err := beaconNode.Metadata().GetNodeIdentity()
+	require.NoError(t, err, "Failed to get node identity")
+	assert.NotNil(t, identity, "Node identity should not be nil")
+
 	// Clean up
 	err = beaconNode.Stop(context.Background())
 	require.NoError(t, err, "Failed to stop beacon node")
@@ -196,7 +207,7 @@ func multiNoteTest(t *testing.T, logger *logrus.Logger, epgNetwork network.Netwo
 			nodeLogger.Info("Starting beacon node")
 			if err := n.Start(ctx); err != nil {
 				nodeLogger.WithError(err).Error("Failed to start beacon node")
-				wg.Done() // Ensure we decrease the counter even on error
+				wg.Done() // Decrement counter since OnReady won't be called for failed nodes
 			}
 		}(node, i)
 	}

@@ -31,7 +31,7 @@ func (c *Crawler) handleStatus(ctx context.Context, stream network.Stream) error
 
 	err := c.reqResp.ReadRequest(ctx, stream, &theirStatus)
 	if err != nil {
-		logCtx.WithError(err).Debug("Failed to decode status message")
+		logCtx.WithError(err).Error("Failed to decode status message")
 
 		if errr := c.reqResp.WriteResponse(ctx, stream, nil, errors.New("failed to decode request body")); errr != nil {
 			logCtx.WithError(errr).Debug("Failed to send status response in response to decode error")
@@ -61,7 +61,7 @@ func (c *Crawler) handleStatus(ctx context.Context, stream network.Stream) error
 		"head_slot":       theirStatus.HeadSlot,
 		"head_root":       theirStatus.HeadRoot,
 		"agent":           agentVersion,
-	}).Debug("Received status message")
+	}).Info("Received status message")
 
 	status := c.GetStatus()
 

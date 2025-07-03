@@ -36,6 +36,15 @@ var sszNetworkEncoder = encoder.SszNetworkEncoder{}
 
 const unknown = "unknown"
 
+// RetryInfo contains information about a peer to be retried.
+type RetryInfo struct {
+	Peer         *discovery.ConnectablePeer
+	ENR          *enode.Node
+	Attempts     int
+	LastAttempt  time.Time
+	BackoffDelay time.Duration
+}
+
 // Crawler is a Mimicry client that connects to Ethereum beacon nodes and
 // requests status updates from them. It depends on an upstream beacon node
 // to provide it with the current Ethereum network state, and never
@@ -65,13 +74,34 @@ type Crawler struct {
 	// ENR storage
 	peerENRs   map[peer.ID]*enode.Node
 	peerENRsMu sync.RWMutex
+
+	// Retry tracking
+	retryQueue   chan *RetryInfo
+	retryTracker map[peer.ID]*RetryInfo
+	retryMu      sync.RWMutex
+
+	// Scheduler for cron jobs
+	scheduler gocron.Scheduler
+
+	// Shutdown tracking
+	shutdownOnce sync.Once
+	isShutdown   bool
+	shutdownMu   sync.RWMutex
+
+	// Context for cancellation
+	//nolint:containedctx // Would require big refactor into channels, leaving for now.
+	ctx    context.Context
+	cancel context.CancelFunc
+
+	// Wait group for dialer workers
+	dialerWg sync.WaitGroup
 }
 
 // New creates a new Crawler.
-func New(log logrus.FieldLogger, config *Config, userAgent, namespace string, f discovery.NodeFinder) *Crawler {
+func New(log logrus.FieldLogger, config *Config, f discovery.NodeFinder) *Crawler {
 	return &Crawler{
-		log:       log,
-		userAgent: userAgent,
+		log:       log.WithField("module", "ethcore/consensus/crawler"),
+		userAgent: config.UserAgent,
 		config:    config,
 		statusMu:  sync.Mutex{},
 		broker:    emission.NewEmitter(),
@@ -89,6 +119,9 @@ func New(log logrus.FieldLogger, config *Config, userAgent, namespace string, f 
 		OnReady:            make(chan struct{}),
 		peerENRs:           make(map[peer.ID]*enode.Node, 1000),
 		peerENRsMu:         sync.RWMutex{},
+		retryQueue:         make(chan *RetryInfo, 1000),
+		retryTracker:       make(map[peer.ID]*RetryInfo, 1000),
+		retryMu:            sync.RWMutex{},
 	}
 }
 
@@ -97,15 +130,18 @@ func (c *Crawler) Start(ctx context.Context) error {
 	c.log.WithFields(logrus.Fields{
 		"user_agent": c.userAgent,
 		"cooloff":    c.config.CooloffDuration,
-	}).Info("Starting Ethereum Mimicry crawler")
+	}).Info("Starting crawler")
+
+	// Create internal context for cancellation
+	c.ctx, c.cancel = context.WithCancel(ctx)
 
 	// Start the duplicate cache
-	if err := c.duplicateCache.Start(ctx); err != nil {
+	if err := c.duplicateCache.Start(c.ctx); err != nil {
 		return fmt.Errorf("failed to start duplicate cache: %w", err)
 	}
 
 	// Create the host
-	h, err := host.NewNode(ctx, c.log, c.config.Node, c.userAgent)
+	h, err := host.NewNode(c.ctx, c.log, c.config.Node, c.userAgent)
 	if err != nil {
 		return fmt.Errorf("failed to create host: %w", err)
 	}
@@ -142,7 +178,7 @@ func (c *Crawler) Start(ctx context.Context) error {
 	// - Start node discovery
 	// - Start our node dialer
 	// - Start the crons
-	c.beacon.OnReady(ctx, func(ctx context.Context) error {
+	c.beacon.OnReady(c.ctx, func(ctx context.Context) error {
 		c.log.Info("Beacon node is ready")
 
 		operation := func() (string, error) {
@@ -191,14 +227,17 @@ func (c *Crawler) Start(ctx context.Context) error {
 			c.log.WithError(err).Fatal("Failed to wire up components")
 		}
 
-		c.log.Info("Successfully wired up components")
-
 		// Start the node dialer
 		if err := c.startDialer(ctx); err != nil {
 			c.log.WithError(err).Fatal("Failed to start node dialer")
 		}
 
 		c.log.Info("Successfully started node dialer")
+
+		// Start the retry worker
+		if err := c.startRetryWorker(ctx); err != nil {
+			c.log.WithError(err).Fatal("Failed to start retry worker")
+		}
 
 		// We now have a valid status and can start discovering peers.
 		if err := c.discovery.Start(ctx); err != nil {
@@ -237,7 +276,7 @@ func (c *Crawler) Start(ctx context.Context) error {
 	})
 
 	// Start the beacon node
-	if err := c.beacon.Start(ctx); err != nil {
+	if err := c.beacon.Start(c.ctx); err != nil {
 		return fmt.Errorf("failed to start beacon node: %w", err)
 	}
 
@@ -245,22 +284,126 @@ func (c *Crawler) Start(ctx context.Context) error {
 }
 
 func (c *Crawler) Stop(ctx context.Context) error {
-	if err := c.duplicateCache.Stop(); err != nil {
-		c.log.WithError(err).Error("Failed to stop duplicate cache")
-	}
+	var finalErr error
 
-	// Tell all our peers we're disconnecting
-	for _, p := range c.node.Peerstore().Peers() {
-		if err := c.DisconnectFromPeer(ctx, p, eth.GoodbyeReasonClientShutdown); err != nil {
-			c.log.WithError(err).Error("Failed to disconnect from peer on shutdown")
+	c.shutdownOnce.Do(func() {
+		c.log.Info("Stopping crawler...")
+
+		// Mark as shutting down
+		c.shutdownMu.Lock()
+		c.isShutdown = true
+		c.shutdownMu.Unlock()
+
+		// Cancel the context to stop all operations
+		if c.cancel != nil {
+			c.cancel()
 		}
-	}
 
-	if err := c.node.Stop(ctx); err != nil {
-		return fmt.Errorf("failed to close host: %w", err)
-	}
+		var errs []error
 
-	return nil
+		// Stop the beacon node first to prevent any more head events
+		if c.beacon != nil {
+			c.log.Info("Stopping beacon node...")
+
+			if err := c.beacon.Stop(ctx); err != nil {
+				errs = append(errs, fmt.Errorf("failed to stop beacon node: %w", err))
+			}
+		}
+
+		// Stop the cron scheduler
+		if c.scheduler != nil {
+			c.log.Info("Stopping cron scheduler...")
+
+			if err := c.scheduler.StopJobs(); err != nil {
+				errs = append(errs, fmt.Errorf("failed to stop scheduler jobs: %w", err))
+			}
+
+			// Shutdown waits for running jobs to complete
+			if err := c.scheduler.Shutdown(); err != nil {
+				errs = append(errs, fmt.Errorf("failed to shutdown scheduler: %w", err))
+			}
+		}
+
+		// Stop discovery
+		if c.discovery != nil {
+			c.log.Info("Stopping discovery...")
+
+			if err := c.discovery.Stop(ctx); err != nil {
+				errs = append(errs, fmt.Errorf("failed to stop discovery: %w", err))
+			}
+		}
+
+		// Close the retry queue channel to stop retry worker
+		if c.retryQueue != nil {
+			c.log.Info("Closing retry queue channel...")
+			close(c.retryQueue)
+		}
+
+		// Close the dialer channel to stop dialer workers
+		if c.peersToDial != nil {
+			c.log.Info("Closing dialer channel...")
+
+			close(c.peersToDial)
+		}
+
+		// Wait for dialer workers to finish with timeout
+		dialerDone := make(chan struct{})
+		go func() {
+			c.dialerWg.Wait()
+			close(dialerDone)
+		}()
+
+		select {
+		case <-dialerDone:
+			c.log.Info("All dialer workers stopped")
+		case <-time.After(5 * time.Second):
+			c.log.Warn("Timeout waiting for dialer workers to stop")
+		}
+
+		// Stop the duplicate cache
+		if c.duplicateCache != nil {
+			if err := c.duplicateCache.Stop(); err != nil {
+				errs = append(errs, fmt.Errorf("failed to stop duplicate cache: %w", err))
+			}
+		}
+
+		// Tell all our peers we're disconnecting
+		if c.node != nil {
+			peerstore := c.node.Peerstore()
+			if peerstore != nil {
+				for _, p := range peerstore.Peers() {
+					if err := c.DisconnectFromPeer(ctx, p, eth.GoodbyeReasonClientShutdown); err != nil {
+						c.log.WithError(err).Debug("Failed to disconnect from peer on shutdown")
+					}
+				}
+			}
+		}
+
+		// Stop the libp2p node
+		if c.node != nil {
+			if err := c.node.Stop(ctx); err != nil {
+				errs = append(errs, fmt.Errorf("failed to stop node: %w", err))
+			}
+		}
+
+		// Clear ENR storage
+		c.peerENRsMu.Lock()
+		c.peerENRs = make(map[peer.ID]*enode.Node)
+		c.peerENRsMu.Unlock()
+
+		// Clear retry tracker
+		c.retryMu.Lock()
+		c.retryTracker = make(map[peer.ID]*RetryInfo)
+		c.retryMu.Unlock()
+
+		c.log.Info("Crawler stopped")
+
+		if len(errs) > 0 {
+			finalErr = fmt.Errorf("errors during shutdown: %v", errs)
+		}
+	})
+
+	return finalErr
 }
 
 func (c *Crawler) startCrons(ctx context.Context) error {
@@ -272,18 +415,35 @@ func (c *Crawler) startCrons(ctx context.Context) error {
 	if _, err := s.NewJob(
 		gocron.DurationJob(1*time.Minute),
 		gocron.NewTask(
-			func(ctx context.Context) {
-				if err := c.fetchAndSetStatus(ctx); err != nil {
+			func() {
+				// Check if we're shutting down
+				c.shutdownMu.RLock()
+				if c.isShutdown {
+					c.shutdownMu.RUnlock()
+
+					return
+				}
+				c.shutdownMu.RUnlock()
+
+				// Use a timeout context for the status fetch.
+				fetchCtx, cancel := context.WithTimeout(c.ctx, 30*time.Second)
+				defer cancel()
+
+				if err := c.fetchAndSetStatus(fetchCtx); err != nil {
+					if errors.Is(err, context.Canceled) {
+						return
+					}
+
 					c.log.WithError(err).Error("Failed to fetch and set status")
 				}
 			},
-			ctx,
 		),
 		gocron.WithStartAt(gocron.WithStartImmediately()),
 	); err != nil {
 		return err
 	}
 
+	c.scheduler = s
 	s.Start()
 
 	return nil
@@ -346,7 +506,7 @@ func (c *Crawler) nodeIsOnOurNetwork(node *enode.Node) error {
 
 func (c *Crawler) ConnectToPeer(ctx context.Context, p peer.AddrInfo, n *enode.Node) error {
 	if err := c.nodeIsOnOurNetwork(n); err != nil {
-		c.emitFailedCrawl(p.ID, newCrawlError(err.Error()))
+		c.handleCrawlFailure(p.ID, newCrawlError(err.Error()))
 
 		return nil
 	}
@@ -356,14 +516,16 @@ func (c *Crawler) ConnectToPeer(ctx context.Context, p peer.AddrInfo, n *enode.N
 			"peer": p.ID,
 		}).Debug("We've already connected to this peer previously")
 
-		c.emitFailedCrawl(p.ID, ErrCrawlTooSoon)
+		c.handleCrawlFailure(p.ID, ErrCrawlTooSoon)
 
 		return nil
 	}
 
 	c.log.WithFields(logrus.Fields{
-		"peer": p.ID,
-	}).Debug("Connecting to peer")
+		"peer_id": p.ID.String(),
+		"enr":     n.String(),
+		"node_id": n.ID().String(),
+	}).Debug("Crawler: Dialing peer")
 
 	// Check if we're already connected to the peer
 	if status := c.node.Connectedness(p.ID); status == network.Connected {
@@ -374,6 +536,12 @@ func (c *Crawler) ConnectToPeer(ctx context.Context, p peer.AddrInfo, n *enode.N
 	c.peerENRsMu.Lock()
 	c.peerENRs[p.ID] = n
 	c.peerENRsMu.Unlock()
+
+	c.log.WithFields(logrus.Fields{
+		"peer_id": p.ID.String(),
+		"enr":     n.String(),
+		"node_id": n.ID().String(),
+	}).Debug("Crawler: Stored ENR for peer")
 
 	// Connect to the peer
 	timeoutCtx, cancel := context.WithTimeout(ctx, c.config.DialTimeout)
@@ -568,11 +736,182 @@ func (c *Crawler) fetchAndSetStatus(ctx context.Context) error {
 			"head_root":       status.HeadRoot,
 			"fork_digest":     status.ForkDigest,
 			"current_fork":    currentFork.Name,
-		}).Info("New eth2 status set")
+		}).Debug("New eth2 status set")
 	}
 
 	// Set our status
 	c.SetStatus(status)
 
 	return nil
+}
+
+// handleCrawlFailure handles a crawl failure by either scheduling a retry or emitting a failure event.
+func (c *Crawler) handleCrawlFailure(peerID peer.ID, err CrawlError) {
+	// Check if error is retryable, if not, emit failure.
+	if !c.isRetryableError(err) {
+		c.emitFailedCrawl(peerID, err)
+
+		return
+	}
+
+	// If max retry attempts is 0, don't retry at all
+	if c.config.MaxRetryAttempts == 0 {
+		c.log.WithFields(logrus.Fields{
+			"peer":  peerID,
+			"error": err,
+		}).Debug("Max retry attempts is 0, emitting failure without retry")
+
+		c.emitFailedCrawl(peerID, err)
+
+		return
+	}
+
+	// Check existing retry info
+	c.retryMu.RLock()
+	retryInfo, exists := c.retryTracker[peerID]
+	c.retryMu.RUnlock()
+
+	// Check if we've exceeded max attempts
+	if exists && retryInfo.Attempts >= c.config.MaxRetryAttempts {
+		// Max attempts reached, emit failure
+		c.log.WithFields(logrus.Fields{
+			"peer":     peerID,
+			"attempts": retryInfo.Attempts,
+			"error":    err,
+		}).Info("Max retry attempts reached, emitting failure")
+
+		// Clean up retry tracking
+		c.retryMu.Lock()
+		delete(c.retryTracker, peerID)
+		c.retryMu.Unlock()
+
+		c.emitFailedCrawl(peerID, err)
+
+		return
+	}
+
+	// Try to schedule a retry; if no ENR is stored, can't retry, emit failure
+	enr := c.GetPeerENR(peerID)
+	if enr == nil {
+		c.emitFailedCrawl(peerID, err)
+
+		return
+	}
+
+	// Create a ConnectablePeer from the ENR, if we can't derive peer details, emit failure.
+	peer, convErr := discovery.DeriveDetailsFromNode(enr)
+	if convErr != nil {
+		c.emitFailedCrawl(peerID, err)
+
+		return
+	}
+
+	// Schedule retry - this will handle the retry logic.
+	c.scheduleRetry(peerID, peer, enr, err)
+
+	// Don't emit failure event - as we're retrying.
+	c.log.WithFields(logrus.Fields{
+		"peer":  peerID,
+		"error": err,
+	}).Info("Scheduling retry instead of emitting failure")
+}
+
+// scheduleRetry schedules a peer for retry if conditions are met.
+func (c *Crawler) scheduleRetry(peerID peer.ID, peer *discovery.ConnectablePeer, enr *enode.Node, err error) {
+	// Check if error is retryable
+	if !c.isRetryableError(err) {
+		c.log.WithFields(logrus.Fields{
+			"peer":  peerID,
+			"error": err,
+		}).Info("Error is not retryable, skipping retry")
+
+		return
+	}
+
+	// If max retry attempts is 0, don't schedule any retries
+	if c.config.MaxRetryAttempts == 0 {
+		c.log.WithField("peer", peerID).Debug("Max retry attempts is 0, not scheduling retry")
+
+		return
+	}
+
+	// Check existing retry info
+	c.retryMu.Lock()
+	defer c.retryMu.Unlock()
+
+	retryInfo, exists := c.retryTracker[peerID]
+	if !exists {
+		// First retry attempt
+		retryInfo = &RetryInfo{
+			Peer:         peer,
+			ENR:          enr,
+			Attempts:     0,
+			LastAttempt:  time.Now(),
+			BackoffDelay: c.config.RetryBackoff,
+		}
+
+		c.retryTracker[peerID] = retryInfo
+	}
+
+	// Check if we've exceeded max attempts
+	if retryInfo.Attempts >= c.config.MaxRetryAttempts {
+		c.log.WithFields(logrus.Fields{
+			"peer":     peerID,
+			"attempts": retryInfo.Attempts,
+		}).Debug("Max retry attempts reached, not scheduling retry")
+
+		delete(c.retryTracker, peerID)
+
+		return
+	}
+
+	// Update retry info
+	retryInfo.Attempts++
+	retryInfo.LastAttempt = time.Now()
+	retryInfo.BackoffDelay = time.Duration(float64(c.config.RetryBackoff) * float64(retryInfo.Attempts))
+
+	// Remove from duplicate cache to allow immediate retry
+	c.duplicateCache.GetCache().Delete(peerID.String())
+
+	// Schedule retry
+	select {
+	case c.retryQueue <- retryInfo:
+		c.log.WithFields(logrus.Fields{
+			"peer":     peerID,
+			"attempts": retryInfo.Attempts,
+			"backoff":  retryInfo.BackoffDelay,
+		}).Info("Scheduled peer for retry")
+	default:
+		c.log.WithField("peer", peerID).Warn("Retry queue full, dropping retry request")
+	}
+}
+
+// isRetryableError determines if an error should trigger a retry.
+func (c *Crawler) isRetryableError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	var crawlErr CrawlError
+	if errors.As(err, &crawlErr) {
+		switch crawlErr.Type() {
+		case ErrCrawlNetworkMismatchType:
+			// Different network; don't retry.
+			return false
+		case ErrCrawlProtocolNotSupportedType:
+			// Protocol isn't supported; don't retry.
+			return false
+		default:
+			// Default to retry for ErrCrawlIdentifyTimeoutType, ErrCrawlTimeoutType and unknowns.
+			return true
+		}
+	}
+
+	// Check for context errors.
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return false
+	}
+
+	// Default to retry for other errors.
+	return true
 }
