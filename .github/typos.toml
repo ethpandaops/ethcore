@@ -9,3 +9,5 @@ extend-ignore-identifiers-re = [
 [default.extend-words]
 # Ignore "Iy" which appears in base64 encoded ENR strings
 Iy = "Iy"
+# Ignore "Dout" which is a valid libp2p gossipsub parameter name
+Dout = "Dout"

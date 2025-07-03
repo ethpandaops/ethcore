@@ -32,16 +32,16 @@ func (e *SSZEncoder[T]) Decode(data []byte) (T, error) {
 	var zero T
 
 	// Use reflection to handle both pointer and non-pointer types
-	typ := reflect.TypeOf(zero)
+	msgType := reflect.TypeOf(zero)
 
 	// Create a new instance
 	var target reflect.Value
-	if typ.Kind() == reflect.Ptr {
+	if msgType.Kind() == reflect.Ptr {
 		// T is already a pointer type (e.g., *MyStruct)
-		target = reflect.New(typ.Elem())
+		target = reflect.New(msgType.Elem())
 	} else {
 		// T is a non-pointer type
-		target = reflect.New(typ)
+		target = reflect.New(msgType)
 	}
 
 	// Check if the target implements Unmarshaler
@@ -56,7 +56,7 @@ func (e *SSZEncoder[T]) Decode(data []byte) (T, error) {
 	}
 
 	// Return the appropriate value
-	if typ.Kind() == reflect.Ptr {
+	if msgType.Kind() == reflect.Ptr {
 		return target.Interface().(T), nil
 	}
 	return target.Elem().Interface().(T), nil
