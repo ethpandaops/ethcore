@@ -16,6 +16,7 @@ package examples
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
@@ -155,7 +156,7 @@ func ExampleAttestationSetup(ctx context.Context, log logrus.FieldLogger) error 
 }
 
 // subscribeToSubnet subscribes to a specific attestation subnet with proper validation and processing.
-func (h *AttestationHandler) subscribeToSubnet(ctx context.Context, subnet uint64, forkDigest [4]byte, events chan<- v1.Event) error {
+func (h *AttestationHandler) subscribeToSubnet(_ context.Context, subnet uint64, forkDigest [4]byte, events chan<- v1.Event) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
@@ -423,13 +424,7 @@ func (h *AttestationHandler) rotateSubnets(ctx context.Context, forkDigest [4]by
 	// Check if we're already subscribed
 	alreadySubscribed := false
 
-	for _, subnet := range currentSubnets {
-		if subnet == newSubnet {
-			alreadySubscribed = true
-
-			break
-		}
-	}
+	alreadySubscribed = slices.Contains(currentSubnets, newSubnet)
 
 	if !alreadySubscribed && len(currentSubnets) < 8 { // Limit concurrent subscriptions
 		if err := h.subscribeToSubnet(ctx, newSubnet, forkDigest, events); err != nil {
@@ -445,7 +440,7 @@ func (h *AttestationHandler) rotateSubnets(ctx context.Context, forkDigest [4]by
 }
 
 // publishExampleAttestation demonstrates how to publish an attestation.
-func (h *AttestationHandler) publishExampleAttestation(ctx context.Context, subnet uint64, forkDigest [4]byte) error {
+func (h *AttestationHandler) publishExampleAttestation(_ context.Context, subnet uint64, forkDigest [4]byte) error {
 	// Create example attestation
 	// Note: In production, you would create proper attestations from your beacon node
 	// The following is a simplified example that may need type adjustments based on your prysm version
