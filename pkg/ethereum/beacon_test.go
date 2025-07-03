@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	epbeacon "github.com/ethpandaops/beacon/pkg/beacon"
+	"github.com/ethpandaops/beacon/pkg/beacon"
 	"github.com/ethpandaops/ethcore/pkg/ethereum"
 	"github.com/ethpandaops/ethcore/pkg/testutil/kurtosis"
 	"github.com/ethpandaops/ethereum-package-go/pkg/network"
@@ -64,18 +64,19 @@ func singleNoteTest(t *testing.T, logger *logrus.Logger, epgNetwork network.Netw
 		BeaconNodeAddress: beaconURL,
 	}
 
-	// Set up beacon options
-	opts := epbeacon.DefaultOptions()
-	opts = opts.DisablePrometheusMetrics()
+	opts := &ethereum.Options{Options: beacon.DefaultOptions()}
+	opts.DisablePrometheusMetrics()
 	opts.HealthCheck.Interval.Duration = time.Second * 3
 	opts.HealthCheck.SuccessfulResponses = 1
+	opts.BeaconSubscription.Enabled = true
+	opts.BeaconSubscription.Topics = []string{"head"}
 
 	// Create the beacon node
 	beaconNode, err := ethereum.NewBeaconNode(
 		logger.WithField("test", "single_node"),
 		fmt.Sprintf("test-single-node-%s", beaconClient.Name()),
 		config,
-		*opts,
+		opts,
 	)
 	require.NoError(t, err, "Failed to create beacon node")
 
@@ -83,7 +84,7 @@ func singleNoteTest(t *testing.T, logger *logrus.Logger, epgNetwork network.Netw
 	ready := make(chan struct{})
 
 	// Register a callback to be executed when the node is ready
-	beaconNode.OnReady(ctx, func(ctx context.Context) error {
+	beaconNode.OnReady(func(ctx context.Context) error {
 		logger.Info("Single beacon node is ready!")
 
 		// Verify we can access metadata
@@ -161,10 +162,12 @@ func multiNoteTest(t *testing.T, logger *logrus.Logger, epgNetwork network.Netwo
 			BeaconNodeAddress: beaconClient.BeaconAPIURL(),
 		}
 
-		opts := epbeacon.DefaultOptions()
-		opts = opts.DisablePrometheusMetrics()
-		opts.HealthCheck.Interval.Duration = time.Second * 2
+		opts := &ethereum.Options{Options: beacon.DefaultOptions()}
+		opts.DisablePrometheusMetrics()
+		opts.HealthCheck.Interval.Duration = time.Second * 3
 		opts.HealthCheck.SuccessfulResponses = 1
+		opts.BeaconSubscription.Enabled = true
+		opts.BeaconSubscription.Topics = []string{"head"}
 
 		nodeLogger.WithField("beacon_url", beaconClient.BeaconAPIURL()).Info("Creating beacon node")
 
@@ -173,7 +176,7 @@ func multiNoteTest(t *testing.T, logger *logrus.Logger, epgNetwork network.Netwo
 			nodeLogger,
 			fmt.Sprintf("test-node-%d", i),
 			config,
-			*opts,
+			opts,
 		)
 		require.NoError(t, err, "Failed to create beacon node %d", i)
 
@@ -187,7 +190,7 @@ func multiNoteTest(t *testing.T, logger *logrus.Logger, epgNetwork network.Netwo
 
 		// Register callback for when node is ready
 		nodeIndex := i
-		node.OnReady(ctx, func(ctx context.Context) error {
+		node.OnReady(func(ctx context.Context) error {
 			defer wg.Done()
 
 			nodeLogger.Info("Node is ready")
