@@ -8,28 +8,28 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub/v1"
+	v1 "github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub/v1"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 )
 
-// GossipTestMessage is a simple test message type for gossipsub tests
+// GossipTestMessage is a simple test message type for gossipsub tests.
 type GossipTestMessage struct {
 	ID      string
 	Content string
 	From    string
 }
 
-// SSZTestMessage is a test message that implements SSZ serialization
+// SSZTestMessage is a test message that implements SSZ serialization.
 type SSZTestMessage struct {
 	ID    uint64
 	Data  []byte
 	Value uint32
 }
 
-// MarshalSSZ implements SSZ marshalling
+// MarshalSSZ implements SSZ marshalling.
 func (m *SSZTestMessage) MarshalSSZ() ([]byte, error) {
 	// Simple encoding: [ID:8][Value:4][ContentLen:4][Content:N]
 	buf := make([]byte, 8+4+4+len(m.Data))
@@ -56,7 +56,7 @@ func (m *SSZTestMessage) MarshalSSZ() ([]byte, error) {
 	return buf, nil
 }
 
-// UnmarshalSSZ implements SSZ unmarshalling
+// UnmarshalSSZ implements SSZ unmarshalling.
 func (m *SSZTestMessage) UnmarshalSSZ(buf []byte) error {
 	if len(buf) < 16 {
 		return fmt.Errorf("buffer too short: need at least 16 bytes, got %d", len(buf))
@@ -91,12 +91,12 @@ func (m *SSZTestMessage) UnmarshalSSZ(buf []byte) error {
 	return nil
 }
 
-// SizeSSZ returns the size of the SSZ encoded message
+// SizeSSZ returns the size of the SSZ encoded message.
 func (m *SSZTestMessage) SizeSSZ() int {
 	return 16 + len(m.Data)
 }
 
-// MarshalSSZTo implements SSZ marshalling to a destination buffer
+// MarshalSSZTo implements SSZ marshalling to a destination buffer.
 func (m *SSZTestMessage) MarshalSSZTo(dst []byte) ([]byte, error) {
 	size := m.SizeSSZ()
 	if len(dst) < size {
@@ -125,12 +125,13 @@ func (m *SSZTestMessage) MarshalSSZTo(dst []byte) ([]byte, error) {
 	return dst[:size], nil
 }
 
-// TestEncoder implements the Encoder interface for GossipTestMessage
+// TestEncoder implements the Encoder interface for GossipTestMessage.
 type TestEncoder struct{}
 
 func (e *TestEncoder) Encode(msg GossipTestMessage) ([]byte, error) {
 	// Simple encoding: "ID|Content|From"
 	encoded := fmt.Sprintf("%s|%s|%s", msg.ID, msg.Content, msg.From)
+
 	return []byte(encoded), nil
 }
 
@@ -153,16 +154,15 @@ func (e *TestEncoder) Decode(data []byte) (GossipTestMessage, error) {
 	return msg, nil
 }
 
-// TestNode represents a test gossipsub node
+// TestNode represents a test gossipsub node.
 type TestNode struct {
 	ID        peer.ID
 	Host      host.Host
 	Gossipsub *v1.Gossipsub
-	ctx       context.Context
 	cancel    context.CancelFunc
 }
 
-// Close shuts down the test node
+// Close shuts down the test node.
 func (n *TestNode) Close() error {
 	if n.Gossipsub != nil {
 		if err := n.Gossipsub.Stop(); err != nil {
@@ -181,21 +181,23 @@ func (n *TestNode) Close() error {
 	return nil
 }
 
-// TestInfrastructure manages test nodes and cleanup
+// TestInfrastructure manages test nodes and cleanup.
 type TestInfrastructure struct {
 	t     *testing.T
 	nodes []*TestNode
 }
 
-// NewTestInfrastructure creates a new test infrastructure
+// NewTestInfrastructure creates a new test infrastructure.
 func NewTestInfrastructure(t *testing.T) *TestInfrastructure {
+	t.Helper()
+
 	return &TestInfrastructure{
 		t:     t,
 		nodes: make([]*TestNode, 0),
 	}
 }
 
-// CreateNode creates a single test node
+// CreateNode creates a single test node.
 func (ti *TestInfrastructure) CreateNode(ctx context.Context, opts ...v1.Option) (*TestNode, error) {
 	// Generate a private key
 	priv, _, err := crypto.GenerateKeyPairWithReader(crypto.RSA, 2048, rand.Reader)
@@ -220,6 +222,7 @@ func (ti *TestInfrastructure) CreateNode(ctx context.Context, opts ...v1.Option)
 	if err != nil {
 		cancel()
 		h.Close()
+
 		return nil, fmt.Errorf("failed to create gossipsub: %w", err)
 	}
 
@@ -227,15 +230,15 @@ func (ti *TestInfrastructure) CreateNode(ctx context.Context, opts ...v1.Option)
 		ID:        h.ID(),
 		Host:      h,
 		Gossipsub: gossipsub,
-		ctx:       nodeCtx,
 		cancel:    cancel,
 	}
 
 	ti.nodes = append(ti.nodes, node)
+
 	return node, nil
 }
 
-// CreateFullyConnectedNetwork creates a fully connected network of test nodes
+// CreateFullyConnectedNetwork creates a fully connected network of test nodes.
 func (ti *TestInfrastructure) CreateFullyConnectedNetwork(ctx context.Context, count int, opts ...v1.Option) ([]*TestNode, error) {
 	nodes := make([]*TestNode, count)
 
@@ -263,7 +266,7 @@ func (ti *TestInfrastructure) CreateFullyConnectedNetwork(ctx context.Context, c
 	return nodes, nil
 }
 
-// connectNodes connects two test nodes
+// connectNodes connects two test nodes.
 func (ti *TestInfrastructure) connectNodes(ctx context.Context, node1, node2 *TestNode) error {
 	// Get node2's address info
 	addrs := node2.Host.Addrs()
@@ -280,7 +283,7 @@ func (ti *TestInfrastructure) connectNodes(ctx context.Context, node1, node2 *Te
 	return node1.Host.Connect(ctx, addrInfo)
 }
 
-// Cleanup shuts down all test nodes
+// Cleanup shuts down all test nodes.
 func (ti *TestInfrastructure) Cleanup() {
 	for _, node := range ti.nodes {
 		if err := node.Close(); err != nil {
@@ -290,7 +293,7 @@ func (ti *TestInfrastructure) Cleanup() {
 	ti.nodes = nil
 }
 
-// ReceivedMessage represents a message received by a test node
+// ReceivedMessage represents a message received by a test node.
 type ReceivedMessage struct {
 	Message GossipTestMessage
 	From    peer.ID
@@ -298,13 +301,13 @@ type ReceivedMessage struct {
 	Node    peer.ID // Alias for NodeID for backwards compatibility
 }
 
-// MessageCollector collects messages for test verification
+// MessageCollector collects messages for test verification.
 type MessageCollector struct {
 	messages chan ReceivedMessage
 	errors   chan error
 }
 
-// NewMessageCollector creates a new message collector
+// NewMessageCollector creates a new message collector.
 func NewMessageCollector(bufferSize int) *MessageCollector {
 	return &MessageCollector{
 		messages: make(chan ReceivedMessage, bufferSize),
@@ -312,7 +315,7 @@ func NewMessageCollector(bufferSize int) *MessageCollector {
 	}
 }
 
-// CreateProcessor creates a processor function that sends messages to the collector
+// CreateProcessor creates a processor function that sends messages to the collector.
 func (mc *MessageCollector) CreateProcessor(nodeID peer.ID) v1.Processor[GossipTestMessage] {
 	return func(ctx context.Context, msg GossipTestMessage, from peer.ID) error {
 		select {
@@ -327,11 +330,12 @@ func (mc *MessageCollector) CreateProcessor(nodeID peer.ID) v1.Processor[GossipT
 		default:
 			// Buffer full, drop message
 		}
+
 		return nil
 	}
 }
 
-// WaitForMessages waits for a specific number of messages
+// WaitForMessages waits for a specific number of messages.
 func (mc *MessageCollector) WaitForMessages(count int, timeout time.Duration) ([]ReceivedMessage, error) {
 	var messages []ReceivedMessage
 	timer := time.NewTimer(timeout)
@@ -351,12 +355,12 @@ func (mc *MessageCollector) WaitForMessages(count int, timeout time.Duration) ([
 	return messages, nil
 }
 
-// CreateTestTopic creates a test topic with the given name
+// CreateTestTopic creates a test topic with the given name.
 func CreateTestTopic(name string) (*v1.Topic[GossipTestMessage], error) {
 	return v1.NewTopic[GossipTestMessage](name)
 }
 
-// CreateTestHandler creates a handler config with the given processor
+// CreateTestHandler creates a handler config with the given processor.
 func CreateTestHandler(processor v1.Processor[GossipTestMessage]) *v1.HandlerConfig[GossipTestMessage] {
 	return v1.NewHandlerConfig(
 		v1.WithEncoder(&TestEncoder{}),
@@ -368,12 +372,12 @@ func CreateTestHandler(processor v1.Processor[GossipTestMessage]) *v1.HandlerCon
 	)
 }
 
-// GetMessageCount returns the number of messages currently in the buffer
+// GetMessageCount returns the number of messages currently in the buffer.
 func (mc *MessageCollector) GetMessageCount() int {
 	return len(mc.messages)
 }
 
-// GetMessages returns all collected messages
+// GetMessages returns all collected messages.
 func (mc *MessageCollector) GetMessages() []ReceivedMessage {
 	var messages []ReceivedMessage
 	for {
@@ -386,14 +390,16 @@ func (mc *MessageCollector) GetMessages() []ReceivedMessage {
 	}
 }
 
-// ConnectNodes connects two nodes directly (backwards compatibility)
+// ConnectNodes connects two nodes directly (backwards compatibility).
 func (ti *TestInfrastructure) ConnectNodes(node1, node2 *TestNode) error {
 	ctx := context.Background()
+
 	return ti.connectNodes(ctx, node1, node2)
 }
 
-// WaitForGossipsubReady waits for gossipsub mesh to be ready
+// WaitForGossipsubReady waits for gossipsub mesh to be ready.
 func WaitForGossipsubReady(t *testing.T, nodes []*TestNode, topic string, expectedConnections int) {
+	t.Helper()
 	// Wait for mesh to stabilize
 	time.Sleep(2 * time.Second)
 }

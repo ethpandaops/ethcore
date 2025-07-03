@@ -8,14 +8,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub/v1"
-	// pubsub "github.com/libp2p/go-libp2p-pubsub" // TODO: Uncomment when implementing score params test
+	v1 "github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub/v1"
+	// pubsub "github.com/libp2p/go-libp2p-pubsub" // TODO: Uncomment when implementing score params test.
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// TestLibp2pValidation tests that validation happens at the libp2p level before propagation
+// TestLibp2pValidation tests that validation happens at the libp2p level before propagation.
 func TestLibp2pValidation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -46,13 +46,16 @@ func TestLibp2pValidation(t *testing.T) {
 			validationCount.Add(1)
 			if msg.Content == "reject" {
 				rejectedCount.Add(1)
+
 				return v1.ValidationReject
 			}
+
 			return v1.ValidationAccept
 		}),
 		v1.WithProcessor(func(ctx context.Context, msg GossipTestMessage, from peer.ID) error {
 			// This should only be called for accepted messages
 			t.Logf("Validator node processed message: %s", msg.Content)
+
 			return nil
 		}),
 	)
@@ -65,6 +68,7 @@ func TestLibp2pValidation(t *testing.T) {
 			if msg.Content == "reject" {
 				return v1.ValidationReject
 			}
+
 			return v1.ValidationAccept
 		}),
 		v1.WithProcessor(func(ctx context.Context, msg GossipTestMessage, from peer.ID) error {
@@ -77,6 +81,7 @@ func TestLibp2pValidation(t *testing.T) {
 			case <-ctx.Done():
 				return ctx.Err()
 			}
+
 			return nil
 		}),
 	)
@@ -201,7 +206,7 @@ func TestValidationWithScoreParams(t *testing.T) {
 }
 */
 
-// TestValidationBeforeDecoding tests that validation metrics are recorded even for decode failures
+// TestValidationBeforeDecoding tests that validation metrics are recorded even for decode failures.
 func TestValidationBeforeDecoding(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -241,11 +246,13 @@ func TestValidationBeforeDecoding(t *testing.T) {
 		v1.WithValidator(func(ctx context.Context, msg GossipTestMessage, from peer.ID) v1.ValidationResult {
 			// This should not be called for messages that fail to decode
 			t.Logf("Validator called (this is expected with libp2p validation)")
+
 			return v1.ValidationAccept
 		}),
 		v1.WithProcessor(func(ctx context.Context, msg GossipTestMessage, from peer.ID) error {
 			// This should not be called for messages that fail to decode
 			t.Error("Processor called for message that should have failed decoding")
+
 			return nil
 		}),
 	)
@@ -283,7 +290,7 @@ func TestValidationBeforeDecoding(t *testing.T) {
 	t.Logf("Invalid payload counts - Topic: %d, Global: %d", invalidPayloadCount.Load(), globalInvalidCount.Load())
 }
 
-// BrokenEncoder is a test encoder that can be configured to fail
+// BrokenEncoder is a test encoder that can be configured to fail.
 type BrokenEncoder struct {
 	failOnDecode func([]byte) bool
 }
@@ -302,6 +309,7 @@ func (e *BrokenEncoder) Decode(data []byte) (GossipTestMessage, error) {
 	if len(parts) != 3 {
 		return GossipTestMessage{}, fmt.Errorf("invalid message format")
 	}
+
 	return GossipTestMessage{
 		ID:      parts[0],
 		Content: parts[1],
@@ -309,7 +317,7 @@ func (e *BrokenEncoder) Decode(data []byte) (GossipTestMessage, error) {
 	}, nil
 }
 
-// TestMultipleValidators tests that multiple subscribers with different validators work correctly
+// TestMultipleValidators tests that multiple subscribers with different validators work correctly.
 func TestMultipleValidators(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -366,6 +374,7 @@ func TestMultipleValidators(t *testing.T) {
 						return v1.ValidationAccept
 					}
 				}
+
 				return v1.ValidationReject
 			}),
 			v1.WithProcessor(func(ctx context.Context, msg GossipTestMessage, from peer.ID) error {
@@ -378,6 +387,7 @@ func TestMultipleValidators(t *testing.T) {
 				case <-ctx.Done():
 					return ctx.Err()
 				}
+
 				return nil
 			}),
 		)

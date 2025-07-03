@@ -179,67 +179,76 @@ func WithEventCallbacks[T any](callbacks *EventCallbacks) HandlerOption[T] {
 		go func() {
 			for event := range eventChan {
 				if gossipEvent, ok := event.(*GossipsubEvent); ok {
-					switch gossipEvent.EventType {
-					case EventTypeSubscribed:
-						if callbacks.OnSubscribed != nil {
-							callbacks.OnSubscribed(gossipEvent.Topic)
-						}
-					case EventTypeUnsubscribed:
-						if callbacks.OnUnsubscribed != nil {
-							callbacks.OnUnsubscribed(gossipEvent.Topic)
-						}
-					case EventTypeMessageReceived:
-						if callbacks.OnMessageReceived != nil {
-							if data, ok := gossipEvent.Data.(*MessageEventData); ok {
-								callbacks.OnMessageReceived(gossipEvent.Topic, gossipEvent.PeerID, data)
-							}
-						}
-					case EventTypeMessageValidated:
-						if callbacks.OnMessageValidated != nil {
-							if data, ok := gossipEvent.Data.(*MessageEventData); ok {
-								callbacks.OnMessageValidated(gossipEvent.Topic, gossipEvent.PeerID, data)
-							}
-						}
-					case EventTypeMessageRejected:
-						if callbacks.OnMessageRejected != nil {
-							if data, ok := gossipEvent.Data.(*MessageEventData); ok {
-								callbacks.OnMessageRejected(gossipEvent.Topic, gossipEvent.PeerID, data)
-							}
-						}
-					case EventTypeMessageProcessed:
-						if callbacks.OnMessageProcessed != nil {
-							if data, ok := gossipEvent.Data.(*MessageEventData); ok {
-								callbacks.OnMessageProcessed(gossipEvent.Topic, gossipEvent.PeerID, data)
-							}
-						}
-					case EventTypeMessagePublished:
-						if callbacks.OnMessagePublished != nil {
-							if data, ok := gossipEvent.Data.(*MessageEventData); ok {
-								callbacks.OnMessagePublished(gossipEvent.Topic, data)
-							}
-						}
-					case EventTypeError:
-						if callbacks.OnError != nil {
-							if data, ok := gossipEvent.Data.(*ErrorEventData); ok {
-								callbacks.OnError(gossipEvent.Topic, gossipEvent.Error, data)
-							}
-						}
-					case EventTypePeerConnected:
-						if callbacks.OnPeerConnected != nil {
-							if data, ok := gossipEvent.Data.(*PeerEventData); ok {
-								callbacks.OnPeerConnected(gossipEvent.Topic, gossipEvent.PeerID, data)
-							}
-						}
-					case EventTypePeerDisconnected:
-						if callbacks.OnPeerDisconnected != nil {
-							if data, ok := gossipEvent.Data.(*PeerEventData); ok {
-								callbacks.OnPeerDisconnected(gossipEvent.Topic, gossipEvent.PeerID, data)
-							}
-						}
-					}
+					processEventCallback(callbacks, gossipEvent)
 				}
 			}
 		}()
+	}
+}
+
+// processEventCallback handles the event callback routing based on event type.
+func processEventCallback(callbacks *EventCallbacks, gossipEvent *GossipsubEvent) {
+	switch gossipEvent.EventType {
+	case EventTypeSubscribed:
+		if callbacks.OnSubscribed != nil {
+			callbacks.OnSubscribed(gossipEvent.Topic)
+		}
+	case EventTypeUnsubscribed:
+		if callbacks.OnUnsubscribed != nil {
+			callbacks.OnUnsubscribed(gossipEvent.Topic)
+		}
+	case EventTypeMessageReceived:
+		processMessageCallback(callbacks.OnMessageReceived, gossipEvent)
+	case EventTypeMessageValidated:
+		processMessageCallback(callbacks.OnMessageValidated, gossipEvent)
+	case EventTypeMessageRejected:
+		processMessageCallback(callbacks.OnMessageRejected, gossipEvent)
+	case EventTypeMessageProcessed:
+		processMessageCallback(callbacks.OnMessageProcessed, gossipEvent)
+	case EventTypeMessagePublished:
+		processPublishCallback(callbacks.OnMessagePublished, gossipEvent)
+	case EventTypeError:
+		processErrorCallback(callbacks.OnError, gossipEvent)
+	case EventTypePeerConnected:
+		processPeerCallback(callbacks.OnPeerConnected, gossipEvent)
+	case EventTypePeerDisconnected:
+		processPeerCallback(callbacks.OnPeerDisconnected, gossipEvent)
+	}
+}
+
+// processMessageCallback handles message-related callbacks.
+func processMessageCallback(callback func(string, peer.ID, *MessageEventData), gossipEvent *GossipsubEvent) {
+	if callback != nil {
+		if data, ok := gossipEvent.Data.(*MessageEventData); ok {
+			callback(gossipEvent.Topic, gossipEvent.PeerID, data)
+		}
+	}
+}
+
+// processPublishCallback handles message published callbacks.
+func processPublishCallback(callback func(string, *MessageEventData), gossipEvent *GossipsubEvent) {
+	if callback != nil {
+		if data, ok := gossipEvent.Data.(*MessageEventData); ok {
+			callback(gossipEvent.Topic, data)
+		}
+	}
+}
+
+// processErrorCallback handles error callbacks.
+func processErrorCallback(callback func(string, error, *ErrorEventData), gossipEvent *GossipsubEvent) {
+	if callback != nil {
+		if data, ok := gossipEvent.Data.(*ErrorEventData); ok {
+			callback(gossipEvent.Topic, gossipEvent.Error, data)
+		}
+	}
+}
+
+// processPeerCallback handles peer-related callbacks.
+func processPeerCallback(callback func(string, peer.ID, *PeerEventData), gossipEvent *GossipsubEvent) {
+	if callback != nil {
+		if data, ok := gossipEvent.Data.(*PeerEventData); ok {
+			callback(gossipEvent.Topic, gossipEvent.PeerID, data)
+		}
 	}
 }
 
@@ -260,6 +269,7 @@ func (e *GossipsubEvent) WithError(err error, operation string) *GossipsubEvent 
 	e.Data = &ErrorEventData{
 		Operation: operation,
 	}
+
 	return e
 }
 
@@ -268,10 +278,12 @@ func (e *GossipsubEvent) WithMessageData(messageID string, size int) *GossipsubE
 	if e.Data == nil {
 		e.Data = &MessageEventData{}
 	}
+
 	if data, ok := e.Data.(*MessageEventData); ok {
 		data.MessageID = messageID
 		data.Size = size
 	}
+
 	return e
 }
 
@@ -280,9 +292,11 @@ func (e *GossipsubEvent) WithValidationResult(result ValidationResult) *Gossipsu
 	if e.Data == nil {
 		e.Data = &MessageEventData{}
 	}
+
 	if data, ok := e.Data.(*MessageEventData); ok {
 		data.ValidationResult = result
 	}
+
 	return e
 }
 
@@ -291,8 +305,10 @@ func (e *GossipsubEvent) WithProcessingDuration(duration time.Duration) *Gossips
 	if e.Data == nil {
 		e.Data = &MessageEventData{}
 	}
+
 	if data, ok := e.Data.(*MessageEventData); ok {
 		data.ProcessingDuration = duration
 	}
+
 	return e
 }

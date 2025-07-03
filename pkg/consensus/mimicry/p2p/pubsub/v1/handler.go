@@ -131,8 +131,10 @@ func WithSSZDecoding[T any]() HandlerOption[T] {
 				if err := unmarshaler.UnmarshalSSZ(data); err != nil {
 					return msg, fmt.Errorf("failed to unmarshal SSZ: %w", err)
 				}
+
 				return *msgPtr, nil
 			}
+
 			return msg, fmt.Errorf("type %T does not implement fastssz.Unmarshaler", msg)
 		}
 	}

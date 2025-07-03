@@ -9,16 +9,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub/v1"
-	"github.com/libp2p/go-libp2p"
-	"github.com/libp2p/go-libp2p/core/crypto"
-	"github.com/libp2p/go-libp2p/core/host"
+	v1 "github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub/v1"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// TestBeaconBlock represents a test beacon block message
+// TestBeaconBlock represents a test beacon block message.
 type TestBeaconBlock struct {
 	Slot       uint64
 	ParentRoot []byte
@@ -26,12 +23,13 @@ type TestBeaconBlock struct {
 	BodyRoot   []byte
 }
 
-// TestBeaconBlockEncoder implements encoding/decoding for TestBeaconBlock
+// TestBeaconBlockEncoder implements encoding/decoding for TestBeaconBlock.
 type TestBeaconBlockEncoder struct{}
 
 func (e *TestBeaconBlockEncoder) Encode(msg *TestBeaconBlock) ([]byte, error) {
 	// Simple encoding: "slot|parentroot|stateroot|bodyroot"
 	encoded := fmt.Sprintf("%d|%x|%x|%x", msg.Slot, msg.ParentRoot, msg.StateRoot, msg.BodyRoot)
+
 	return []byte(encoded), nil
 }
 
@@ -79,11 +77,11 @@ func decodeHex(s string) ([]byte, error) {
 		}
 		result[i/2] = b
 	}
+
 	return result, nil
 }
 
-// TestSubscriptionLifecycle_MultipleMessages tests that a subscription can receive multiple messages sequentially
-// This is the core test for the reported issue where Next() blocks after the first message
+// This is the core test for the reported issue where Next() blocks after the first message.
 func TestSubscriptionLifecycle_MultipleMessages(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -144,6 +142,7 @@ func TestSubscriptionLifecycle_MultipleMessages(t *testing.T) {
 		topics0 := nodes[0].Gossipsub.ActiveTopics()
 		topics1 := nodes[1].Gossipsub.ActiveTopics()
 		t.Logf("Node0 topics: %v, Node1 topics: %v", topics0, topics1)
+
 		return len(topics0) > 0
 	}, 10*time.Second, 500*time.Millisecond, "Expected topics to be active")
 
@@ -171,6 +170,7 @@ func TestSubscriptionLifecycle_MultipleMessages(t *testing.T) {
 	require.Eventually(t, func() bool {
 		count := messageCount.Load()
 		t.Logf("Processed %d/%d messages", count, len(messageSlots))
+
 		return count == int64(len(messageSlots))
 	}, 15*time.Second, 500*time.Millisecond, "Expected all messages to be processed")
 
@@ -183,7 +183,7 @@ func TestSubscriptionLifecycle_MultipleMessages(t *testing.T) {
 	t.Logf("SUCCESS: All %d messages were processed correctly", len(messageSlots))
 }
 
-// TestSubscriptionLifecycle_SubscriptionCleanup verifies that subscriptions are properly cleaned up
+// TestSubscriptionLifecycle_SubscriptionCleanup verifies that subscriptions are properly cleaned up.
 func TestSubscriptionLifecycle_SubscriptionCleanup(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
@@ -208,6 +208,7 @@ func TestSubscriptionLifecycle_SubscriptionCleanup(t *testing.T) {
 		v1.WithProcessor[*TestBeaconBlock](func(ctx context.Context, data *TestBeaconBlock, from peer.ID) error {
 			messageCount.Add(1)
 			t.Logf("Received message: slot=%d", data.Slot)
+
 			return nil
 		}),
 	)
@@ -256,7 +257,7 @@ func TestSubscriptionLifecycle_SubscriptionCleanup(t *testing.T) {
 	t.Log("SUCCESS: Subscription cleanup works correctly")
 }
 
-// TestSubscriptionLifecycle_ResubscribeAfterCancel tests re-subscribing to a topic after cancellation
+// TestSubscriptionLifecycle_ResubscribeAfterCancel tests re-subscribing to a topic after cancellation.
 func TestSubscriptionLifecycle_ResubscribeAfterCancel(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
@@ -281,6 +282,7 @@ func TestSubscriptionLifecycle_ResubscribeAfterCancel(t *testing.T) {
 		v1.WithProcessor[*TestBeaconBlock](func(ctx context.Context, data *TestBeaconBlock, from peer.ID) error {
 			messageCount.Add(1)
 			t.Logf("Received message: slot=%d", data.Slot)
+
 			return nil
 		}),
 	)
@@ -337,7 +339,7 @@ func TestSubscriptionLifecycle_ResubscribeAfterCancel(t *testing.T) {
 	t.Log("SUCCESS: Re-subscription after cancel works correctly")
 }
 
-// TestSubscriptionLifecycle_SubscriptionState tests that subscription state is managed correctly
+// TestSubscriptionLifecycle_SubscriptionState tests that subscription state is managed correctly.
 func TestSubscriptionLifecycle_SubscriptionState(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
@@ -383,38 +385,4 @@ func TestSubscriptionLifecycle_SubscriptionState(t *testing.T) {
 	assert.True(t, sub.IsCancelled())
 
 	t.Log("SUCCESS: Subscription state management works correctly")
-}
-
-// createTestHostPair creates two connected libp2p hosts for testing
-func createTestHostPair(t *testing.T, ctx context.Context) (host.Host, host.Host, func()) {
-	// Create private keys
-	priv1, _, err := crypto.GenerateKeyPair(crypto.RSA, 2048)
-	require.NoError(t, err)
-
-	priv2, _, err := crypto.GenerateKeyPair(crypto.RSA, 2048)
-	require.NoError(t, err)
-
-	// Create hosts
-	host1, err := libp2p.New(
-		libp2p.Identity(priv1),
-		libp2p.ListenAddrStrings("/ip4/127.0.0.1/tcp/0"),
-	)
-	require.NoError(t, err)
-
-	host2, err := libp2p.New(
-		libp2p.Identity(priv2),
-		libp2p.ListenAddrStrings("/ip4/127.0.0.1/tcp/0"),
-	)
-	require.NoError(t, err)
-
-	// Connect the hosts
-	err = host1.Connect(ctx, host2.Peerstore().PeerInfo(host2.ID()))
-	require.NoError(t, err)
-
-	cleanup := func() {
-		host1.Close()
-		host2.Close()
-	}
-
-	return host1, host2, cleanup
 }

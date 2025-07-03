@@ -8,13 +8,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub/v1"
+	v1 "github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub/v1"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// TestBackpressure_SlowConsumer tests behavior when message processing is slower than delivery
+// TestBackpressure_SlowConsumer tests behavior when message processing is slower than delivery.
 func TestBackpressure_SlowConsumer(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
@@ -109,6 +109,7 @@ func TestBackpressure_SlowConsumer(t *testing.T) {
 	require.Eventually(t, func() bool {
 		received := messagesReceived.Load()
 		t.Logf("Received %d/%d messages", received, numMessages)
+
 		return received == numMessages
 	}, 15*time.Second, 500*time.Millisecond, "All messages should be received quickly")
 
@@ -120,6 +121,7 @@ func TestBackpressure_SlowConsumer(t *testing.T) {
 	require.Eventually(t, func() bool {
 		processed := messagesProcessed.Load()
 		t.Logf("Processed %d/%d messages", processed, numMessages)
+
 		return processed == numMessages
 	}, 60*time.Second, 2*time.Second, "All messages should eventually be processed")
 
@@ -156,7 +158,7 @@ func TestBackpressure_SlowConsumer(t *testing.T) {
 	t.Log("SUCCESS: Slow consumer test completed - no blocking detected")
 }
 
-// TestBackpressure_MessageBuffering tests message buffering behavior
+// TestBackpressure_MessageBuffering tests message buffering behavior.
 func TestBackpressure_MessageBuffering(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
@@ -235,6 +237,7 @@ func TestBackpressure_MessageBuffering(t *testing.T) {
 		received := totalReceived.Load()
 		processed := batchProcessed.Load()
 		t.Logf("Received: %d, Processed: %d", received, processed)
+
 		return received == batchSize
 	}, 15*time.Second, 500*time.Millisecond, "All messages should be received")
 
@@ -249,13 +252,14 @@ func TestBackpressure_MessageBuffering(t *testing.T) {
 	require.Eventually(t, func() bool {
 		processed := batchProcessed.Load()
 		t.Logf("Processing resumed: %d/%d messages processed", processed, batchSize)
+
 		return processed == batchSize
 	}, 30*time.Second, 500*time.Millisecond, "All buffered messages should be processed")
 
 	t.Log("SUCCESS: Message buffering test completed")
 }
 
-// TestBackpressure_HighThroughputSustained tests sustained high throughput
+// TestBackpressure_HighThroughputSustained tests sustained high throughput.
 func TestBackpressure_HighThroughputSustained(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
@@ -285,7 +289,11 @@ func TestBackpressure_HighThroughputSustained(t *testing.T) {
 			// Report throughput every 100 messages
 			if count%100 == 0 {
 				now := time.Now()
-				lastReport := lastReportTime.Load().(time.Time)
+				lastReportValue := lastReportTime.Load()
+				lastReport, ok := lastReportValue.(time.Time)
+				if !ok {
+					lastReport = time.Time{}
+				}
 				if !lastReport.IsZero() {
 					duration := now.Sub(lastReport)
 					rate := float64(100) / duration.Seconds()
@@ -345,6 +353,7 @@ publishLoop:
 			err = v1.Publish(nodes[1].Gossipsub, topic, msg)
 			if err != nil {
 				t.Errorf("Failed to publish message %d: %v", messagesSent, err)
+
 				continue
 			}
 
@@ -366,6 +375,7 @@ publishLoop:
 		processed := messagesProcessed.Load()
 		rate := float64(processed) / time.Since(startTime).Seconds()
 		t.Logf("Processed %d/%d messages (rate: %.2f msg/sec)", processed, messagesSent, rate)
+
 		return processed == int64(messagesSent)
 	}, 60*time.Second, 2*time.Second, "All messages should be processed")
 
@@ -387,7 +397,7 @@ publishLoop:
 	t.Log("SUCCESS: Sustained high throughput test completed")
 }
 
-// TestBackpressure_ProcessorFailureRecovery tests recovery from processor failures
+// TestBackpressure_ProcessorFailureRecovery tests recovery from processor failures.
 func TestBackpressure_ProcessorFailureRecovery(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
@@ -415,11 +425,13 @@ func TestBackpressure_ProcessorFailureRecovery(t *testing.T) {
 			if shouldFail.Load() {
 				errors := processingErrors.Add(1)
 				t.Logf("💥 Simulated processor failure %d for message: %s", errors, msg.ID)
+
 				return fmt.Errorf("simulated processing failure")
 			}
 
 			processed := messagesProcessed.Add(1)
 			t.Logf("✅ Successfully processed message %d: %s", processed, msg.ID)
+
 			return nil
 		}),
 	)
@@ -483,6 +495,7 @@ func TestBackpressure_ProcessorFailureRecovery(t *testing.T) {
 	require.Eventually(t, func() bool {
 		processed := messagesProcessed.Load()
 		t.Logf("Recovery phase: %d messages processed successfully", processed)
+
 		return processed >= 5
 	}, 10*time.Second, 500*time.Millisecond, "Recovery messages should be processed")
 

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub/v1"
+	v1 "github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub/v1"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
 )
@@ -94,6 +94,7 @@ func TestMinimalReproduction_BeaconBlockBlocking(t *testing.T) {
 	require.Eventually(t, func() bool {
 		count := messageCount.Load()
 		t.Logf("Current message count: %d", count)
+
 		return count == 1
 	}, 10*time.Second, 200*time.Millisecond, "First message should be processed")
 
@@ -158,6 +159,7 @@ func TestMinimalReproduction_BeaconBlockBlocking(t *testing.T) {
 	// Verify third message is processed quickly (system should be working normally)
 	require.Eventually(t, func() bool {
 		count := messageCount.Load()
+
 		return count == 3
 	}, 5*time.Second, 200*time.Millisecond, "Third message should be processed quickly")
 
@@ -171,7 +173,7 @@ func TestMinimalReproduction_BeaconBlockBlocking(t *testing.T) {
 	}
 }
 
-// TestMinimalReproduction_NextMethodDirectInspection provides direct debugging of the Next() method
+// TestMinimalReproduction_NextMethodDirectInspection provides direct debugging of the Next() method.
 func TestMinimalReproduction_NextMethodDirectInspection(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
@@ -185,7 +187,7 @@ func TestMinimalReproduction_NextMethodDirectInspection(t *testing.T) {
 	require.NoError(t, err)
 
 	// Track timing of Next() calls
-	var nextCallTimes []time.Time
+	nextCallTimes := make([]time.Time, 0)
 	var processingTimes []time.Duration
 
 	// Create topic
@@ -279,7 +281,7 @@ func TestMinimalReproduction_NextMethodDirectInspection(t *testing.T) {
 	t.Log("✅ Next() method timing inspection completed")
 }
 
-// TestMinimalReproduction_SubscriptionStateMonitoring monitors subscription state during message flow
+// TestMinimalReproduction_SubscriptionStateMonitoring monitors subscription state during message flow.
 func TestMinimalReproduction_SubscriptionStateMonitoring(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -304,6 +306,7 @@ func TestMinimalReproduction_SubscriptionStateMonitoring(t *testing.T) {
 		v1.WithProcessor(func(ctx context.Context, msg GossipTestMessage, from peer.ID) error {
 			count := messageCount.Add(1)
 			t.Logf("📨 State Monitor: Processing message %d (%s)", count, msg.ID)
+
 			return nil
 		}),
 	)
@@ -331,6 +334,7 @@ func TestMinimalReproduction_SubscriptionStateMonitoring(t *testing.T) {
 			case <-ticker.C:
 				if sub.IsCancelled() {
 					t.Log("⚠️  Subscription cancelled unexpectedly!")
+
 					return
 				}
 
@@ -364,6 +368,7 @@ func TestMinimalReproduction_SubscriptionStateMonitoring(t *testing.T) {
 			count := messageCount.Load()
 			isActive := !sub.IsCancelled()
 			t.Logf("Waiting: count=%d, subscription_active=%v", count, isActive)
+
 			return count == int64(i+1)
 		}, 10*time.Second, 200*time.Millisecond,
 			fmt.Sprintf("Message %d should be processed", i+1))

@@ -58,15 +58,7 @@ type AttestationMetrics struct {
 	processingErrors      map[uint64]uint64
 }
 
-// ExampleAttestationSetup demonstrates how to set up attestation subnet handlers
-// with dynamic subscription management using the v1 API.
-//
-// This example shows:
-// 1. Setting up the attestation handler and pool
-// 2. Creating gossipsub with attestation-optimized settings
-// 3. Managing dynamic subnet subscriptions
-// 4. Handling attestation validation and processing
-// 5. Monitoring metrics across subnets
+// 5. Monitoring metrics across subnets.
 func ExampleAttestationSetup(ctx context.Context, log logrus.FieldLogger) error {
 	// Create a libp2p host
 	h, err := libp2p.New(
@@ -116,7 +108,12 @@ func ExampleAttestationSetup(ctx context.Context, log logrus.FieldLogger) error 
 	if err != nil {
 		return fmt.Errorf("failed to create gossipsub: %w", err)
 	}
-	defer gs.Stop()
+
+	defer func() {
+		if err := gs.Stop(); err != nil {
+			log.WithError(err).Error("Failed to stop gossipsub")
+		}
+	}()
 
 	handler.gs = gs
 
@@ -153,6 +150,7 @@ func ExampleAttestationSetup(ctx context.Context, log logrus.FieldLogger) error 
 
 	// Keep running until context is cancelled
 	<-ctx.Done()
+
 	return nil
 }
 
@@ -191,8 +189,8 @@ func (h *AttestationHandler) subscribeToSubnet(ctx context.Context, subnet uint6
 	)
 
 	// Register the handler
-	if err := v1.Register(h.gs.Registry(), typedTopic, handlerConfig); err != nil {
-		return fmt.Errorf("failed to register handler for subnet %d: %w", subnet, err)
+	if regErr := v1.Register(h.gs.Registry(), typedTopic, handlerConfig); regErr != nil {
+		return fmt.Errorf("failed to register handler for subnet %d: %w", subnet, regErr)
 	}
 
 	// Subscribe to the topic
@@ -248,8 +246,10 @@ func (h *AttestationHandler) validateAttestationSubnet(
 	h.metrics.incrementReceived(subnet)
 
 	// Add timeout for validation
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	validationCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
+
+	_ = validationCtx // Context available for future use
 
 	// Validate basic attestation structure
 	if att == nil || att.Data == nil {
@@ -258,6 +258,7 @@ func (h *AttestationHandler) validateAttestationSubnet(
 			"from":   from,
 		}).Debug("received nil attestation or data")
 		h.metrics.incrementValidationError(subnet)
+
 		return v1.ValidationReject
 	}
 
@@ -271,6 +272,7 @@ func (h *AttestationHandler) validateAttestationSubnet(
 			"committee_index": att.Data.CommitteeIndex,
 		}).Debug("attestation on wrong subnet")
 		h.metrics.incrementValidationError(subnet)
+
 		return v1.ValidationReject
 	}
 
@@ -286,6 +288,7 @@ func (h *AttestationHandler) validateAttestationSubnet(
 			"current_slot": currentSlot,
 		}).Debug("attestation from future slot")
 		h.metrics.incrementValidationError(subnet)
+
 		return v1.ValidationIgnore // Future attestations are ignored, not rejected
 	}
 
@@ -297,13 +300,15 @@ func (h *AttestationHandler) validateAttestationSubnet(
 			"current_slot": currentSlot,
 		}).Debug("attestation too old")
 		h.metrics.incrementValidationError(subnet)
+
 		return v1.ValidationIgnore
 	}
 
 	// Check aggregation bits length
-	if att.AggregationBits == nil || len(att.AggregationBits) == 0 {
+	if len(att.AggregationBits) == 0 {
 		h.log.WithField("subnet", subnet).Debug("invalid aggregation bits")
 		h.metrics.incrementValidationError(subnet)
+
 		return v1.ValidationReject
 	}
 
@@ -314,6 +319,7 @@ func (h *AttestationHandler) validateAttestationSubnet(
 			"sig_len": len(att.Signature),
 		}).Debug("invalid signature length")
 		h.metrics.incrementValidationError(subnet)
+
 		return v1.ValidationReject
 	}
 
@@ -342,8 +348,10 @@ func (h *AttestationHandler) processAttestationSubnet(
 	subnet uint64,
 ) error {
 	// Add timeout for processing
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	processCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
+
+	_ = processCtx // Context available for future use
 
 	// Add to attestation pool
 	if err := h.pool.Add(att); err != nil {
@@ -353,6 +361,7 @@ func (h *AttestationHandler) processAttestationSubnet(
 			"error":  err,
 		}).Error("failed to add attestation to pool")
 		h.metrics.incrementProcessingError(subnet)
+
 		return fmt.Errorf("failed to add to pool: %w", err)
 	}
 
@@ -393,6 +402,7 @@ func (h *AttestationHandler) manageDynamicSubnets(ctx context.Context, forkDiges
 // rotateSubnets demonstrates how to change subnet subscriptions.
 func (h *AttestationHandler) rotateSubnets(ctx context.Context, forkDigest [4]byte, events chan<- v1.Event) {
 	h.mu.RLock()
+
 	currentSubnets := make([]uint64, 0, len(h.activeSubnets))
 	for subnet := range h.activeSubnets {
 		currentSubnets = append(currentSubnets, subnet)
@@ -400,13 +410,23 @@ func (h *AttestationHandler) rotateSubnets(ctx context.Context, forkDigest [4]by
 	h.mu.RUnlock()
 
 	// Simulate new duty assignment (in production, get this from beacon node)
-	newSubnet := uint64(time.Now().Unix() % topics.AttestationSubnetCount)
+	unixTime := time.Now().Unix()
+
+	var newSubnet uint64
+
+	if unixTime >= 0 {
+		newSubnet = uint64(unixTime) % topics.AttestationSubnetCount
+	} else {
+		newSubnet = 0 // Fallback for negative time (should never happen)
+	}
 
 	// Check if we're already subscribed
 	alreadySubscribed := false
+
 	for _, subnet := range currentSubnets {
 		if subnet == newSubnet {
 			alreadySubscribed = true
+
 			break
 		}
 	}
@@ -452,6 +472,7 @@ func (h *AttestationHandler) publishExampleAttestation(ctx context.Context, subn
 	if err != nil {
 		return fmt.Errorf("failed to create topic for subnet %d: %w", subnet, err)
 	}
+
 	typedTopic, err := v1.NewTopic[*eth.Attestation](topic.Name())
 	if err != nil {
 		return fmt.Errorf("failed to create typed topic: %w", err)
@@ -524,6 +545,7 @@ func computeSubnetForAttestation(att *eth.Attestation) uint64 {
 
 	// Simplified subnet calculation (production uses proper spec algorithm)
 	committeeIndex := uint64(att.Data.CommitteeIndex)
+
 	return committeeIndex % topics.AttestationSubnetCount
 }
 
@@ -600,30 +622,35 @@ func (p *AttestationPool) Count() int {
 func (m *AttestationMetrics) incrementReceived(subnet uint64) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
 	m.attestationsReceived[subnet]++
 }
 
 func (m *AttestationMetrics) incrementValidated(subnet uint64) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
 	m.attestationsValidated[subnet]++
 }
 
 func (m *AttestationMetrics) incrementProcessed(subnet uint64) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
 	m.attestationsProcessed[subnet]++
 }
 
 func (m *AttestationMetrics) incrementValidationError(subnet uint64) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
 	m.validationErrors[subnet]++
 }
 
 func (m *AttestationMetrics) incrementProcessingError(subnet uint64) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
 	m.processingErrors[subnet]++
 }
 
@@ -648,5 +675,6 @@ func (h *AttestationHandler) GetActiveSubnets() []uint64 {
 	for subnet := range h.activeSubnets {
 		subnets = append(subnets, subnet)
 	}
+
 	return subnets
 }

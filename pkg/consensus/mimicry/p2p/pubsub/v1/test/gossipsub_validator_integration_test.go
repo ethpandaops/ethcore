@@ -7,13 +7,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub/v1"
+	v1 "github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub/v1"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// TestValidatorIntegration_ValidatorBlocking checks if validator execution blocks message delivery
+// TestValidatorIntegration_ValidatorBlocking checks if validator execution blocks message delivery.
 func TestValidatorIntegration_ValidatorBlocking(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
@@ -44,11 +44,13 @@ func TestValidatorIntegration_ValidatorBlocking(t *testing.T) {
 			time.Sleep(2 * time.Second)
 
 			t.Logf("🔍 Validator: Completed validation for message %d (%s)", count, msg.ID)
+
 			return v1.ValidationAccept
 		}),
 		v1.WithProcessor(func(ctx context.Context, msg GossipTestMessage, from peer.ID) error {
 			count := messageCount.Add(1)
 			t.Logf("📨 Processor: Processing message %d (%s)", count, msg.ID)
+
 			return nil
 		}),
 	)
@@ -95,6 +97,7 @@ func TestValidatorIntegration_ValidatorBlocking(t *testing.T) {
 	require.Eventually(t, func() bool {
 		count := validationCount.Load()
 		t.Logf("Validation count: %d", count)
+
 		return count >= 1
 	}, 5*time.Second, 200*time.Millisecond, "First validation should start quickly")
 
@@ -103,13 +106,14 @@ func TestValidatorIntegration_ValidatorBlocking(t *testing.T) {
 		validations := validationCount.Load()
 		messages := messageCount.Load()
 		t.Logf("Validations: %d, Messages processed: %d", validations, messages)
+
 		return validations == 3 && messages == 3
 	}, 15*time.Second, 500*time.Millisecond, "All messages should be validated and processed")
 
 	t.Log("SUCCESS: Validator execution doesn't block message delivery")
 }
 
-// TestValidatorIntegration_ValidatorRejectionImpact verifies rejected messages don't block subsequent messages
+// TestValidatorIntegration_ValidatorRejectionImpact verifies rejected messages don't block subsequent messages.
 func TestValidatorIntegration_ValidatorRejectionImpact(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -140,15 +144,18 @@ func TestValidatorIntegration_ValidatorRejectionImpact(t *testing.T) {
 			if msg.ID[len(msg.ID)-1]%2 == 0 {
 				rejectedCount.Add(1)
 				t.Logf("❌ Validator: Rejecting message %d (%s)", count, msg.ID)
+
 				return v1.ValidationReject
 			}
 
 			t.Logf("✅ Validator: Accepting message %d (%s)", count, msg.ID)
+
 			return v1.ValidationAccept
 		}),
 		v1.WithProcessor(func(ctx context.Context, msg GossipTestMessage, from peer.ID) error {
 			count := messageCount.Add(1)
 			t.Logf("📨 Processor: Processing accepted message %d (%s)", count, msg.ID)
+
 			return nil
 		}),
 	)
@@ -188,6 +195,7 @@ func TestValidatorIntegration_ValidatorRejectionImpact(t *testing.T) {
 		rejected := rejectedCount.Load()
 
 		t.Logf("Validations: %d, Processed: %d, Rejected: %d", validations, processed, rejected)
+
 		return validations == 10
 	}, 15*time.Second, 500*time.Millisecond, "All messages should be validated")
 
@@ -203,7 +211,7 @@ func TestValidatorIntegration_ValidatorRejectionImpact(t *testing.T) {
 	t.Log("SUCCESS: Rejected messages don't prevent future message deliveries")
 }
 
-// TestValidatorIntegration_ValidatorErrorHandling tests validator error scenarios
+// TestValidatorIntegration_ValidatorErrorHandling tests validator error scenarios.
 func TestValidatorIntegration_ValidatorErrorHandling(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
 	defer cancel()
@@ -234,15 +242,18 @@ func TestValidatorIntegration_ValidatorErrorHandling(t *testing.T) {
 			if msg.Content == "error message" {
 				errorCount.Add(1)
 				t.Logf("💥 Validator: Error for message %d (%s)", count, msg.ID)
+
 				return v1.ValidationIgnore // Treat errors as ignore
 			}
 
 			t.Logf("✅ Validator: Success for message %d (%s)", count, msg.ID)
+
 			return v1.ValidationAccept
 		}),
 		v1.WithProcessor(func(ctx context.Context, msg GossipTestMessage, from peer.ID) error {
 			count := messageCount.Add(1)
 			t.Logf("📨 Processor: Processing message %d (%s)", count, msg.ID)
+
 			return nil
 		}),
 	)
@@ -290,6 +301,7 @@ func TestValidatorIntegration_ValidatorErrorHandling(t *testing.T) {
 	// Wait for all validations
 	require.Eventually(t, func() bool {
 		validations := validationCount.Load()
+
 		return validations == int64(len(messages))
 	}, 10*time.Second, 200*time.Millisecond, "All messages should be validated")
 
@@ -305,7 +317,7 @@ func TestValidatorIntegration_ValidatorErrorHandling(t *testing.T) {
 	t.Log("SUCCESS: Validator errors don't break message processing")
 }
 
-// TestValidatorIntegration_ConcurrentValidation tests concurrent validation behavior
+// TestValidatorIntegration_ConcurrentValidation tests concurrent validation behavior.
 func TestValidatorIntegration_ConcurrentValidation(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -349,6 +361,7 @@ func TestValidatorIntegration_ConcurrentValidation(t *testing.T) {
 		v1.WithProcessor(func(ctx context.Context, msg GossipTestMessage, from peer.ID) error {
 			count := messageCount.Add(1)
 			t.Logf("📨 Processor: Processing message %d (%s)", count, msg.ID)
+
 			return nil
 		}),
 	)
@@ -390,6 +403,7 @@ func TestValidatorIntegration_ConcurrentValidation(t *testing.T) {
 	// Wait for all messages to be processed
 	require.Eventually(t, func() bool {
 		count := messageCount.Load()
+
 		return count == 3
 	}, 15*time.Second, 200*time.Millisecond, "All messages should be processed")
 

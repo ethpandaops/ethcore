@@ -18,7 +18,7 @@ type TestMessage struct {
 	Value   int
 }
 
-// TestMessageEncoder implements the Encoder interface for TestMessage
+// TestMessageEncoder implements the Encoder interface for TestMessage.
 type TestMessageEncoder struct{}
 
 func (e *TestMessageEncoder) Encode(msg TestMessage) ([]byte, error) {
@@ -39,6 +39,7 @@ func TestHandlerConfig(t *testing.T) {
 			if msg.Content == "invalid" {
 				return v1.ValidationReject
 			}
+
 			return v1.ValidationAccept
 		}
 
@@ -46,6 +47,7 @@ func TestHandlerConfig(t *testing.T) {
 			if msg.Content == "error" {
 				return errors.New("processing error")
 			}
+
 			return nil
 		}
 
@@ -111,12 +113,14 @@ func TestHandlerConfig(t *testing.T) {
 		subnetValidator := v1.SubnetValidator[TestMessage](func(ctx context.Context, msg TestMessage, from peer.ID, subnet uint64) v1.ValidationResult {
 			subnetValidatorCalled = true
 			assert.Equal(t, uint64(42), subnet)
+
 			return v1.ValidationAccept
 		})
 
 		subnetProcessor := v1.SubnetProcessor[TestMessage](func(ctx context.Context, msg TestMessage, from peer.ID, subnet uint64) error {
 			subnetProcessorCalled = true
 			assert.Equal(t, uint64(42), subnet)
+
 			return nil
 		})
 

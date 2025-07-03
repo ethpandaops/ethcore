@@ -9,13 +9,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub/v1"
+	v1 "github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub/v1"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// TestStress_HighVolumeMessages tests system behavior under high message volume
+// TestStress_HighVolumeMessages tests system behavior under high message volume.
 func TestStress_HighVolumeMessages(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
@@ -109,6 +109,7 @@ func TestStress_HighVolumeMessages(t *testing.T) {
 			rate := float64(count) / elapsed.Seconds()
 			t.Logf("Processing: %d/%d messages (%.2f msg/sec)", count, numMessages, rate)
 		}
+
 		return count == numMessages
 	}, 60*time.Second, 1*time.Second, "All messages should be processed")
 
@@ -121,18 +122,18 @@ func TestStress_HighVolumeMessages(t *testing.T) {
 	mu.Lock()
 	if len(processingTimes) > 0 {
 		var total time.Duration
-		var max time.Duration
+		var maxTime time.Duration
 		for _, pt := range processingTimes {
 			total += pt
-			if pt > max {
-				max = pt
+			if pt > maxTime {
+				maxTime = pt
 			}
 		}
 		avgProcessing := total / time.Duration(len(processingTimes))
-		t.Logf("Processing time stats: avg=%v, max=%v", avgProcessing, max)
+		t.Logf("Processing time stats: avg=%v, max=%v", avgProcessing, maxTime)
 
 		// Check that no processing took too long (indicating blocking)
-		assert.Less(t, max, 100*time.Millisecond, "No single message should take too long to process")
+		assert.Less(t, maxTime, 100*time.Millisecond, "No single message should take too long to process")
 	}
 	mu.Unlock()
 
@@ -140,7 +141,7 @@ func TestStress_HighVolumeMessages(t *testing.T) {
 	assert.False(t, sub.IsCancelled(), "Subscription should remain active after stress test")
 }
 
-// TestStress_ConcurrentPublishers tests multiple publishers sending simultaneously
+// TestStress_ConcurrentPublishers tests multiple publishers sending simultaneously.
 func TestStress_ConcurrentPublishers(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
@@ -179,6 +180,7 @@ func TestStress_ConcurrentPublishers(t *testing.T) {
 					if pubCount%50 == 0 {
 						t.Logf("Received %d messages from publisher %d", pubCount, i)
 					}
+
 					break
 				}
 			}
@@ -226,6 +228,7 @@ func TestStress_ConcurrentPublishers(t *testing.T) {
 				err := v1.Publish(pub.Gossipsub, topic, msg)
 				if err != nil {
 					t.Errorf("Publisher %d failed to publish message %d: %v", publisherID, j, err)
+
 					return
 				}
 
@@ -248,6 +251,7 @@ func TestStress_ConcurrentPublishers(t *testing.T) {
 	require.Eventually(t, func() bool {
 		count := totalProcessed.Load()
 		t.Logf("Processed %d/%d messages", count, expectedTotal)
+
 		return count == expectedTotal
 	}, 45*time.Second, 2*time.Second, "All messages should be processed")
 
@@ -265,7 +269,7 @@ func TestStress_ConcurrentPublishers(t *testing.T) {
 	}
 }
 
-// TestStress_MemoryPressure tests behavior under memory pressure
+// TestStress_MemoryPressure tests behavior under memory pressure.
 func TestStress_MemoryPressure(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
@@ -356,6 +360,7 @@ func TestStress_MemoryPressure(t *testing.T) {
 			t.Logf("Processing under memory pressure: %d/%d messages, HeapAlloc: %d MB",
 				count, numMessages, m.HeapAlloc/1024/1024)
 		}
+
 		return count == numMessages
 	}, 30*time.Second, 1*time.Second, "All messages should be processed under memory pressure")
 
@@ -374,7 +379,7 @@ func TestStress_MemoryPressure(t *testing.T) {
 	assert.False(t, sub.IsCancelled(), "Subscription should remain active after memory pressure test")
 }
 
-// TestStress_RapidSubscribeUnsubscribe tests rapid subscription changes
+// TestStress_RapidSubscribeUnsubscribe tests rapid subscription changes.
 func TestStress_RapidSubscribeUnsubscribe(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
@@ -390,8 +395,8 @@ func TestStress_RapidSubscribeUnsubscribe(t *testing.T) {
 	// Create multiple topics for stress testing
 	topics := make([]*v1.Topic[GossipTestMessage], 5)
 	for i := 0; i < 5; i++ {
-		topic, err := CreateTestTopic(fmt.Sprintf("rapid-topic-%d", i))
-		require.NoError(t, err)
+		topic, topicErr := CreateTestTopic(fmt.Sprintf("rapid-topic-%d", i))
+		require.NoError(t, topicErr)
 		topics[i] = topic
 	}
 
@@ -430,9 +435,10 @@ func TestStress_RapidSubscribeUnsubscribe(t *testing.T) {
 				topic := topics[topicIndex]
 
 				// Subscribe
-				sub, err := v1.Subscribe(ctx, node.Gossipsub, topic)
-				if err != nil {
-					t.Errorf("Node %d failed to subscribe to topic %d: %v", nodeID, topicIndex, err)
+				sub, subErr := v1.Subscribe(ctx, node.Gossipsub, topic)
+				if subErr != nil {
+					t.Errorf("Node %d failed to subscribe to topic %d: %v", nodeID, topicIndex, subErr)
+
 					continue
 				}
 

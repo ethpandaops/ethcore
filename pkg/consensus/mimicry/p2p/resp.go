@@ -94,17 +94,21 @@ func (r *ReqResp) ReadResponseBytes(ctx context.Context, stream network.Stream) 
 
 	// Read the varint length prefix
 	var length uint64
+
 	buf := make([]byte, 1)
 	shift := uint(0)
+
 	for {
 		if _, err := io.ReadFull(stream, buf); err != nil {
 			return nil, fmt.Errorf("failed to read varint: %w", err)
 		}
 
 		length |= uint64(buf[0]&0x7F) << shift
+
 		if buf[0]&0x80 == 0 {
 			break
 		}
+
 		shift += 7
 		if shift >= 64 {
 			return nil, fmt.Errorf("varint overflows uint64")
@@ -115,6 +119,7 @@ func (r *ReqResp) ReadResponseBytes(ctx context.Context, stream network.Stream) 
 	if length == 0 {
 		return nil, fmt.Errorf("zero length response")
 	}
+
 	if length > 10_000_000 { // 10MB max
 		return nil, fmt.Errorf("response too large: %d bytes", length)
 	}
@@ -162,11 +167,14 @@ func (r *ReqResp) WriteResponseBytes(ctx context.Context, stream network.Stream,
 		// Write varint length prefix
 		length := uint64(len(compressedData))
 		varintBuf := make([]byte, 0, 10)
+
 		for {
 			if length < 0x80 {
 				varintBuf = append(varintBuf, byte(length))
+
 				break
 			}
+
 			varintBuf = append(varintBuf, byte(length&0x7F|0x80))
 			length >>= 7
 		}

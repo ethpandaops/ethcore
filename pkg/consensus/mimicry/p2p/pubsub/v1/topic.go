@@ -39,6 +39,7 @@ func (t *Topic[T]) Name() string {
 func (t *Topic[T]) WithForkDigest(forkDigest [4]byte) *Topic[T] {
 	// Format: /eth2/<fork_digest>/<topic_name>/ssz_snappy
 	name := fmt.Sprintf("/eth2/%x/%s/ssz_snappy", forkDigest, t.name)
+
 	return &Topic[T]{
 		name: name,
 	}
@@ -55,9 +56,11 @@ func NewSubnetTopic[T any](pattern string, maxSubnets uint64) (*SubnetTopic[T], 
 	if pattern == "" {
 		return nil, fmt.Errorf("subnet topic pattern cannot be empty")
 	}
+
 	if !strings.Contains(pattern, "%d") {
 		return nil, fmt.Errorf("subnet topic pattern must contain '%%d' placeholder for subnet ID")
 	}
+
 	if maxSubnets == 0 {
 		return nil, fmt.Errorf("maxSubnets must be greater than 0")
 	}
@@ -99,6 +102,7 @@ func (st *SubnetTopic[T]) ParseSubnet(topicName string) (uint64, error) {
 
 	// Find where the pattern starts and ends
 	patternPrefix := strings.Split(st.pattern, "%d")[0]
+
 	patternSuffix := ""
 	if parts := strings.Split(st.pattern, "%d"); len(parts) > 1 {
 		patternSuffix = parts[1]

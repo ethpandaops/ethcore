@@ -13,21 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// sszSnappyEncoder provides SSZ+Snappy encoding for Ethereum types
-type sszSnappyEncoder[T any] struct{}
-
-func (e *sszSnappyEncoder[T]) Encode(msg T) ([]byte, error) {
-	// In production, this would use SSZ+Snappy encoding
-	// For testing, we'll use a simple placeholder
-	return []byte("encoded"), nil
-}
-
-func (e *sszSnappyEncoder[T]) Decode(data []byte) (T, error) {
-	var msg T
-	// In production, this would use SSZ+Snappy decoding
-	return msg, nil
-}
-
 func TestEthereumTopicsIntegration(t *testing.T) {
 	// Skip this test as it requires networking infrastructure
 	t.Skip("Integration test requires actual networking")
@@ -53,11 +38,19 @@ func TestEthereumTopicsIntegration(t *testing.T) {
 	// Create v1 gossipsub instances
 	gs1, err := v1.New(ctx, h1, v1.WithLogger(logger.WithField("node", "1")))
 	require.NoError(t, err)
-	defer gs1.Stop()
+	defer func() {
+		if stopErr := gs1.Stop(); stopErr != nil {
+			t.Logf("Error stopping gs1: %v", stopErr)
+		}
+	}()
 
 	gs2, err := v1.New(ctx, h2, v1.WithLogger(logger.WithField("node", "2")))
 	require.NoError(t, err)
-	defer gs2.Stop()
+	defer func() {
+		if stopErr := gs2.Stop(); stopErr != nil {
+			t.Logf("Error stopping gs2: %v", stopErr)
+		}
+	}()
 
 	t.Run("BeaconBlockPubSub", func(t *testing.T) {
 		// NOTE: In a real implementation, topics would have proper encoders set

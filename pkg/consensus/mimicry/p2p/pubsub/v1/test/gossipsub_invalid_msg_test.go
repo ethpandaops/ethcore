@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub/v1"
+	v1 "github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub/v1"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/prometheus/client_golang/prometheus"
 	io_prometheus_client "github.com/prometheus/client_model/go"
@@ -16,7 +16,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// MalformedEncoder is an encoder that can produce malformed messages
+const (
+	badTopicName = "bad-topic"
+	topicLabel   = "topic"
+)
+
+// MalformedEncoder is an encoder that can produce malformed messages.
 type MalformedEncoder struct {
 	// Controls whether encoding produces valid data
 	EncodeValid bool
@@ -40,6 +45,7 @@ func (e *MalformedEncoder) Encode(msg GossipTestMessage) ([]byte, error) {
 
 	// Normal encoding
 	encoded := fmt.Sprintf("%s|%s|%s", msg.ID, msg.Content, msg.From)
+
 	return []byte(encoded), nil
 }
 
@@ -48,15 +54,17 @@ func (e *MalformedEncoder) Decode(data []byte) (GossipTestMessage, error) {
 		if e.DecodeError != nil {
 			return GossipTestMessage{}, e.DecodeError
 		}
+
 		return GossipTestMessage{}, fmt.Errorf("decoding failed: malformed data")
 	}
 
 	// Use the standard test encoder logic
 	encoder := &TestEncoder{}
+
 	return encoder.Decode(data)
 }
 
-// InvalidPayloadCollector collects invalid payload handler calls
+// InvalidPayloadCollector collects invalid payload handler calls.
 type InvalidPayloadCollector struct {
 	mu       sync.Mutex
 	payloads []InvalidPayload
@@ -102,12 +110,14 @@ func (c *InvalidPayloadCollector) GetPayloads() []InvalidPayload {
 	defer c.mu.Unlock()
 	result := make([]InvalidPayload, len(c.payloads))
 	copy(result, c.payloads)
+
 	return result
 }
 
 func (c *InvalidPayloadCollector) Count() int {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
 	return len(c.payloads)
 }
 
@@ -249,8 +259,8 @@ func TestTopicSpecificInvalidPayloadHandler(t *testing.T) {
 				collectorA.CollectWithoutTopic(ctx, data, err, from)
 			}),
 		)
-		err := v1.Register(nodes[i].Gossipsub.Registry(), topicA, handlerA)
-		require.NoError(t, err)
+		regErr := v1.Register(nodes[i].Gossipsub.Registry(), topicA, handlerA)
+		require.NoError(t, regErr)
 		_, err = v1.Subscribe(ctx, nodes[i].Gossipsub, topicA)
 		require.NoError(t, err)
 
@@ -624,8 +634,8 @@ func TestInvalidMessageMetricsRecording(t *testing.T) {
 	// Create nodes with metrics
 	nodes := make([]*TestNode, 2)
 	for i := 0; i < 2; i++ {
-		node, err := ti.CreateNode(ctx, v1.WithMetrics(metrics))
-		require.NoError(t, err)
+		node, nodeErr := ti.CreateNode(ctx, v1.WithMetrics(metrics))
+		require.NoError(t, nodeErr)
 		nodes[i] = node
 	}
 
@@ -641,7 +651,7 @@ func TestInvalidMessageMetricsRecording(t *testing.T) {
 		DecodeSuccess: false,
 		DecodeError:   errors.New("metrics test error"),
 	}
-	badTopic, err := v1.NewTopic[GossipTestMessage]("bad-topic")
+	badTopic, err := v1.NewTopic[GossipTestMessage](badTopicName)
 	require.NoError(t, err)
 
 	// Track metrics state
@@ -654,7 +664,7 @@ func TestInvalidMessageMetricsRecording(t *testing.T) {
 		if mf.GetName() == "test_messages_received_total" {
 			for _, m := range mf.GetMetric() {
 				for _, lp := range m.GetLabel() {
-					if lp.GetName() == "topic" && lp.GetValue() == "bad-topic" {
+					if lp.GetName() == topicLabel && lp.GetValue() == badTopicName {
 						initialReceived = m.GetCounter().GetValue()
 					}
 				}
@@ -673,8 +683,8 @@ func TestInvalidMessageMetricsRecording(t *testing.T) {
 				return v1.ValidationAccept
 			}),
 		)
-		err := v1.Register(node.Gossipsub.Registry(), goodTopic, goodHandler)
-		require.NoError(t, err)
+		regErr := v1.Register(node.Gossipsub.Registry(), goodTopic, goodHandler)
+		require.NoError(t, regErr)
 
 		// Bad topic
 		badHandler := v1.NewHandlerConfig[GossipTestMessage](
@@ -731,11 +741,11 @@ func TestInvalidMessageMetricsRecording(t *testing.T) {
 		case "test_messages_received_total":
 			for _, m := range mf.GetMetric() {
 				for _, lp := range m.GetLabel() {
-					if lp.GetName() == "topic" {
+					if lp.GetName() == topicLabel {
 						switch lp.GetValue() {
 						case "good-topic":
 							goodReceived = m.GetCounter().GetValue()
-						case "bad-topic":
+						case badTopicName:
 							badReceived = m.GetCounter().GetValue()
 						}
 					}
@@ -744,13 +754,13 @@ func TestInvalidMessageMetricsRecording(t *testing.T) {
 		case "test_messages_validated_total":
 			for _, m := range mf.GetMetric() {
 				for _, lp := range m.GetLabel() {
-					if lp.GetName() == "topic" {
+					if lp.GetName() == topicLabel {
 						switch lp.GetValue() {
 						case "good-topic":
 							if getLabel(m.GetLabel(), "result") == "accept" {
 								goodValidated = m.GetCounter().GetValue()
 							}
-						case "bad-topic":
+						case badTopicName:
 							if getLabel(m.GetLabel(), "result") == "accept" {
 								badValidated = m.GetCounter().GetValue()
 							}
@@ -770,13 +780,14 @@ func TestInvalidMessageMetricsRecording(t *testing.T) {
 	assert.Equal(t, initialValidated, badValidated, "Bad topic should not have validated messages due to decode error")
 }
 
-// Helper function to get label value from label pairs
+// Helper function to get label value from label pairs.
 func getLabel(labels []*io_prometheus_client.LabelPair, name string) string {
 	for _, lp := range labels {
 		if lp.GetName() == name {
 			return lp.GetValue()
 		}
 	}
+
 	return ""
 }
 

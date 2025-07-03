@@ -27,8 +27,14 @@ func (s *SnappyCompressor) Decompress(data []byte) ([]byte, error) {
 		return nil, errors.Wrap(err, "failed to get decoded length")
 	}
 
-	if s.maxLength > 0 && uint64(decodedLen) > s.maxLength {
-		return nil, errors.Errorf("decompressed data exceeds max length: %d > %d", decodedLen, s.maxLength)
+	if s.maxLength > 0 {
+		if decodedLen < 0 {
+			return nil, errors.Errorf("invalid decoded length: %d", decodedLen)
+		}
+
+		if uint64(decodedLen) > s.maxLength {
+			return nil, errors.Errorf("decompressed data exceeds max length: %d > %d", decodedLen, s.maxLength)
+		}
 	}
 
 	return snappy.Decode(nil, data)

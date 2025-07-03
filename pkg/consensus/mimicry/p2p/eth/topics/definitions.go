@@ -60,7 +60,7 @@ var (
 	)
 
 	// SyncCommittee represents sync committee subnet topics.
-	SyncCommittee = mustCreateSubnetTopic[*eth.SyncCommitteeMessage](
+	SyncCommittee = mustCreateSubnetTopic[*eth.SyncCommitteeMessage]( //nolint:staticcheck // Using deprecated prysm type for compatibility
 		SyncCommitteeTopicPattern,
 		SyncCommitteeSubnetCount,
 	)
@@ -79,6 +79,7 @@ func mustCreateTopic[T any](name string) *v1.Topic[T] {
 	if err != nil {
 		panic(fmt.Sprintf("failed to create topic %s: %v", name, err))
 	}
+
 	return topic
 }
 
@@ -89,5 +90,6 @@ func mustCreateSubnetTopic[T any](pattern string, maxSubnets uint64) *v1.SubnetT
 	if err != nil {
 		panic(fmt.Sprintf("failed to create subnet topic %s: %v", pattern, err))
 	}
+
 	return topic
 }

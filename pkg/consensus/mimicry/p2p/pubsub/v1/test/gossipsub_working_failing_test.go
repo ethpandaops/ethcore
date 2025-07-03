@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub/v1"
+	v1 "github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub/v1"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -47,6 +47,7 @@ func TestWorkingEncoderFailingDecoder(t *testing.T) {
 		v1.WithDecoder[GossipTestMessage](failingDecoder),
 		v1.WithProcessor[GossipTestMessage](func(ctx context.Context, msg GossipTestMessage, from peer.ID) error {
 			t.Fatal("❌ Node 1 processor should not be called - decoding should fail")
+
 			return nil
 		}),
 		v1.WithInvalidPayloadHandler[GossipTestMessage](func(ctx context.Context, data []byte, err error, from peer.ID) {

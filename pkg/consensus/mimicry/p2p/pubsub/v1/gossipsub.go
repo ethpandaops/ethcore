@@ -39,7 +39,9 @@ func WithPublishTimeout(timeout time.Duration) Option {
 		if timeout <= 0 {
 			return fmt.Errorf("publish timeout must be positive, got %v", timeout)
 		}
+
 		g.publishTimeout = timeout
+
 		return nil
 	}
 }
@@ -48,6 +50,7 @@ func WithPublishTimeout(timeout time.Duration) Option {
 func WithGossipSubParams(params pubsub.GossipSubParams) Option {
 	return func(g *Gossipsub) error {
 		g.gossipSubParams = params
+
 		return nil
 	}
 }
@@ -80,6 +83,7 @@ func WithGlobalInvalidPayloadHandler(handler func(ctx context.Context, data []by
 func WithPubsubOptions(opts ...pubsub.Option) Option {
 	return func(g *Gossipsub) error {
 		g.pubsubOpts = append(g.pubsubOpts, opts...)
+
 		return nil
 	}
 }
@@ -128,6 +132,7 @@ func New(ctx context.Context, host host.Host, opts ...Option) (*Gossipsub, error
 	if ctx == nil {
 		return nil, fmt.Errorf("context cannot be nil")
 	}
+
 	if host == nil {
 		return nil, fmt.Errorf("host cannot be nil")
 	}
@@ -150,6 +155,7 @@ func New(ctx context.Context, host host.Host, opts ...Option) (*Gossipsub, error
 	for _, opt := range opts {
 		if err := opt(g); err != nil {
 			cancel()
+
 			return nil, fmt.Errorf("failed to apply option: %w", err)
 		}
 	}
@@ -157,6 +163,7 @@ func New(ctx context.Context, host host.Host, opts ...Option) (*Gossipsub, error
 	// Initialize libp2p pubsub
 	if err := g.initializePubSub(gossipCtx); err != nil {
 		cancel()
+
 		return nil, fmt.Errorf("failed to initialize pubsub: %w", err)
 	}
 
@@ -183,6 +190,7 @@ func (g *Gossipsub) initializePubSub(ctx context.Context) error {
 	}
 
 	g.pubsub = ps
+
 	return nil
 }
 
@@ -254,8 +262,8 @@ func Subscribe[T any](ctx context.Context, g *Gossipsub, topic *Topic[T]) (*Subs
 
 	// Apply score parameters if configured
 	if handler.scoreParams != nil {
-		if err := topicHandle.SetScoreParams(handler.scoreParams); err != nil {
-			return nil, fmt.Errorf("failed to set score params for topic %s: %w", topicName, err)
+		if scoreErr := topicHandle.SetScoreParams(handler.scoreParams); scoreErr != nil {
+			return nil, fmt.Errorf("failed to set score params for topic %s: %w", topicName, scoreErr)
 		}
 	}
 
@@ -269,6 +277,7 @@ func Subscribe[T any](ctx context.Context, g *Gossipsub, topic *Topic[T]) (*Subs
 	proc, procCtx, err := g.createProcessor(ctx, anyTopic, handler, libp2pSub)
 	if err != nil {
 		libp2pSub.Cancel()
+
 		return nil, fmt.Errorf("failed to create processor: %w", err)
 	}
 
@@ -348,6 +357,7 @@ func Publish[T any](g *Gossipsub, topic *Topic[T], msg T) error {
 	if handler == nil {
 		return fmt.Errorf("no handler registered for topic %s", topicName)
 	}
+
 	if handler.encoder == nil {
 		return fmt.Errorf("no encoder configured for topic %s", topicName)
 	}
@@ -358,6 +368,7 @@ func Publish[T any](g *Gossipsub, topic *Topic[T], msg T) error {
 		if g.metrics != nil {
 			g.metrics.RecordPublishError(topicName)
 		}
+
 		return fmt.Errorf("failed to encode message: %w", err)
 	}
 
@@ -368,17 +379,20 @@ func Publish[T any](g *Gossipsub, topic *Topic[T], msg T) error {
 			if g.metrics != nil {
 				g.metrics.RecordPublishError(topicName)
 			}
+
 			return fmt.Errorf("failed to compress message for topic %s: %w", topicName, err)
 		}
+
 		data = compressed
 	}
 
 	// Publish to the topic
-	if err := g.pubsub.Publish(topicName, data); err != nil {
+	if err := g.pubsub.Publish(topicName, data); err != nil { //nolint:staticcheck // Using legacy pubsub.Publish for compatibility
 		if g.metrics != nil {
 			g.metrics.RecordPublishError(topicName)
 			g.metrics.RecordMessagePublished(topicName, false)
 		}
+
 		return fmt.Errorf("failed to publish to topic %s: %w", topicName, err)
 	}
 
@@ -415,6 +429,7 @@ func (g *Gossipsub) createProcessor(ctx context.Context, topic *Topic[any], hand
 // removeProcessor removes a processor for a topic.
 func (g *Gossipsub) removeProcessor(topicName string) {
 	g.procMutex.Lock()
+
 	proc, exists := g.processors[topicName]
 	if exists {
 		delete(g.processors, topicName)
@@ -530,6 +545,7 @@ func (g *Gossipsub) createLibp2pValidator(topic *Topic[any], handler *HandlerCon
 
 				return pubsub.ValidationReject
 			}
+
 			data = decompressed
 		}
 
@@ -538,11 +554,13 @@ func (g *Gossipsub) createLibp2pValidator(topic *Topic[any], handler *HandlerCon
 		if decoder == nil && handler.encoder != nil {
 			decoder = handler.encoder.Decode
 		}
+
 		if decoder == nil {
 			// No decoder available
 			if g.metrics != nil {
 				g.metrics.RecordMessageValidated(topic.Name(), ValidationReject)
 			}
+
 			return pubsub.ValidationReject
 		}
 
@@ -606,6 +624,7 @@ func (e *anyEncoder[T]) Encode(msg any) ([]byte, error) {
 	if !ok {
 		return nil, fmt.Errorf("encoder type assertion failed: expected %T, got %T", *new(T), msg)
 	}
+
 	return e.typed.Encode(typedMsg)
 }
 
@@ -633,6 +652,7 @@ func (g *Gossipsub) PeerID() peer.ID {
 func (g *Gossipsub) IsStarted() bool {
 	g.startMu.Lock()
 	defer g.startMu.Unlock()
+
 	return g.started
 }
 
@@ -640,6 +660,7 @@ func (g *Gossipsub) IsStarted() bool {
 func (g *Gossipsub) TopicCount() int {
 	g.subMutex.RLock()
 	defer g.subMutex.RUnlock()
+
 	return len(g.subscriptions)
 }
 
@@ -652,5 +673,6 @@ func (g *Gossipsub) ActiveTopics() []string {
 	for topic := range g.subscriptions {
 		topics = append(topics, topic)
 	}
+
 	return topics
 }

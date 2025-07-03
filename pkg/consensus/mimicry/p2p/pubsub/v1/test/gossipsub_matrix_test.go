@@ -6,14 +6,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub/v1"
+	v1 "github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub/v1"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// TestMatrix tests various combinations of node counts, message sizes, and configurations
+// TestMatrix tests various combinations of node counts, message sizes, and configurations.
 func TestGossipsubMatrix(t *testing.T) {
 	testCases := []struct {
 		name             string
@@ -175,7 +175,7 @@ func TestGossipsubMatrix(t *testing.T) {
 	}
 }
 
-// TestGossipsubWithDifferentParams tests gossipsub with different parameter configurations
+// TestGossipsubWithDifferentParams tests gossipsub with different parameter configurations.
 func TestGossipsubWithDifferentParams(t *testing.T) {
 	testCases := []struct {
 		name   string
@@ -345,7 +345,7 @@ func TestGossipsubWithDifferentParams(t *testing.T) {
 	}
 }
 
-// TestConcurrentOperations tests concurrent subscribe/unsubscribe/publish operations
+// TestConcurrentOperations tests concurrent subscribe/unsubscribe/publish operations.
 func TestConcurrentOperations(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -400,6 +400,7 @@ func TestConcurrentOperations(t *testing.T) {
 					case errChan <- fmt.Errorf("subscribe error: %w", err):
 					default:
 					}
+
 					return
 				}
 
@@ -442,7 +443,7 @@ func TestConcurrentOperations(t *testing.T) {
 
 	// Check for errors
 	close(errChan)
-	var errors []error
+	errors := make([]error, 0)
 	for err := range errChan {
 		errors = append(errors, err)
 	}
@@ -450,7 +451,7 @@ func TestConcurrentOperations(t *testing.T) {
 	assert.Empty(t, errors, "Concurrent operations should not produce errors")
 }
 
-// generateContent generates a string of the specified size
+// generateContent generates a string of the specified size.
 func generateContent(size int) string {
 	if size <= 0 {
 		return ""

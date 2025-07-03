@@ -7,13 +7,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub/v1"
+	v1 "github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub/v1"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// TestNetworkPartition_MessageDeliveryDuringPartition tests message delivery during network partition
+// TestNetworkPartition_MessageDeliveryDuringPartition tests message delivery during network partition.
 func TestNetworkPartition_MessageDeliveryDuringPartition(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
@@ -41,6 +41,7 @@ func TestNetworkPartition_MessageDeliveryDuringPartition(t *testing.T) {
 		v1.WithProcessor(func(ctx context.Context, msg GossipTestMessage, from peer.ID) error {
 			count := countA.Add(1)
 			t.Logf("Node A received message %d: %s", count, msg.ID)
+
 			return nil
 		}),
 	)
@@ -50,6 +51,7 @@ func TestNetworkPartition_MessageDeliveryDuringPartition(t *testing.T) {
 		v1.WithProcessor(func(ctx context.Context, msg GossipTestMessage, from peer.ID) error {
 			count := countB.Add(1)
 			t.Logf("Node B received message %d: %s", count, msg.ID)
+
 			return nil
 		}),
 	)
@@ -59,6 +61,7 @@ func TestNetworkPartition_MessageDeliveryDuringPartition(t *testing.T) {
 		v1.WithProcessor(func(ctx context.Context, msg GossipTestMessage, from peer.ID) error {
 			count := countC.Add(1)
 			t.Logf("Node C received message %d: %s", count, msg.ID)
+
 			return nil
 		}),
 	)
@@ -134,6 +137,7 @@ func TestNetworkPartition_MessageDeliveryDuringPartition(t *testing.T) {
 	require.Eventually(t, func() bool {
 		a, b, c := countA.Load(), countB.Load(), countC.Load()
 		t.Logf("Phase 2a counts: A=%d, B=%d, C=%d", a, b, c)
+
 		return b >= 1 && c >= 1
 	}, 5*time.Second, 500*time.Millisecond, "B and C should receive B->C message")
 
@@ -190,13 +194,14 @@ func TestNetworkPartition_MessageDeliveryDuringPartition(t *testing.T) {
 	require.Eventually(t, func() bool {
 		a, b, c := countA.Load(), countB.Load(), countC.Load()
 		t.Logf("Phase 3 counts: A=%d, B=%d, C=%d", a, b, c)
+
 		return a >= 1 && b >= 1 && c >= 1
 	}, 10*time.Second, 500*time.Millisecond, "All nodes should receive message after healing")
 
 	t.Log("SUCCESS: Network partition and recovery test completed")
 }
 
-// TestNetworkPartition_SubscriptionSurvival tests that subscriptions survive network partitions
+// TestNetworkPartition_SubscriptionSurvival tests that subscriptions survive network partitions.
 func TestNetworkPartition_SubscriptionSurvival(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
@@ -222,6 +227,7 @@ func TestNetworkPartition_SubscriptionSurvival(t *testing.T) {
 		v1.WithProcessor(func(ctx context.Context, msg GossipTestMessage, from peer.ID) error {
 			count := messageCount.Add(1)
 			t.Logf("Received message %d: %s", count, msg.ID)
+
 			return nil
 		}),
 	)
@@ -286,6 +292,7 @@ func TestNetworkPartition_SubscriptionSurvival(t *testing.T) {
 	require.Eventually(t, func() bool {
 		count := messageCount.Load()
 		t.Logf("Messages after reconnect: %d", count)
+
 		return count >= 2
 	}, 10*time.Second, 500*time.Millisecond, "Messages should flow after reconnection")
 
@@ -296,7 +303,7 @@ func TestNetworkPartition_SubscriptionSurvival(t *testing.T) {
 	t.Log("SUCCESS: Subscriptions survived network partition")
 }
 
-// TestNetworkPartition_RapidPartitionRecovery tests rapid partition/recovery cycles
+// TestNetworkPartition_RapidPartitionRecovery tests rapid partition/recovery cycles.
 func TestNetworkPartition_RapidPartitionRecovery(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
@@ -322,6 +329,7 @@ func TestNetworkPartition_RapidPartitionRecovery(t *testing.T) {
 		v1.WithProcessor(func(ctx context.Context, msg GossipTestMessage, from peer.ID) error {
 			count := messageCount.Add(1)
 			t.Logf("Received message %d: %s", count, msg.ID)
+
 			return nil
 		}),
 	)
@@ -371,6 +379,7 @@ func TestNetworkPartition_RapidPartitionRecovery(t *testing.T) {
 		// Should receive messages
 		require.Eventually(t, func() bool {
 			count := messageCount.Load()
+
 			return count >= 2
 		}, 8*time.Second, 500*time.Millisecond,
 			fmt.Sprintf("Messages should flow after cycle %d", i+1))

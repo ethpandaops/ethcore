@@ -9,13 +9,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub/v1"
+	v1 "github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub/v1"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// SubnetTestMessage represents a message that can be sent on subnet topics
+// SubnetTestMessage represents a message that can be sent on subnet topics.
 type SubnetTestMessage struct {
 	ID       string
 	SubnetID uint64
@@ -23,12 +23,13 @@ type SubnetTestMessage struct {
 	From     string
 }
 
-// SubnetTestEncoder implements the Encoder interface for SubnetTestMessage
+// SubnetTestEncoder implements the Encoder interface for SubnetTestMessage.
 type SubnetTestEncoder struct{}
 
 func (e *SubnetTestEncoder) Encode(msg SubnetTestMessage) ([]byte, error) {
 	// Simple encoding: "ID|SubnetID|Content|From"
 	encoded := fmt.Sprintf("%s|%d|%s|%s", msg.ID, msg.SubnetID, msg.Content, msg.From)
+
 	return []byte(encoded), nil
 }
 
@@ -57,12 +58,12 @@ func (e *SubnetTestEncoder) Decode(data []byte) (SubnetTestMessage, error) {
 	return msg, nil
 }
 
-// CreateTestSubnetTopic creates a test subnet topic with the given pattern and max subnets
+// CreateTestSubnetTopic creates a test subnet topic with the given pattern and max subnets.
 func CreateTestSubnetTopic(pattern string, maxSubnets uint64) (*v1.SubnetTopic[SubnetTestMessage], error) {
 	return v1.NewSubnetTopic[SubnetTestMessage](pattern, maxSubnets)
 }
 
-// TestSubnetTopicCreation tests the creation and configuration of subnet topics
+// TestSubnetTopicCreation tests the creation and configuration of subnet topics.
 func TestSubnetTopicCreation(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -123,7 +124,7 @@ func TestSubnetTopicCreation(t *testing.T) {
 	}
 }
 
-// TestSubnetTopicForSubnet tests creating topics for specific subnets
+// TestSubnetTopicForSubnet tests creating topics for specific subnets.
 func TestSubnetTopicForSubnet(t *testing.T) {
 	pattern := "beacon_attestation_%d"
 	maxSubnets := uint64(64)
@@ -189,7 +190,7 @@ func TestSubnetTopicForSubnet(t *testing.T) {
 	}
 }
 
-// TestSubnetParsing tests parsing subnet IDs from topic names
+// TestSubnetParsing tests parsing subnet IDs from topic names.
 func TestSubnetParsing(t *testing.T) {
 	pattern := "beacon_attestation_%d"
 	maxSubnets := uint64(64)
@@ -262,7 +263,7 @@ func TestSubnetParsing(t *testing.T) {
 	}
 }
 
-// TestSubnetSubscriptionLifecycle tests subscribing and unsubscribing from subnet topics
+// TestSubnetSubscriptionLifecycle tests subscribing and unsubscribing from subnet topics.
 func TestSubnetSubscriptionLifecycle(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -295,8 +296,8 @@ func TestSubnetSubscriptionLifecycle(t *testing.T) {
 		collector := collectors[i]
 
 		// Get topic for specific subnet
-		topic, err := subnetTopic.TopicForSubnet(subnet, forkDigest)
-		require.NoError(t, err)
+		topic, topicErr := subnetTopic.TopicForSubnet(subnet, forkDigest)
+		require.NoError(t, topicErr)
 
 		// Create handler
 		handler := v1.NewHandlerConfig(
@@ -315,6 +316,7 @@ func TestSubnetSubscriptionLifecycle(t *testing.T) {
 				case <-ctx.Done():
 					return ctx.Err()
 				}
+
 				return nil
 			}),
 		)
@@ -324,8 +326,8 @@ func TestSubnetSubscriptionLifecycle(t *testing.T) {
 		require.NoError(t, err)
 
 		// Subscribe to topic
-		sub, err := v1.Subscribe(ctx, node.Gossipsub, topic)
-		require.NoError(t, err)
+		sub, subErr := v1.Subscribe(ctx, node.Gossipsub, topic)
+		require.NoError(t, subErr)
 		require.NotNil(t, sub)
 
 		t.Logf("Node %d subscribed to subnet %d (topic: %s)", i, subnet, topic.Name())
@@ -382,7 +384,7 @@ func TestSubnetSubscriptionLifecycle(t *testing.T) {
 	assert.Equal(t, 0, collectors[2].GetMessageCount(), "Node 2 should not receive subnet 5 message")
 }
 
-// TestSubnetMessagePropagation tests message propagation across subnet topics
+// TestSubnetMessagePropagation tests message propagation across subnet topics.
 func TestSubnetMessagePropagation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -423,8 +425,8 @@ func TestSubnetMessagePropagation(t *testing.T) {
 		node := nodes[nodeIdx]
 
 		for _, subnet := range subnets {
-			topic, err := subnetTopic.TopicForSubnet(subnet, forkDigest)
-			require.NoError(t, err)
+			topic, topicErr := subnetTopic.TopicForSubnet(subnet, forkDigest)
+			require.NoError(t, topicErr)
 
 			// Create handler that includes subnet info
 			handler := v1.NewHandlerConfig(
@@ -442,6 +444,7 @@ func TestSubnetMessagePropagation(t *testing.T) {
 					case <-ctx.Done():
 						return ctx.Err()
 					}
+
 					return nil
 				}),
 			)
@@ -459,8 +462,8 @@ func TestSubnetMessagePropagation(t *testing.T) {
 
 	// Test message propagation on each subnet
 	for subnet := uint64(0); subnet < 4; subnet++ {
-		topic, err := subnetTopic.TopicForSubnet(subnet, forkDigest)
-		require.NoError(t, err)
+		topic, topicErr := subnetTopic.TopicForSubnet(subnet, forkDigest)
+		require.NoError(t, topicErr)
 
 		msg := SubnetTestMessage{
 			ID:       fmt.Sprintf("msg-subnet-%d", subnet),
@@ -486,7 +489,11 @@ func TestSubnetMessagePropagation(t *testing.T) {
 	for _, msg := range messages {
 		// Extract subnet ID from message content
 		var subnetID uint64
-		fmt.Sscanf(msg.Message.Content, "subnet-%d:", &subnetID)
+		if _, err := fmt.Sscanf(msg.Message.Content, "subnet-%d:", &subnetID); err != nil {
+			t.Logf("Error parsing subnet ID: %v", err)
+
+			continue
+		}
 		messagesBySubnet[subnetID] = append(messagesBySubnet[subnetID], msg)
 	}
 
@@ -520,7 +527,7 @@ func TestSubnetMessagePropagation(t *testing.T) {
 	}
 }
 
-// TestSubnetSubscriptionManager tests the SubnetSubscription manager functionality
+// TestSubnetSubscriptionManager tests the SubnetSubscription manager functionality.
 func TestSubnetSubscriptionManager(t *testing.T) {
 	// Create subnet topic
 	subnetTopic, err := CreateTestSubnetTopic("beacon_attestation_%d", 64)
@@ -587,9 +594,9 @@ func TestSubnetSubscriptionManager(t *testing.T) {
 
 	// Test Set method
 	newSubs := map[uint64]*v1.Subscription{
-		1:  &v1.Subscription{},
-		15: &v1.Subscription{},
-		20: &v1.Subscription{},
+		1:  {},
+		15: {},
+		20: {},
 	}
 
 	err = subnetManager.Set(newSubs)
@@ -604,8 +611,8 @@ func TestSubnetSubscriptionManager(t *testing.T) {
 
 	// Test Set with invalid subnet
 	invalidSubs := map[uint64]*v1.Subscription{
-		1:   &v1.Subscription{},
-		100: &v1.Subscription{}, // Invalid subnet
+		1:   {},
+		100: {}, // Invalid subnet
 	}
 	err = subnetManager.Set(invalidSubs)
 	require.Error(t, err)
@@ -616,7 +623,7 @@ func TestSubnetSubscriptionManager(t *testing.T) {
 	assert.Empty(t, subnetManager.Active())
 }
 
-// TestMultipleSubnetsWithDifferentForkDigests tests handling multiple subnets with different fork digests
+// TestMultipleSubnetsWithDifferentForkDigests tests handling multiple subnets with different fork digests.
 func TestMultipleSubnetsWithDifferentForkDigests(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -661,8 +668,8 @@ func TestMultipleSubnetsWithDifferentForkDigests(t *testing.T) {
 		node := nodes[sub.nodeIdx]
 		collector := collectors[sub.nodeIdx]
 
-		topic, err := subnetTopic.TopicForSubnet(sub.subnet, sub.forkDigest)
-		require.NoError(t, err)
+		topic, topicErr := subnetTopic.TopicForSubnet(sub.subnet, sub.forkDigest)
+		require.NoError(t, topicErr)
 
 		handler := v1.NewHandlerConfig(
 			v1.WithProcessor(func(ctx context.Context, msg SubnetTestMessage, from peer.ID) error {
@@ -679,6 +686,7 @@ func TestMultipleSubnetsWithDifferentForkDigests(t *testing.T) {
 				case <-ctx.Done():
 					return ctx.Err()
 				}
+
 				return nil
 			}),
 		)
@@ -752,7 +760,7 @@ func TestMultipleSubnetsWithDifferentForkDigests(t *testing.T) {
 	assert.True(t, messageIDs["fork2-msg"], "Node 2 should receive fork2 message")
 }
 
-// TestSubnetLimitsAndValidation tests subnet limits and validation
+// TestSubnetLimitsAndValidation tests subnet limits and validation.
 func TestSubnetLimitsAndValidation(t *testing.T) {
 	// Test with small subnet limit
 	smallSubnetTopic, err := CreateTestSubnetTopic("test_%d", 4)
@@ -802,7 +810,7 @@ func TestSubnetLimitsAndValidation(t *testing.T) {
 	}
 }
 
-// TestConcurrentSubnetOperations tests concurrent operations on subnet subscriptions
+// TestConcurrentSubnetOperations tests concurrent operations on subnet subscriptions.
 func TestConcurrentSubnetOperations(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -918,7 +926,7 @@ func TestConcurrentSubnetOperations(t *testing.T) {
 	assert.GreaterOrEqual(t, removeCount.Load(), int32(0))
 }
 
-// TestSubnetWithPrefixAndSuffix tests subnet topics with both prefix and suffix
+// TestSubnetWithPrefixAndSuffix tests subnet topics with both prefix and suffix.
 func TestSubnetWithPrefixAndSuffix(t *testing.T) {
 	pattern := "prefix_%d_suffix"
 	maxSubnets := uint64(16)
@@ -976,7 +984,7 @@ func TestSubnetWithPrefixAndSuffix(t *testing.T) {
 	}
 }
 
-// TestSubnetTopicEncoderValidation tests that subnet topics properly validate encoders
+// TestSubnetTopicEncoderValidation tests that subnet topics properly validate encoders.
 func TestSubnetTopicEncoderValidation(t *testing.T) {
 	pattern := "test_%d"
 	maxSubnets := uint64(10)

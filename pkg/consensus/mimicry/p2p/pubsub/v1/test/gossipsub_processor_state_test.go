@@ -9,13 +9,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub/v1"
+	v1 "github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub/v1"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// TestProcessorState_ContextHandling verifies processor context isn't being cancelled prematurely
+// TestProcessorState_ContextHandling verifies processor context isn't being cancelled prematurely.
 func TestProcessorState_ContextHandling(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -46,6 +46,7 @@ func TestProcessorState_ContextHandling(t *testing.T) {
 			mu.Unlock()
 
 			t.Logf("Processing message %s, context valid: %v", msg.ID, ctx.Err() == nil)
+
 			return nil
 		}),
 	)
@@ -84,6 +85,7 @@ func TestProcessorState_ContextHandling(t *testing.T) {
 		mu.Lock()
 		count := len(contextChecks)
 		mu.Unlock()
+
 		return count == 5
 	}, 10*time.Second, 100*time.Millisecond, "Expected all messages to be processed")
 
@@ -97,7 +99,7 @@ func TestProcessorState_ContextHandling(t *testing.T) {
 	t.Log("SUCCESS: Processor context remains valid for multiple messages")
 }
 
-// TestProcessorState_ConcurrentMessageProcessing tests if concurrent processing blocks subsequent messages
+// TestProcessorState_ConcurrentMessageProcessing tests if concurrent processing blocks subsequent messages.
 func TestProcessorState_ConcurrentMessageProcessing(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -135,6 +137,7 @@ func TestProcessorState_ConcurrentMessageProcessing(t *testing.T) {
 			time.Sleep(500 * time.Millisecond)
 
 			t.Logf("Finished processing message %s (#%d)", msg.ID, received)
+
 			return nil
 		}),
 	)
@@ -176,6 +179,7 @@ func TestProcessorState_ConcurrentMessageProcessing(t *testing.T) {
 	require.Eventually(t, func() bool {
 		count := messagesReceived.Load()
 		t.Logf("Received %d/5 messages", count)
+
 		return count == 5
 	}, 15*time.Second, 100*time.Millisecond, "Expected all messages to be received")
 
@@ -195,7 +199,7 @@ func TestProcessorState_ConcurrentMessageProcessing(t *testing.T) {
 	t.Log("SUCCESS: Concurrent message processing doesn't block message delivery")
 }
 
-// TestProcessorState_ProcessorGoroutineLifecycle tests processor goroutine lifecycle
+// TestProcessorState_ProcessorGoroutineLifecycle tests processor goroutine lifecycle.
 func TestProcessorState_ProcessorGoroutineLifecycle(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
@@ -220,6 +224,7 @@ func TestProcessorState_ProcessorGoroutineLifecycle(t *testing.T) {
 		v1.WithProcessor(func(ctx context.Context, msg GossipTestMessage, from peer.ID) error {
 			messageCount.Add(1)
 			t.Logf("Processed message: %s", msg.ID)
+
 			return nil
 		}),
 	)
@@ -275,7 +280,7 @@ func TestProcessorState_ProcessorGoroutineLifecycle(t *testing.T) {
 	t.Log("SUCCESS: Processor goroutine lifecycle managed correctly")
 }
 
-// TestProcessorState_MessageOrderPreservation tests that message processing preserves order
+// TestProcessorState_MessageOrderPreservation tests that message processing preserves order.
 func TestProcessorState_MessageOrderPreservation(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
@@ -305,6 +310,7 @@ func TestProcessorState_MessageOrderPreservation(t *testing.T) {
 			mu.Unlock()
 
 			t.Logf("Processed message: %s", msg.ID)
+
 			return nil
 		}),
 	)
@@ -345,6 +351,7 @@ func TestProcessorState_MessageOrderPreservation(t *testing.T) {
 		mu.Lock()
 		count := len(processedOrder)
 		mu.Unlock()
+
 		return count == len(expectedOrder)
 	}, 10*time.Second, 100*time.Millisecond, "Expected all messages to be processed")
 

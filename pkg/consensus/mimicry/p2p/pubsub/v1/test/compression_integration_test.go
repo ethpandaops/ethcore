@@ -13,7 +13,6 @@ import (
 
 func TestCompressionIntegration(t *testing.T) {
 	t.Run("handler with compression", func(t *testing.T) {
-
 		// Create topic with SSZ encoder
 		_, err := v1.NewTopic[*SSZTestMessage]("test-topic")
 		require.NoError(t, err)
@@ -66,7 +65,6 @@ func TestCompressionIntegration(t *testing.T) {
 	})
 
 	t.Run("handler without compression", func(t *testing.T) {
-
 		// Create topic with SSZ encoder
 		topic, err := v1.NewTopic[*SSZTestMessage]("test-topic-no-compression")
 		require.NoError(t, err)

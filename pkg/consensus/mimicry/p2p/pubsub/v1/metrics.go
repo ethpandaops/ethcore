@@ -6,6 +6,11 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+const (
+	statusSuccess = "success"
+	statusError   = "error"
+)
+
 // Metrics contains prometheus metrics for the pubsub system.
 type Metrics struct {
 	// Message metrics
@@ -209,9 +214,9 @@ func (m *Metrics) RecordMessageReceived(topic string) {
 
 func (m *Metrics) RecordMessagePublished(topic string, success bool) {
 	if m.MessagesPublished != nil {
-		status := "success"
+		status := statusSuccess
 		if !success {
-			status = "error"
+			status = statusError
 		}
 
 		m.MessagesPublished.WithLabelValues(topic, status).Inc()
@@ -221,6 +226,7 @@ func (m *Metrics) RecordMessagePublished(topic string, success bool) {
 func (m *Metrics) RecordMessageValidated(topic string, result ValidationResult) {
 	if m.MessagesValidated != nil {
 		var resultStr string
+
 		switch result {
 		case ValidationAccept:
 			resultStr = "accept"
@@ -231,15 +237,16 @@ func (m *Metrics) RecordMessageValidated(topic string, result ValidationResult) 
 		default:
 			resultStr = "unknown"
 		}
+
 		m.MessagesValidated.WithLabelValues(topic, resultStr).Inc()
 	}
 }
 
 func (m *Metrics) RecordMessageHandled(topic string, success bool, duration time.Duration) {
 	if m.MessagesHandled != nil {
-		status := "success"
+		status := statusSuccess
 		if !success {
-			status = "error"
+			status = statusError
 		}
 
 		m.MessagesHandled.WithLabelValues(topic, status).Inc()

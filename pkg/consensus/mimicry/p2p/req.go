@@ -91,7 +91,7 @@ func (r *ReqResp) WriteRequest(ctx context.Context, stream network.Stream, paylo
 	return nil
 }
 
-// WriteRequestBytes writes a request to the stream using raw bytes payload
+// WriteRequestBytes writes a request to the stream using raw bytes payload.
 func (r *ReqResp) WriteRequestBytes(ctx context.Context, stream network.Stream, payloadBytes []byte) error {
 	if err := stream.SetWriteDeadline(time.Now().Add(r.config.WriteTimeout)); err != nil {
 		return fmt.Errorf("failed to set write deadline on stream: %w", err)
@@ -104,11 +104,14 @@ func (r *ReqResp) WriteRequestBytes(ctx context.Context, stream network.Stream, 
 		// Write varint length prefix
 		length := uint64(len(compressedData))
 		varintBuf := make([]byte, 0, 10)
+
 		for {
 			if length < 0x80 {
 				varintBuf = append(varintBuf, byte(length))
+
 				break
 			}
+
 			varintBuf = append(varintBuf, byte(length&0x7F|0x80))
 			length >>= 7
 		}

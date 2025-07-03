@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub/v1"
+	v1 "github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub/v1"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// DisconnectNodes disconnects two nodes from each other
+// DisconnectNodes disconnects two nodes from each other.
 func (ti *TestInfrastructure) DisconnectNodes(node1, node2 *TestNode) error {
 	// Close the connection from both sides
 	if err := node1.Host.Network().ClosePeer(node2.ID); err != nil {
@@ -30,19 +30,19 @@ func (ti *TestInfrastructure) DisconnectNodes(node1, node2 *TestNode) error {
 	return nil
 }
 
-// waitForDisconnection waits for a disconnection to be confirmed
+// waitForDisconnection waits for a disconnection to be confirmed.
 func (ti *TestInfrastructure) waitForDisconnection(node *TestNode, targetID peer.ID) {
 	require.Eventually(ti.t, func() bool {
 		return node.Host.Network().Connectedness(targetID) == network.NotConnected
 	}, 5*time.Second, 100*time.Millisecond)
 }
 
-// ReconnectNodes reconnects two previously connected nodes
+// ReconnectNodes reconnects two previously connected nodes.
 func (ti *TestInfrastructure) ReconnectNodes(node1, node2 *TestNode) error {
 	return ti.ConnectNodes(node1, node2)
 }
 
-// TestGossipsubMessageDeliveryWithDisconnect tests message delivery when nodes disconnect/reconnect
+// TestGossipsubMessageDeliveryWithDisconnect tests message delivery when nodes disconnect/reconnect.
 func TestGossipsubMessageDeliveryWithDisconnect(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -69,8 +69,8 @@ func TestGossipsubMessageDeliveryWithDisconnect(t *testing.T) {
 	// Register handlers and subscribe all nodes to the topic
 	for i, node := range nodes {
 		handler := CreateTestHandler(collectors[i].CreateProcessor(node.ID))
-		err := v1.Register(node.Gossipsub.Registry(), topic, handler)
-		require.NoError(t, err)
+		regErr := v1.Register(node.Gossipsub.Registry(), topic, handler)
+		require.NoError(t, regErr)
 
 		_, err = v1.Subscribe(ctx, node.Gossipsub, topic)
 		require.NoError(t, err)
@@ -165,7 +165,7 @@ func TestGossipsubMessageDeliveryWithDisconnect(t *testing.T) {
 	assert.Equal(t, 2, collectors[2].GetMessageCount(), "Node 2 should have received 2 messages (missed one during disconnect)")
 }
 
-// TestGossipsubPeerOfflineMidTransmission tests behavior when peer goes offline mid-transmission
+// TestGossipsubPeerOfflineMidTransmission tests behavior when peer goes offline mid-transmission.
 func TestGossipsubPeerOfflineMidTransmission(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -193,6 +193,7 @@ func TestGossipsubPeerOfflineMidTransmission(t *testing.T) {
 			// Add delay to simulate processing during disconnection
 			processor = func(ctx context.Context, msg GossipTestMessage, from peer.ID) error {
 				time.Sleep(500 * time.Millisecond)
+
 				return collectors[i].CreateProcessor(node.ID)(ctx, msg, from)
 			}
 		} else {
@@ -200,8 +201,8 @@ func TestGossipsubPeerOfflineMidTransmission(t *testing.T) {
 		}
 
 		handler := CreateTestHandler(processor)
-		err := v1.Register(node.Gossipsub.Registry(), topic, handler)
-		require.NoError(t, err)
+		regErr := v1.Register(node.Gossipsub.Registry(), topic, handler)
+		require.NoError(t, regErr)
 
 		_, err = v1.Subscribe(ctx, node.Gossipsub, topic)
 		require.NoError(t, err)
@@ -221,8 +222,8 @@ func TestGossipsubPeerOfflineMidTransmission(t *testing.T) {
 				From:    nodes[0].ID.String(),
 			}
 
-			if err := v1.Publish(nodes[0].Gossipsub, topic, msg); err != nil {
-				t.Logf("Failed to publish message %d: %v", i, err)
+			if pubErr := v1.Publish(nodes[0].Gossipsub, topic, msg); pubErr != nil {
+				t.Logf("Failed to publish message %d: %v", i, pubErr)
 			}
 
 			time.Sleep(200 * time.Millisecond)
@@ -258,7 +259,7 @@ func TestGossipsubPeerOfflineMidTransmission(t *testing.T) {
 	}
 }
 
-// TestGossipsubMeshReformationAfterNetworkChanges tests mesh reformation after network topology changes
+// TestGossipsubMeshReformationAfterNetworkChanges tests mesh reformation after network topology changes.
 func TestGossipsubMeshReformationAfterNetworkChanges(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -277,8 +278,8 @@ func TestGossipsubMeshReformationAfterNetworkChanges(t *testing.T) {
 	for i := range collectors {
 		collectors[i] = NewMessageCollector(20)
 		handler := CreateTestHandler(collectors[i].CreateProcessor(nodes[i].ID))
-		err := v1.Register(nodes[i].Gossipsub.Registry(), topic, handler)
-		require.NoError(t, err)
+		regErr := v1.Register(nodes[i].Gossipsub.Registry(), topic, handler)
+		require.NoError(t, regErr)
 
 		_, err = v1.Subscribe(ctx, nodes[i].Gossipsub, topic)
 		require.NoError(t, err)
@@ -303,6 +304,7 @@ func TestGossipsubMeshReformationAfterNetworkChanges(t *testing.T) {
 				return false
 			}
 		}
+
 		return true
 	}, 5*time.Second, 100*time.Millisecond)
 
@@ -403,6 +405,7 @@ func TestGossipsubMeshReformationAfterNetworkChanges(t *testing.T) {
 			for _, msg := range messages {
 				if msg.Message.ID == msg4.ID {
 					hasMsg4 = true
+
 					break
 				}
 			}
@@ -410,11 +413,12 @@ func TestGossipsubMeshReformationAfterNetworkChanges(t *testing.T) {
 				return false
 			}
 		}
+
 		return true
 	}, 5*time.Second, 100*time.Millisecond)
 }
 
-// TestGossipsubIntermittentConnectivity tests message delivery with intermittent connectivity
+// TestGossipsubIntermittentConnectivity tests message delivery with intermittent connectivity.
 func TestGossipsubIntermittentConnectivity(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -433,8 +437,8 @@ func TestGossipsubIntermittentConnectivity(t *testing.T) {
 	for i := range collectors {
 		collectors[i] = NewMessageCollector(50)
 		handler := CreateTestHandler(collectors[i].CreateProcessor(nodes[i].ID))
-		err := v1.Register(nodes[i].Gossipsub.Registry(), topic, handler)
-		require.NoError(t, err)
+		regErr := v1.Register(nodes[i].Gossipsub.Registry(), topic, handler)
+		require.NoError(t, regErr)
 
 		_, err = v1.Subscribe(ctx, nodes[i].Gossipsub, topic)
 		require.NoError(t, err)
@@ -458,22 +462,35 @@ func TestGossipsubIntermittentConnectivity(t *testing.T) {
 				if disconnected {
 					// Reconnect
 					t.Log("Reconnecting node 2")
-					ti.ReconnectNodes(nodes[0], nodes[2])
-					ti.ReconnectNodes(nodes[1], nodes[2])
+					if reconnectErr := ti.ReconnectNodes(nodes[0], nodes[2]); reconnectErr != nil {
+						t.Logf("Error reconnecting nodes: %v", reconnectErr)
+					}
+					if reconnectErr := ti.ReconnectNodes(nodes[1], nodes[2]); reconnectErr != nil {
+						t.Logf("Error reconnecting nodes: %v", reconnectErr)
+					}
 					disconnected = false
 				} else {
 					// Disconnect
 					t.Log("Disconnecting node 2")
-					ti.DisconnectNodes(nodes[0], nodes[2])
-					ti.DisconnectNodes(nodes[1], nodes[2])
+					if disconnectErr := ti.DisconnectNodes(nodes[0], nodes[2]); disconnectErr != nil {
+						t.Logf("Error disconnecting nodes: %v", disconnectErr)
+					}
+					if disconnectErr := ti.DisconnectNodes(nodes[1], nodes[2]); disconnectErr != nil {
+						t.Logf("Error disconnecting nodes: %v", disconnectErr)
+					}
 					disconnected = true
 				}
 			case <-stopIntermittent:
 				// Ensure we're connected before returning
 				if disconnected {
-					ti.ReconnectNodes(nodes[0], nodes[2])
-					ti.ReconnectNodes(nodes[1], nodes[2])
+					if reconnectErr := ti.ReconnectNodes(nodes[0], nodes[2]); reconnectErr != nil {
+						t.Logf("Error reconnecting nodes: %v", reconnectErr)
+					}
+					if reconnectErr := ti.ReconnectNodes(nodes[1], nodes[2]); reconnectErr != nil {
+						t.Logf("Error reconnecting nodes: %v", reconnectErr)
+					}
 				}
+
 				return
 			}
 		}
@@ -523,14 +540,22 @@ func TestGossipsubIntermittentConnectivity(t *testing.T) {
 
 		// Extract message numbers
 		var prevNum, currNum int
-		fmt.Sscanf(prevID, "intermittent-msg-%d", &prevNum)
-		fmt.Sscanf(currID, "intermittent-msg-%d", &currNum)
+		if _, err := fmt.Sscanf(prevID, "intermittent-msg-%d", &prevNum); err != nil {
+			t.Logf("Error parsing prevID: %v", err)
+
+			continue
+		}
+		if _, err := fmt.Sscanf(currID, "intermittent-msg-%d", &currNum); err != nil {
+			t.Logf("Error parsing currID: %v", err)
+
+			continue
+		}
 
 		assert.Less(t, prevNum, currNum, "Messages should be received in order")
 	}
 }
 
-// TestGossipsubNetworkPartitionRecovery tests gossipsub recovery after network partition
+// TestGossipsubNetworkPartitionRecovery tests gossipsub recovery after network partition.
 func TestGossipsubNetworkPartitionRecovery(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -555,8 +580,8 @@ func TestGossipsubNetworkPartitionRecovery(t *testing.T) {
 	for i := range collectors {
 		collectors[i] = NewMessageCollector(30)
 		handler := CreateTestHandler(collectors[i].CreateProcessor(nodes[i].ID))
-		err := v1.Register(nodes[i].Gossipsub.Registry(), topic, handler)
-		require.NoError(t, err)
+		regErr := v1.Register(nodes[i].Gossipsub.Registry(), topic, handler)
+		require.NoError(t, regErr)
 
 		_, err = v1.Subscribe(ctx, nodes[i].Gossipsub, topic)
 		require.NoError(t, err)
@@ -581,6 +606,7 @@ func TestGossipsubNetworkPartitionRecovery(t *testing.T) {
 				return false
 			}
 		}
+
 		return true
 	}, 5*time.Second, 100*time.Millisecond)
 
@@ -614,7 +640,7 @@ func TestGossipsubNetworkPartitionRecovery(t *testing.T) {
 				Content: fmt.Sprintf("Message %d from partition A", i),
 				From:    nodes[i%4].ID.String(),
 			}
-			if err := v1.Publish(nodes[i%4].Gossipsub, topic, msg); err == nil {
+			if pubErr := v1.Publish(nodes[i%4].Gossipsub, topic, msg); pubErr == nil {
 				messagesSent["A"] = append(messagesSent["A"], msg.ID)
 			}
 			time.Sleep(200 * time.Millisecond)
@@ -631,7 +657,7 @@ func TestGossipsubNetworkPartitionRecovery(t *testing.T) {
 				Content: fmt.Sprintf("Message %d from partition B", i),
 				From:    nodes[4+i%4].ID.String(),
 			}
-			if err := v1.Publish(nodes[4+i%4].Gossipsub, topic, msg); err == nil {
+			if pubErr := v1.Publish(nodes[4+i%4].Gossipsub, topic, msg); pubErr == nil {
 				messagesSent["B"] = append(messagesSent["B"], msg.ID)
 			}
 			time.Sleep(200 * time.Millisecond)
@@ -693,6 +719,7 @@ func TestGossipsubNetworkPartitionRecovery(t *testing.T) {
 				}
 			}
 		}
+
 		return false
 	}, 10*time.Second, 500*time.Millisecond)
 
@@ -729,6 +756,7 @@ func TestGossipsubNetworkPartitionRecovery(t *testing.T) {
 			for _, msg := range messages {
 				if msg.Message.ID == recoveryMsg.ID {
 					found = true
+
 					break
 				}
 			}
@@ -736,13 +764,14 @@ func TestGossipsubNetworkPartitionRecovery(t *testing.T) {
 				return false
 			}
 		}
+
 		return true
 	}, 5*time.Second, 100*time.Millisecond)
 
 	t.Log("Network partition recovery test completed successfully")
 }
 
-// TestGossipsubRapidConnectDisconnect tests behavior with rapid connect/disconnect cycles
+// TestGossipsubRapidConnectDisconnect tests behavior with rapid connect/disconnect cycles.
 func TestGossipsubRapidConnectDisconnect(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -764,8 +793,8 @@ func TestGossipsubRapidConnectDisconnect(t *testing.T) {
 	for i := range collectors {
 		collectors[i] = NewMessageCollector(100)
 		handler := CreateTestHandler(collectors[i].CreateProcessor(nodes[i].ID))
-		err := v1.Register(nodes[i].Gossipsub.Registry(), topic, handler)
-		require.NoError(t, err)
+		regErr := v1.Register(nodes[i].Gossipsub.Registry(), topic, handler)
+		require.NoError(t, regErr)
 
 		_, err = v1.Subscribe(ctx, nodes[i].Gossipsub, topic)
 		require.NoError(t, err)
@@ -792,20 +821,27 @@ func TestGossipsubRapidConnectDisconnect(t *testing.T) {
 					// Disconnect phase
 					t.Logf("Cycle %d: Disconnecting node 3", cycleCount)
 					for i := 0; i < 3; i++ {
-						ti.DisconnectNodes(nodes[i], nodes[3])
+						if disconnectErr := ti.DisconnectNodes(nodes[i], nodes[3]); disconnectErr != nil {
+							t.Logf("Error disconnecting nodes: %v", disconnectErr)
+						}
 					}
 				} else {
 					// Reconnect phase
 					t.Logf("Cycle %d: Reconnecting node 3", cycleCount)
 					for i := 0; i < 3; i++ {
-						ti.ReconnectNodes(nodes[i], nodes[3])
+						if reconnectErr := ti.ReconnectNodes(nodes[i], nodes[3]); reconnectErr != nil {
+							t.Logf("Error reconnecting nodes: %v", reconnectErr)
+						}
 					}
 				}
 			case <-stopCycles:
 				// Ensure we're connected before exiting
 				for i := 0; i < 3; i++ {
-					ti.ReconnectNodes(nodes[i], nodes[3])
+					if reconnectErr := ti.ReconnectNodes(nodes[i], nodes[3]); reconnectErr != nil {
+						t.Logf("Error reconnecting nodes: %v", reconnectErr)
+					}
 				}
+
 				return
 			}
 		}
@@ -824,12 +860,12 @@ func TestGossipsubRapidConnectDisconnect(t *testing.T) {
 				From:    nodes[i%3].ID.String(),
 			}
 
-			if err := v1.Publish(nodes[i%3].Gossipsub, topic, msg); err == nil {
+			if pubErr := v1.Publish(nodes[i%3].Gossipsub, topic, msg); pubErr == nil {
 				messagesMutex.Lock()
 				messagesSent = append(messagesSent, msg.ID)
 				messagesMutex.Unlock()
 			} else {
-				t.Logf("Failed to publish message %d: %v", i, err)
+				t.Logf("Failed to publish message %d: %v", i, pubErr)
 			}
 
 			time.Sleep(150 * time.Millisecond)
@@ -889,6 +925,7 @@ func TestGossipsubRapidConnectDisconnect(t *testing.T) {
 			for _, msg := range messages {
 				if msg.Message.ID == finalMsg.ID {
 					found = true
+
 					break
 				}
 			}
@@ -896,6 +933,7 @@ func TestGossipsubRapidConnectDisconnect(t *testing.T) {
 				return false
 			}
 		}
+
 		return true
 	}, 5*time.Second, 100*time.Millisecond)
 

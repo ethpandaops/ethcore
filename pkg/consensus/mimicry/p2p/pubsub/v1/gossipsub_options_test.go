@@ -5,13 +5,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub/v1"
+	v1 "github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub/v1"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
 )
 
-// TestWithPubsubOptions tests that custom pubsub options can be provided
+// TestWithPubsubOptions tests that custom pubsub options can be provided.
 func TestWithPubsubOptions(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -37,7 +37,7 @@ func TestWithPubsubOptions(t *testing.T) {
 	require.True(t, node.Gossipsub.IsStarted())
 }
 
-// TestWithPubsubOptionsMultiple tests that multiple WithPubsubOptions calls append options
+// TestWithPubsubOptionsMultiple tests that multiple WithPubsubOptions calls append options.
 func TestWithPubsubOptionsMultiple(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -59,7 +59,7 @@ func TestWithPubsubOptionsMultiple(t *testing.T) {
 	require.True(t, node.Gossipsub.IsStarted())
 }
 
-// TestWithPubsubOptionsScoring tests providing peer scoring options
+// TestWithPubsubOptionsScoring tests providing peer scoring options.
 func TestWithPubsubOptionsScoring(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -98,7 +98,7 @@ func TestWithPubsubOptionsScoring(t *testing.T) {
 	require.True(t, node.Gossipsub.IsStarted())
 }
 
-// TestWithPubsubOptionsIntegration tests pubsub options work with actual pub/sub
+// TestWithPubsubOptionsIntegration tests pubsub options work with actual pub/sub.
 func TestWithPubsubOptionsIntegration(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

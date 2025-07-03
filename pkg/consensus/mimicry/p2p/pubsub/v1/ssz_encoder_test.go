@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// SSZTestMessage implements fastssz.Marshaler and fastssz.Unmarshaler for testing
+// SSZTestMessage implements fastssz.Marshaler and fastssz.Unmarshaler for testing.
 type SSZTestMessage struct {
 	Value uint64
 	Data  []byte
@@ -20,6 +20,7 @@ func (m *SSZTestMessage) MarshalSSZ() ([]byte, error) {
 	buf := make([]byte, 8+len(m.Data))
 	binary.LittleEndian.PutUint64(buf[0:8], m.Value)
 	copy(buf[8:], m.Data)
+
 	return buf, nil
 }
 
@@ -30,6 +31,7 @@ func (m *SSZTestMessage) UnmarshalSSZ(data []byte) error {
 	m.Value = binary.LittleEndian.Uint64(data[0:8])
 	m.Data = make([]byte, len(data)-8)
 	copy(m.Data, data[8:])
+
 	return nil
 }
 

@@ -38,9 +38,11 @@ func Register[T any](r *Registry, topic *Topic[T], handler *HandlerConfig[T]) er
 	if r == nil {
 		return fmt.Errorf("registry is nil")
 	}
+
 	if topic == nil {
 		return fmt.Errorf("topic is nil")
 	}
+
 	if handler == nil {
 		return fmt.Errorf("handler is nil")
 	}
@@ -69,6 +71,7 @@ func Register[T any](r *Registry, topic *Topic[T], handler *HandlerConfig[T]) er
 		scoreParams: handler.scoreParams,
 		events:      handler.events,
 	}
+
 	return nil
 }
 
@@ -79,9 +82,11 @@ func RegisterSubnet[T any](r *Registry, subnetTopic *SubnetTopic[T], handler *Ha
 	if r == nil {
 		return fmt.Errorf("registry is nil")
 	}
+
 	if subnetTopic == nil {
 		return fmt.Errorf("subnet topic is nil")
 	}
+
 	if handler == nil {
 		return fmt.Errorf("handler is nil")
 	}
@@ -111,6 +116,7 @@ func RegisterSubnet[T any](r *Registry, subnetTopic *SubnetTopic[T], handler *Ha
 		scoreParams: handler.scoreParams,
 		events:      handler.events,
 	}
+
 	return nil
 }
 
@@ -166,6 +172,7 @@ func (r *Registry) Clear() {
 func (r *Registry) TopicCount() int {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
+
 	return len(r.handlers)
 }
 
@@ -173,6 +180,7 @@ func (r *Registry) TopicCount() int {
 func (r *Registry) SubnetPatternCount() int {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
+
 	return len(r.subnetHandlers)
 }
 
@@ -185,9 +193,11 @@ func wrapDecoder[T any](decoder Decoder[T], encoder Encoder[T]) Decoder[any] {
 			return encoder.Decode(data)
 		}
 	}
+
 	if decoder == nil {
 		return nil
 	}
+
 	return func(data []byte) (any, error) {
 		return decoder(data)
 	}
@@ -198,6 +208,7 @@ func wrapValidator[T any](validator Validator[T]) Validator[any] {
 	if validator == nil {
 		return nil
 	}
+
 	return func(ctx context.Context, msg any, from peer.ID) ValidationResult {
 		// Type assert the message to the expected type
 		typedMsg, ok := msg.(T)
@@ -205,6 +216,7 @@ func wrapValidator[T any](validator Validator[T]) Validator[any] {
 			// If type assertion fails, reject the message
 			return ValidationReject
 		}
+
 		return validator(ctx, typedMsg, from)
 	}
 }
@@ -214,12 +226,14 @@ func wrapProcessor[T any](processor Processor[T]) Processor[any] {
 	if processor == nil {
 		return nil
 	}
+
 	return func(ctx context.Context, msg any, from peer.ID) error {
 		// Type assert the message to the expected type
 		typedMsg, ok := msg.(T)
 		if !ok {
 			return fmt.Errorf("processor type assertion failed: expected %T, got %T", *new(T), msg)
 		}
+
 		return processor(ctx, typedMsg, from)
 	}
 }

@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub/v1"
+	v1 "github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub/v1"
 	"github.com/libp2p/go-libp2p"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/crypto"
@@ -20,16 +20,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestNode represents a test node with its gossipsub instance and host
+// TestNode represents a test node with its gossipsub instance and host.
 type TestNode struct {
 	ID        peer.ID
 	Host      host.Host
 	Gossipsub *v1.Gossipsub
-	ctx       context.Context
 	cancel    context.CancelFunc
 }
 
-// Close shuts down the test node
+// Close shuts down the test node.
 func (n *TestNode) Close() error {
 	if n.Gossipsub != nil {
 		if err := n.Gossipsub.Stop(); err != nil {
@@ -44,22 +43,24 @@ func (n *TestNode) Close() error {
 	if n.cancel != nil {
 		n.cancel()
 	}
+
 	return nil
 }
 
-// GossipTestMessage is a simple test message type for gossipsub tests
+// GossipTestMessage is a simple test message type for gossipsub tests.
 type GossipTestMessage struct {
 	ID      string
 	Content string
 	From    string
 }
 
-// TestEncoder implements the Encoder interface for GossipTestMessage
+// TestEncoder implements the Encoder interface for GossipTestMessage.
 type TestEncoder struct{}
 
 func (e *TestEncoder) Encode(msg GossipTestMessage) ([]byte, error) {
 	// Simple encoding: "ID|Content|From"
 	encoded := fmt.Sprintf("%s|%s|%s", msg.ID, msg.Content, msg.From)
+
 	return []byte(encoded), nil
 }
 
@@ -82,21 +83,23 @@ func (e *TestEncoder) Decode(data []byte) (GossipTestMessage, error) {
 	return msg, nil
 }
 
-// TestInfrastructure provides common test setup and utilities
+// TestInfrastructure provides common test setup and utilities.
 type TestInfrastructure struct {
 	t     *testing.T
 	nodes []*TestNode
 }
 
-// NewTestInfrastructure creates a new test infrastructure
+// NewTestInfrastructure creates a new test infrastructure.
 func NewTestInfrastructure(t *testing.T) *TestInfrastructure {
+	t.Helper()
+
 	return &TestInfrastructure{
 		t:     t,
 		nodes: make([]*TestNode, 0),
 	}
 }
 
-// CreateNode creates a new test node with gossipsub
+// CreateNode creates a new test node with gossipsub.
 func (ti *TestInfrastructure) CreateNode(ctx context.Context, opts ...v1.Option) (*TestNode, error) {
 	// Generate a new key pair for the node
 	priv, _, err := crypto.GenerateKeyPairWithReader(crypto.RSA, 2048, rand.Reader)
@@ -136,6 +139,7 @@ func (ti *TestInfrastructure) CreateNode(ctx context.Context, opts ...v1.Option)
 	if err != nil {
 		cancel()
 		h.Close()
+
 		return nil, fmt.Errorf("failed to create gossipsub: %w", err)
 	}
 
@@ -143,15 +147,15 @@ func (ti *TestInfrastructure) CreateNode(ctx context.Context, opts ...v1.Option)
 		ID:        h.ID(),
 		Host:      h,
 		Gossipsub: gossipsub,
-		ctx:       nodeCtx,
 		cancel:    cancel,
 	}
 
 	ti.nodes = append(ti.nodes, node)
+
 	return node, nil
 }
 
-// ConnectNodes connects two nodes together
+// ConnectNodes connects two nodes together.
 func (ti *TestInfrastructure) ConnectNodes(node1, node2 *TestNode) error {
 	// Get node2's addresses
 	addrs := node2.Host.Addrs()
@@ -177,14 +181,14 @@ func (ti *TestInfrastructure) ConnectNodes(node1, node2 *TestNode) error {
 	return nil
 }
 
-// waitForConnection waits for a connection to be established
+// waitForConnection waits for a connection to be established.
 func (ti *TestInfrastructure) waitForConnection(node *TestNode, targetID peer.ID) {
 	require.Eventually(ti.t, func() bool {
 		return node.Host.Network().Connectedness(targetID) == network.Connected
 	}, 5*time.Second, 100*time.Millisecond)
 }
 
-// CreateFullyConnectedNetwork creates n nodes and connects them all together
+// CreateFullyConnectedNetwork creates n nodes and connects them all together.
 func (ti *TestInfrastructure) CreateFullyConnectedNetwork(ctx context.Context, n int, opts ...v1.Option) ([]*TestNode, error) {
 	nodes := make([]*TestNode, n)
 
@@ -212,7 +216,7 @@ func (ti *TestInfrastructure) CreateFullyConnectedNetwork(ctx context.Context, n
 	return nodes, nil
 }
 
-// Cleanup closes all nodes created by this infrastructure
+// Cleanup closes all nodes created by this infrastructure.
 func (ti *TestInfrastructure) Cleanup() {
 	for _, node := range ti.nodes {
 		if err := node.Close(); err != nil {
@@ -222,20 +226,20 @@ func (ti *TestInfrastructure) Cleanup() {
 	ti.nodes = nil
 }
 
-// MessageCollector helps collect messages received by nodes
+// MessageCollector helps collect messages received by nodes.
 type MessageCollector struct {
 	messages chan ReceivedMessage
 	errors   chan error
 }
 
-// ReceivedMessage represents a message received by a node
+// ReceivedMessage represents a message received by a node.
 type ReceivedMessage struct {
 	Node    peer.ID
 	Message GossipTestMessage
 	From    peer.ID
 }
 
-// NewMessageCollector creates a new message collector
+// NewMessageCollector creates a new message collector.
 func NewMessageCollector(bufferSize int) *MessageCollector {
 	return &MessageCollector{
 		messages: make(chan ReceivedMessage, bufferSize),
@@ -243,7 +247,7 @@ func NewMessageCollector(bufferSize int) *MessageCollector {
 	}
 }
 
-// CreateProcessor creates a processor function that sends messages to the collector
+// CreateProcessor creates a processor function that sends messages to the collector.
 func (mc *MessageCollector) CreateProcessor(nodeID peer.ID) v1.Processor[GossipTestMessage] {
 	return func(ctx context.Context, msg GossipTestMessage, from peer.ID) error {
 		select {
@@ -255,11 +259,12 @@ func (mc *MessageCollector) CreateProcessor(nodeID peer.ID) v1.Processor[GossipT
 		case <-ctx.Done():
 			return ctx.Err()
 		}
+
 		return nil
 	}
 }
 
-// GetMessages returns all collected messages
+// GetMessages returns all collected messages.
 func (mc *MessageCollector) GetMessages() []ReceivedMessage {
 	var msgs []ReceivedMessage
 	for {
@@ -272,17 +277,17 @@ func (mc *MessageCollector) GetMessages() []ReceivedMessage {
 	}
 }
 
-// GetMessageCount returns the number of messages collected
+// GetMessageCount returns the number of messages collected.
 func (mc *MessageCollector) GetMessageCount() int {
 	return len(mc.messages)
 }
 
-// CreateTestTopic creates a test topic with the given name
+// CreateTestTopic creates a test topic with the given name.
 func CreateTestTopic(name string) (*v1.Topic[GossipTestMessage], error) {
 	return v1.NewTopic[GossipTestMessage](name)
 }
 
-// CreateTestHandler creates a handler config with the given processor
+// CreateTestHandler creates a handler config with the given processor.
 func CreateTestHandler(processor v1.Processor[GossipTestMessage]) *v1.HandlerConfig[GossipTestMessage] {
 	return v1.NewHandlerConfig(
 		v1.WithEncoder(&TestEncoder{}),
@@ -294,8 +299,9 @@ func CreateTestHandler(processor v1.Processor[GossipTestMessage]) *v1.HandlerCon
 	)
 }
 
-// WaitForGossipsubReady waits for gossipsub to be ready with the expected number of peers on a topic
+// WaitForGossipsubReady waits for gossipsub to be ready with the expected number of peers on a topic.
 func WaitForGossipsubReady(t *testing.T, nodes []*TestNode, topicName string, expectedPeers int) {
+	t.Helper()
 	require.Eventually(t, func() bool {
 		for i, node := range nodes {
 			// Check if node has the expected number of peers for the topic
@@ -306,6 +312,7 @@ func WaitForGossipsubReady(t *testing.T, nodes []*TestNode, topicName string, ex
 				return false
 			}
 		}
+
 		return true
 	}, 30*time.Second, 500*time.Millisecond, "Gossipsub mesh not fully formed")
 }
@@ -337,12 +344,12 @@ func TestGossipsubThreeNodeMessagePropagation(t *testing.T) {
 		handler := CreateTestHandler(collector.CreateProcessor(node.ID))
 
 		// Register handler
-		err := v1.Register(node.Gossipsub.Registry(), topic, handler)
-		require.NoError(t, err)
+		regErr := v1.Register(node.Gossipsub.Registry(), topic, handler)
+		require.NoError(t, regErr)
 
 		// Subscribe to topic
-		sub, err := v1.Subscribe(ctx, node.Gossipsub, topic)
-		require.NoError(t, err)
+		sub, subErr := v1.Subscribe(ctx, node.Gossipsub, topic)
+		require.NoError(t, subErr)
 		require.NotNil(t, sub)
 		subscriptions[i] = sub
 
@@ -408,9 +415,10 @@ func TestGossipsubThreeNodeMessagePropagation(t *testing.T) {
 		assert.Equal(t, testMsg.Content, msg.Message.Content)
 		assert.Equal(t, testMsg.From, msg.Message.From)
 
-		if msg.Node == nodes[1].ID {
+		switch msg.Node {
+		case nodes[1].ID:
 			receivedByNode1 = true
-		} else if msg.Node == nodes[2].ID {
+		case nodes[2].ID:
 			receivedByNode2 = true
 		}
 	}
@@ -527,11 +535,11 @@ func TestGossipsubUnsubscribe(t *testing.T) {
 		collectors[i] = NewMessageCollector(5)
 		handler := CreateTestHandler(collectors[i].CreateProcessor(node.ID))
 
-		err := v1.Register(node.Gossipsub.Registry(), topic, handler)
-		require.NoError(t, err)
+		regErr := v1.Register(node.Gossipsub.Registry(), topic, handler)
+		require.NoError(t, regErr)
 
-		sub, err := v1.Subscribe(ctx, node.Gossipsub, topic)
-		require.NoError(t, err)
+		sub, subErr := v1.Subscribe(ctx, node.Gossipsub, topic)
+		require.NoError(t, subErr)
 		subscriptions[i] = sub
 	}
 
@@ -597,18 +605,18 @@ func TestGossipsubTopicIsolation(t *testing.T) {
 
 		if i == 0 || i == 1 { // Nodes 0 and 1 subscribe to topic A
 			handlerA := CreateTestHandler(collectorsA[i].CreateProcessor(node.ID))
-			err := v1.Register(node.Gossipsub.Registry(), topicA, handlerA)
-			require.NoError(t, err)
-			_, err = v1.Subscribe(ctx, node.Gossipsub, topicA)
-			require.NoError(t, err)
+			regErrA := v1.Register(node.Gossipsub.Registry(), topicA, handlerA)
+			require.NoError(t, regErrA)
+			_, subErrA := v1.Subscribe(ctx, node.Gossipsub, topicA)
+			require.NoError(t, subErrA)
 		}
 
 		if i == 0 || i == 2 { // Nodes 0 and 2 subscribe to topic B
 			handlerB := CreateTestHandler(collectorsB[i].CreateProcessor(node.ID))
-			err := v1.Register(node.Gossipsub.Registry(), topicB, handlerB)
-			require.NoError(t, err)
-			_, err = v1.Subscribe(ctx, node.Gossipsub, topicB)
-			require.NoError(t, err)
+			regErrB := v1.Register(node.Gossipsub.Registry(), topicB, handlerB)
+			require.NoError(t, regErrB)
+			_, subErrB := v1.Subscribe(ctx, node.Gossipsub, topicB)
+			require.NoError(t, subErrB)
 		}
 	}
 

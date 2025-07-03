@@ -57,7 +57,18 @@ func (e *SSZEncoder[T]) Decode(data []byte) (T, error) {
 
 	// Return the appropriate value
 	if msgType.Kind() == reflect.Ptr {
-		return target.Interface().(T), nil
+		val, convertOk := target.Interface().(T)
+		if !convertOk {
+			return zero, fmt.Errorf("failed to convert to target type")
+		}
+
+		return val, nil
 	}
-	return target.Elem().Interface().(T), nil
+
+	val, convertOk := target.Elem().Interface().(T)
+	if !convertOk {
+		return zero, fmt.Errorf("failed to convert to target type")
+	}
+
+	return val, nil
 }

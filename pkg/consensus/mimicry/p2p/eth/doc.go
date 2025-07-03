@@ -443,14 +443,14 @@
 //
 // # Best Practices
 //
-//   1. Implement comprehensive logging with structured fields
-//   2. Use metrics for observability and alerting
-//   3. Handle network partitions gracefully
-//   4. Implement proper error recovery mechanisms
-//   5. Test under various network conditions
-//   6. Monitor peer diversity and connection health
-//   7. Implement proper backpressure mechanisms
-//   8. Use appropriate buffer sizes for high-volume topics
-//   9. Implement graceful shutdown procedures
-//   10. Follow Ethereum specification requirements exactly
+//  1. Implement comprehensive logging with structured fields
+//  2. Use metrics for observability and alerting
+//  3. Handle network partitions gracefully
+//  4. Implement proper error recovery mechanisms
+//  5. Test under various network conditions
+//  6. Monitor peer diversity and connection health
+//  7. Implement proper backpressure mechanisms
+//  8. Use appropriate buffer sizes for high-volume topics
+//  9. Implement graceful shutdown procedures
+//  10. Follow Ethereum specification requirements exactly
 package eth

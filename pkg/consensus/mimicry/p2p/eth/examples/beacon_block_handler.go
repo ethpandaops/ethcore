@@ -47,17 +47,7 @@ type BlockMetrics struct {
 	processingErrors uint64
 }
 
-// ExampleBeaconBlockSetup demonstrates how to set up a beacon block handler
-// with validation, processing, and event monitoring using the v1 API.
-//
-// This example shows the complete setup process:
-// 1. Create a libp2p host
-// 2. Initialize the beacon block handler
-// 3. Create a Gossipsub instance with production settings
-// 4. Set up the beacon block topic with proper encoding
-// 5. Configure handler with validation and processing
-// 6. Register and subscribe to the topic
-// 7. Monitor events for debugging and metrics
+// 7. Monitor events for debugging and metrics.
 func ExampleBeaconBlockSetup(ctx context.Context, db *sql.DB, log logrus.FieldLogger) error {
 	// Create a libp2p host for network communication
 	h, err := libp2p.New(
@@ -96,7 +86,12 @@ func ExampleBeaconBlockSetup(ctx context.Context, db *sql.DB, log logrus.FieldLo
 	if err != nil {
 		return fmt.Errorf("failed to create gossipsub: %w", err)
 	}
-	defer gs.Stop()
+
+	defer func() {
+		if stopErr := gs.Stop(); stopErr != nil {
+			log.WithError(stopErr).Error("Failed to stop gossipsub")
+		}
+	}()
 
 	// Create event channel for monitoring (optional but recommended)
 	events := make(chan v1.Event, 1000)
@@ -124,8 +119,8 @@ func ExampleBeaconBlockSetup(ctx context.Context, db *sql.DB, log logrus.FieldLo
 	)
 
 	// Register the handler with gossipsub
-	if err := v1.Register(gs.Registry(), typedTopic, handlerConfig); err != nil {
-		return fmt.Errorf("failed to register handler: %w", err)
+	if regErr := v1.Register(gs.Registry(), typedTopic, handlerConfig); regErr != nil {
+		return fmt.Errorf("failed to register handler: %w", regErr)
 	}
 
 	// Subscribe to the topic to start receiving messages
@@ -150,6 +145,7 @@ func ExampleBeaconBlockSetup(ctx context.Context, db *sql.DB, log logrus.FieldLo
 
 	// Keep the handler running until context is cancelled
 	<-ctx.Done()
+
 	return nil
 }
 
@@ -162,13 +158,17 @@ func (h *BeaconBlockHandler) validateBeaconBlock(ctx context.Context, block *eth
 	h.metrics.blocksReceived++
 
 	// Add timeout for validation to prevent blocking
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	validationCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
+
+	_ = validationCtx // Context available for future use
 
 	// Basic validation checks
 	if block == nil || block.Block == nil {
 		h.log.WithField("from", from).Warn("received nil block")
+
 		h.metrics.validationErrors++
+
 		return v1.ValidationReject
 	}
 
@@ -180,7 +180,9 @@ func (h *BeaconBlockHandler) validateBeaconBlock(ctx context.Context, block *eth
 			"current_slot": currentSlot,
 			"from":         from,
 		}).Warn("block slot too far in future")
+
 		h.metrics.validationErrors++
+
 		return v1.ValidationIgnore // Future blocks are ignored, not rejected
 	}
 
@@ -190,6 +192,7 @@ func (h *BeaconBlockHandler) validateBeaconBlock(ctx context.Context, block *eth
 			"block_slot":   uint64(block.Block.Slot),
 			"current_slot": currentSlot,
 		}).Debug("block too old")
+
 		return v1.ValidationIgnore
 	}
 
@@ -200,13 +203,16 @@ func (h *BeaconBlockHandler) validateBeaconBlock(ctx context.Context, block *eth
 			"block_root": fmt.Sprintf("%x", blockRoot),
 			"slot":       uint64(block.Block.Slot),
 		}).Debug("already have block")
+
 		return v1.ValidationIgnore
 	}
 
 	// Validate block signature length (simplified validation)
 	if len(block.Signature) != 96 {
 		h.log.WithField("sig_len", len(block.Signature)).Warn("invalid signature length")
+
 		h.metrics.validationErrors++
+
 		return v1.ValidationReject
 	}
 
@@ -247,25 +253,34 @@ func (h *BeaconBlockHandler) processBeaconBlock(ctx context.Context, block *eth.
 	tx, err := h.db.BeginTx(ctx, nil)
 	if err != nil {
 		h.metrics.processingErrors++
+
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+
+	defer func() {
+		if err := tx.Rollback(); err != nil {
+			h.log.WithError(err).Error("Failed to rollback transaction")
+		}
+	}()
 
 	// Save block to database
 	if err := h.saveBlock(ctx, tx, block, blockRoot); err != nil {
 		h.metrics.processingErrors++
+
 		return fmt.Errorf("failed to save block: %w", err)
 	}
 
 	// Save block metadata (peer, timing, etc.)
 	if err := h.saveBlockMetadata(ctx, tx, block, blockRoot, from); err != nil {
 		h.metrics.processingErrors++
+
 		return fmt.Errorf("failed to save block metadata: %w", err)
 	}
 
 	// Commit transaction
 	if err := tx.Commit(); err != nil {
 		h.metrics.processingErrors++
+
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
@@ -378,8 +393,10 @@ func (h *BeaconBlockHandler) monitorEvents(ctx context.Context, events <-chan v1
 
 func (h *BeaconBlockHandler) hasBlock(blockRoot [32]byte) bool {
 	var exists bool
+
 	query := `SELECT EXISTS(SELECT 1 FROM beacon_blocks WHERE root = $1)`
 	_ = h.db.QueryRow(query, blockRoot[:]).Scan(&exists)
+
 	return exists
 }
 
@@ -406,6 +423,7 @@ func (h *BeaconBlockHandler) saveBlock(ctx context.Context, tx *sql.Tx, block *e
 		block.Signature,
 		blockData,
 	)
+
 	return err
 }
 
@@ -431,6 +449,7 @@ func (h *BeaconBlockHandler) saveBlockMetadata(ctx context.Context, tx *sql.Tx, 
 		attestationCount,
 		depositCount,
 	)
+
 	return err
 }
 
@@ -448,7 +467,17 @@ func (h *BeaconBlockHandler) notifyBlockProcessed(block *eth.SignedBeaconBlock, 
 func getCurrentSlot() uint64 {
 	// In production, this would calculate based on genesis time and slot duration
 	// For example: (time.Now().Unix() - genesisTime) / secondsPerSlot
-	return uint64(time.Now().Unix()/12) % 1000000 // Simplified calculation
+	unixTime := time.Now().Unix()
+	if unixTime < 0 {
+		return 0 // Fallback for negative time (should never happen)
+	}
+
+	slotTime := unixTime / 12
+	if slotTime < 0 {
+		return 0
+	}
+
+	return uint64(slotTime) % 1000000 // Simplified calculation
 }
 
 func getBlockRoot(block *eth.SignedBeaconBlock) [32]byte {
@@ -459,12 +488,14 @@ func getBlockRoot(block *eth.SignedBeaconBlock) [32]byte {
 		copy(root[:8], []byte(fmt.Sprintf("%08d", block.Block.Slot)))
 		copy(root[8:16], []byte(fmt.Sprintf("%08d", block.Block.ProposerIndex)))
 	}
+
 	return root
 }
 
 func getBlockBodyRoot(body *eth.BeaconBlockBody) [32]byte {
 	// In production, this would compute the actual body root
 	var root [32]byte
+
 	return root
 }
 

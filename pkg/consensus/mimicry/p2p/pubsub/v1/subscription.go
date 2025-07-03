@@ -340,6 +340,7 @@ func (p *processor[T]) processMessage(ctx context.Context, msg *pubsub.Message) 
 			// Decompression error - ignore message after calling handlers
 			return
 		}
+
 		data = decompressed
 	}
 
@@ -348,6 +349,7 @@ func (p *processor[T]) processMessage(ctx context.Context, msg *pubsub.Message) 
 	if decoder == nil && p.handler.encoder != nil {
 		decoder = p.handler.encoder.Decode
 	}
+
 	if decoder == nil {
 		// No decoder available - this should not happen if handler was validated
 		return
@@ -391,5 +393,7 @@ func (p *processor[T]) processMessage(ctx context.Context, msg *pubsub.Message) 
 	if p.handler.events != nil {
 		// In production, this would publish appropriate events
 		// based on the processing results
+		// TODO: Implement event publishing
+		_ = p.handler.events // Available for future implementation
 	}
 }

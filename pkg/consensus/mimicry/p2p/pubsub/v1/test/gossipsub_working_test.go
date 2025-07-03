@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub/v1"
+	v1 "github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub/v1"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
 )
@@ -35,14 +35,15 @@ func TestWorkingMessage(t *testing.T) {
 		v1.WithProcessor(func(ctx context.Context, msg GossipTestMessage, from peer.ID) error {
 			t.Logf("Received message: %+v from %s", msg, from)
 			messageReceived = true
+
 			return nil
 		}),
 	)
 
 	// Subscribe both nodes
 	for i, node := range nodes {
-		err := v1.Register(node.Gossipsub.Registry(), topic, handler)
-		require.NoError(t, err)
+		regErr := v1.Register(node.Gossipsub.Registry(), topic, handler)
+		require.NoError(t, regErr)
 		_, err = v1.Subscribe(ctx, node.Gossipsub, topic)
 		require.NoError(t, err)
 		t.Logf("Node %d subscribed", i)

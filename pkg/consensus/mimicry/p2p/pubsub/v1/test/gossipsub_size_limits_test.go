@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub/v1"
+	v1 "github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub/v1"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/sirupsen/logrus"
@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestPublishMessageExceedingMaxSize tests publishing a message that exceeds the maximum size limit
+// TestPublishMessageExceedingMaxSize tests publishing a message that exceeds the maximum size limit.
 func TestPublishMessageExceedingMaxSize(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -43,8 +43,8 @@ func TestPublishMessageExceedingMaxSize(t *testing.T) {
 	// Register handlers and subscribe all nodes
 	for _, node := range nodes {
 		handler := CreateTestHandler(collector.CreateProcessor(node.ID))
-		err := v1.Register(node.Gossipsub.Registry(), topic, handler)
-		require.NoError(t, err)
+		regErr := v1.Register(node.Gossipsub.Registry(), topic, handler)
+		require.NoError(t, regErr)
 
 		_, err = v1.Subscribe(ctx, node.Gossipsub, topic)
 		require.NoError(t, err)
@@ -81,7 +81,7 @@ func TestPublishMessageExceedingMaxSize(t *testing.T) {
 	assert.Equal(t, 0, receiversCount, "Oversized messages should not propagate to other nodes")
 }
 
-// TestReceivingOversizedMessages tests the behavior when receiving oversized messages from peers
+// TestReceivingOversizedMessages tests the behavior when receiving oversized messages from peers.
 func TestReceivingOversizedMessages(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -157,7 +157,7 @@ func TestReceivingOversizedMessages(t *testing.T) {
 	// This is implementation-specific and may vary
 }
 
-// TestCustomMaxMessageSizeConfiguration tests custom message size configuration
+// TestCustomMaxMessageSizeConfiguration tests custom message size configuration.
 func TestCustomMaxMessageSizeConfiguration(t *testing.T) {
 	testCases := []struct {
 		name        string
@@ -213,8 +213,8 @@ func TestCustomMaxMessageSizeConfiguration(t *testing.T) {
 			collector := NewMessageCollector(5)
 			for _, node := range nodes {
 				handler := CreateTestHandler(collector.CreateProcessor(node.ID))
-				err := v1.Register(node.Gossipsub.Registry(), topic, handler)
-				require.NoError(t, err)
+				regErr := v1.Register(node.Gossipsub.Registry(), topic, handler)
+				require.NoError(t, regErr)
 
 				_, err = v1.Subscribe(ctx, node.Gossipsub, topic)
 				require.NoError(t, err)
@@ -260,7 +260,7 @@ func TestCustomMaxMessageSizeConfiguration(t *testing.T) {
 	}
 }
 
-// TestMessageSizeLimitEdgeCases tests edge cases around message size limits
+// TestMessageSizeLimitEdgeCases tests edge cases around message size limits.
 func TestMessageSizeLimitEdgeCases(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -284,8 +284,8 @@ func TestMessageSizeLimitEdgeCases(t *testing.T) {
 	collector := NewMessageCollector(10)
 	for _, node := range nodes {
 		handler := CreateTestHandler(collector.CreateProcessor(node.ID))
-		err := v1.Register(node.Gossipsub.Registry(), topic, handler)
-		require.NoError(t, err)
+		regErr := v1.Register(node.Gossipsub.Registry(), topic, handler)
+		require.NoError(t, regErr)
 
 		_, err = v1.Subscribe(ctx, node.Gossipsub, topic)
 		require.NoError(t, err)
@@ -375,7 +375,7 @@ func TestMessageSizeLimitEdgeCases(t *testing.T) {
 	}
 }
 
-// TestDefaultMessageSizeLimit tests the default message size limit behavior
+// TestDefaultMessageSizeLimit tests the default message size limit behavior.
 func TestDefaultMessageSizeLimit(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -396,8 +396,8 @@ func TestDefaultMessageSizeLimit(t *testing.T) {
 	collector := NewMessageCollector(5)
 	for _, node := range nodes {
 		handler := CreateTestHandler(collector.CreateProcessor(node.ID))
-		err := v1.Register(node.Gossipsub.Registry(), topic, handler)
-		require.NoError(t, err)
+		regErr := v1.Register(node.Gossipsub.Registry(), topic, handler)
+		require.NoError(t, regErr)
 
 		_, err = v1.Subscribe(ctx, node.Gossipsub, topic)
 		require.NoError(t, err)
@@ -452,13 +452,14 @@ func TestDefaultMessageSizeLimit(t *testing.T) {
 	assert.Equal(t, 0, receiversCount, "15MB message should not propagate with default 10MB limit")
 }
 
-// VerboseEncoder is a test encoder that adds significant overhead to messages
+// VerboseEncoder is a test encoder that adds significant overhead to messages.
 type VerboseEncoder struct{}
 
 func (e *VerboseEncoder) Encode(msg GossipTestMessage) ([]byte, error) {
 	// Add verbose encoding with metadata
 	encoded := fmt.Sprintf("VERSION:1|ID:%s|CONTENT:%s|FROM:%s|CHECKSUM:12345",
 		msg.ID, msg.Content, msg.From)
+
 	return []byte(encoded), nil
 }
 
@@ -494,7 +495,7 @@ func (e *VerboseEncoder) Decode(data []byte) (GossipTestMessage, error) {
 	}, nil
 }
 
-// TestMessageSizeWithDifferentEncodings tests size limits with different message encodings
+// TestMessageSizeWithDifferentEncodings tests size limits with different message encodings.
 func TestMessageSizeWithDifferentEncodings(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -525,8 +526,8 @@ func TestMessageSizeWithDifferentEncodings(t *testing.T) {
 				return v1.ValidationAccept
 			}),
 		)
-		err := v1.Register(node.Gossipsub.Registry(), verboseTopic, handler)
-		require.NoError(t, err)
+		regErr := v1.Register(node.Gossipsub.Registry(), verboseTopic, handler)
+		require.NoError(t, regErr)
 
 		_, err = v1.Subscribe(ctx, node.Gossipsub, verboseTopic)
 		require.NoError(t, err)
@@ -580,7 +581,7 @@ func TestMessageSizeWithDifferentEncodings(t *testing.T) {
 	}, 2*time.Second, 100*time.Millisecond)
 }
 
-// TestInvalidMaxMessageSizeConfiguration tests invalid configuration handling
+// TestInvalidMaxMessageSizeConfiguration tests invalid configuration handling.
 func TestInvalidMaxMessageSizeConfiguration(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -615,7 +616,7 @@ func TestInvalidMaxMessageSizeConfiguration(t *testing.T) {
 	}
 }
 
-// TestConcurrentMessageSizeLimit tests size limits under concurrent publishing
+// TestConcurrentMessageSizeLimit tests size limits under concurrent publishing.
 func TestConcurrentMessageSizeLimit(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -642,8 +643,8 @@ func TestConcurrentMessageSizeLimit(t *testing.T) {
 	for i, node := range nodes {
 		collectors[i] = NewMessageCollector(50)
 		handler := CreateTestHandler(collectors[i].CreateProcessor(node.ID))
-		err := v1.Register(node.Gossipsub.Registry(), topic, handler)
-		require.NoError(t, err)
+		regErr := v1.Register(node.Gossipsub.Registry(), topic, handler)
+		require.NoError(t, regErr)
 
 		_, err = v1.Subscribe(ctx, node.Gossipsub, topic)
 		require.NoError(t, err)
