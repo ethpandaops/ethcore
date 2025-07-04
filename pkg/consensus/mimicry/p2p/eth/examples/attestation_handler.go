@@ -20,11 +20,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/OffchainLabs/prysm/v6/beacon-chain/p2p"
 	eth "github.com/OffchainLabs/prysm/v6/proto/prysm/v1alpha1"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/eth/topics"
 	v1 "github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub/v1"
 	"github.com/libp2p/go-libp2p"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/sirupsen/logrus"
 )
@@ -92,6 +95,10 @@ func ExampleAttestationSetup(ctx context.Context, log logrus.FieldLogger) error 
 	// Fork digest for the current network fork
 	forkDigest := [4]byte{0x6a, 0x95, 0xa1, 0xa3} // Example mainnet fork digest
 
+	// Genesis root
+	genesisRoot := "0x0000000000000000000000000000000000000000000000000000000000000000"
+	genesisRootBytes := common.HexToHash(genesisRoot)
+
 	// Create metrics for monitoring
 	metrics := v1.NewMetrics("attestation_gossipsub")
 
@@ -104,6 +111,9 @@ func ExampleAttestationSetup(ctx context.Context, log logrus.FieldLogger) error 
 		v1.WithPubsubOptions(
 			pubsub.WithMaxMessageSize(1*1024*1024), // 1 MB max for attestations
 			pubsub.WithValidateWorkers(200),        // Higher concurrency for attestations
+			pubsub.WithMessageIdFn(func(pmsg *pubsub_pb.Message) string { // Custom message ID function, critical for Ethereum
+				return p2p.MsgID(genesisRootBytes[:], pmsg)
+			}),
 		),
 	)
 	if err != nil {
@@ -246,97 +256,7 @@ func (h *AttestationHandler) validateAttestationSubnet(
 ) v1.ValidationResult {
 	h.metrics.incrementReceived(subnet)
 
-	// Add timeout for validation
-	validationCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
-	defer cancel()
-
-	_ = validationCtx // Context available for future use
-
-	// Validate basic attestation structure
-	if att == nil || att.Data == nil {
-		h.log.WithFields(logrus.Fields{
-			"subnet": subnet,
-			"from":   from,
-		}).Debug("received nil attestation or data")
-		h.metrics.incrementValidationError(subnet)
-
-		return v1.ValidationReject
-	}
-
-	// Check if attestation belongs to this subnet
-	expectedSubnet := computeSubnetForAttestation(att)
-	if expectedSubnet != subnet {
-		h.log.WithFields(logrus.Fields{
-			"subnet":          subnet,
-			"expected_subnet": expectedSubnet,
-			"slot":            att.Data.Slot,
-			"committee_index": att.Data.CommitteeIndex,
-		}).Debug("attestation on wrong subnet")
-		h.metrics.incrementValidationError(subnet)
-
-		return v1.ValidationReject
-	}
-
-	// Validate attestation slot timing
-	currentSlot := getCurrentSlot()
-	attSlot := uint64(att.Data.Slot)
-
-	// Check if attestation is from the future
-	if attSlot > currentSlot+1 {
-		h.log.WithFields(logrus.Fields{
-			"subnet":       subnet,
-			"att_slot":     attSlot,
-			"current_slot": currentSlot,
-		}).Debug("attestation from future slot")
-		h.metrics.incrementValidationError(subnet)
-
-		return v1.ValidationIgnore // Future attestations are ignored, not rejected
-	}
-
-	// Check if attestation is too old (keep for ~13 minutes)
-	if attSlot+64 < currentSlot {
-		h.log.WithFields(logrus.Fields{
-			"subnet":       subnet,
-			"att_slot":     attSlot,
-			"current_slot": currentSlot,
-		}).Debug("attestation too old")
-		h.metrics.incrementValidationError(subnet)
-
-		return v1.ValidationIgnore
-	}
-
-	// Check aggregation bits length
-	if len(att.AggregationBits) == 0 {
-		h.log.WithField("subnet", subnet).Debug("invalid aggregation bits")
-		h.metrics.incrementValidationError(subnet)
-
-		return v1.ValidationReject
-	}
-
-	// Check signature length
-	if len(att.Signature) != 96 {
-		h.log.WithFields(logrus.Fields{
-			"subnet":  subnet,
-			"sig_len": len(att.Signature),
-		}).Debug("invalid signature length")
-		h.metrics.incrementValidationError(subnet)
-
-		return v1.ValidationReject
-	}
-
-	// Additional validation in production would include:
-	// - Committee membership verification
-	// - Signature verification
-	// - FFG target verification
-	// - LMD GHOST head verification
-
-	h.metrics.incrementValidated(subnet)
-	h.log.WithFields(logrus.Fields{
-		"subnet":          subnet,
-		"slot":            attSlot,
-		"committee_index": att.Data.CommitteeIndex,
-		"from":            from,
-	}).Debug("attestation validated")
+	// Do your validation here
 
 	return v1.ValidationAccept
 }

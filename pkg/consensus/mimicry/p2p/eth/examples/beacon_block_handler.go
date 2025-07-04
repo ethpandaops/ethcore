@@ -21,11 +21,14 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/OffchainLabs/prysm/v6/beacon-chain/p2p"
 	eth "github.com/OffchainLabs/prysm/v6/proto/prysm/v1alpha1"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/eth/topics"
 	v1 "github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub/v1"
 	"github.com/libp2p/go-libp2p"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/sirupsen/logrus"
 )
@@ -69,6 +72,10 @@ func ExampleBeaconBlockSetup(ctx context.Context, db *sql.DB, log logrus.FieldLo
 	// Fork digest for the current network fork (example for mainnet)
 	forkDigest := [4]byte{0x6a, 0x95, 0xa1, 0xa3} // Example mainnet fork digest
 
+	// Genesis root
+	genesisRoot := "0x0000000000000000000000000000000000000000000000000000000000000000"
+	genesisRootBytes := common.HexToHash(genesisRoot)
+
 	// Create metrics for monitoring (optional)
 	metrics := v1.NewMetrics("gossipsub_example")
 
@@ -81,6 +88,9 @@ func ExampleBeaconBlockSetup(ctx context.Context, db *sql.DB, log logrus.FieldLo
 		v1.WithPubsubOptions(
 			pubsub.WithMaxMessageSize(10*1024*1024), // 10 MB max for beacon blocks
 			pubsub.WithValidateWorkers(100),         // Process up to 100 messages concurrently
+			pubsub.WithMessageIdFn(func(pmsg *pubsub_pb.Message) string { // Custom message ID function, critical for Ethereum
+				return p2p.MsgID(genesisRootBytes[:], pmsg)
+			}),
 		),
 	)
 	if err != nil {
@@ -155,80 +165,9 @@ func ExampleBeaconBlockSetup(ctx context.Context, db *sql.DB, log logrus.FieldLo
 // v1.ValidationReject to reject and penalize the sender,
 // or v1.ValidationIgnore to ignore without penalty.
 func (h *BeaconBlockHandler) validateBeaconBlock(ctx context.Context, block *eth.SignedBeaconBlock, from peer.ID) v1.ValidationResult {
-	h.metrics.blocksReceived++
-
-	// Add timeout for validation to prevent blocking
-	validationCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
-	_ = validationCtx // Context available for future use
-
-	// Basic validation checks
-	if block == nil || block.Block == nil {
-		h.log.WithField("from", from).Warn("received nil block")
-
-		h.metrics.validationErrors++
-
+	if block.Block == nil {
 		return v1.ValidationReject
 	}
-
-	// Check block slot is reasonable (not too far in future)
-	currentSlot := getCurrentSlot()
-	if uint64(block.Block.Slot) > currentSlot+10 {
-		h.log.WithFields(logrus.Fields{
-			"block_slot":   uint64(block.Block.Slot),
-			"current_slot": currentSlot,
-			"from":         from,
-		}).Warn("block slot too far in future")
-
-		h.metrics.validationErrors++
-
-		return v1.ValidationIgnore // Future blocks are ignored, not rejected
-	}
-
-	// Check if block is too old
-	if uint64(block.Block.Slot)+32 < currentSlot { // Keep blocks for ~6 minutes
-		h.log.WithFields(logrus.Fields{
-			"block_slot":   uint64(block.Block.Slot),
-			"current_slot": currentSlot,
-		}).Debug("block too old")
-
-		return v1.ValidationIgnore
-	}
-
-	// Check if we've already seen this block
-	blockRoot := getBlockRoot(block)
-	if h.hasBlock(blockRoot) {
-		h.log.WithFields(logrus.Fields{
-			"block_root": fmt.Sprintf("%x", blockRoot),
-			"slot":       uint64(block.Block.Slot),
-		}).Debug("already have block")
-
-		return v1.ValidationIgnore
-	}
-
-	// Validate block signature length (simplified validation)
-	if len(block.Signature) != 96 {
-		h.log.WithField("sig_len", len(block.Signature)).Warn("invalid signature length")
-
-		h.metrics.validationErrors++
-
-		return v1.ValidationReject
-	}
-
-	// Additional validation in production would include:
-	// - Parent block exists and is valid
-	// - Proposer is authorized for this slot
-	// - Block follows fork choice rules
-	// - State transition is valid
-	// - BLS signature verification
-
-	h.metrics.blocksValidated++
-	h.log.WithFields(logrus.Fields{
-		"slot":     uint64(block.Block.Slot),
-		"proposer": block.Block.ProposerIndex,
-		"from":     from,
-	}).Debug("block validated")
 
 	return v1.ValidationAccept
 }
@@ -237,66 +176,10 @@ func (h *BeaconBlockHandler) validateBeaconBlock(ctx context.Context, block *eth
 // This is called after validation has passed and the block has been accepted.
 // Any error returned here will be logged but won't affect message propagation.
 func (h *BeaconBlockHandler) processBeaconBlock(ctx context.Context, block *eth.SignedBeaconBlock, from peer.ID) error {
-	startTime := time.Now()
-	defer func() {
-		h.log.WithField("duration", time.Since(startTime)).Debug("block processing completed")
-	}()
-
-	// Add timeout for processing to prevent hanging
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	// Calculate block root for storage
-	blockRoot := getBlockRoot(block)
-
-	// Begin database transaction for atomic operations
-	tx, err := h.db.BeginTx(ctx, nil)
-	if err != nil {
-		h.metrics.processingErrors++
-
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-
-	defer func() {
-		if err := tx.Rollback(); err != nil {
-			h.log.WithError(err).Error("Failed to rollback transaction")
-		}
-	}()
-
-	// Save block to database
-	if err := h.saveBlock(ctx, tx, block, blockRoot); err != nil {
-		h.metrics.processingErrors++
-
-		return fmt.Errorf("failed to save block: %w", err)
-	}
-
-	// Save block metadata (peer, timing, etc.)
-	if err := h.saveBlockMetadata(ctx, tx, block, blockRoot, from); err != nil {
-		h.metrics.processingErrors++
-
-		return fmt.Errorf("failed to save block metadata: %w", err)
-	}
-
-	// Commit transaction
-	if err := tx.Commit(); err != nil {
-		h.metrics.processingErrors++
-
-		return fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
-	h.metrics.blocksProcessed++
-	h.metrics.blocksSaved++
-
-	h.log.WithFields(logrus.Fields{
-		"slot":       uint64(block.Block.Slot),
-		"proposer":   block.Block.ProposerIndex,
-		"block_root": fmt.Sprintf("%x", blockRoot),
-		"from":       from,
-	}).Info("beacon block saved to database")
 
 	// Trigger any downstream processing asynchronously
 	// In production, this might update fork choice, notify subscribers, etc.
-	go h.notifyBlockProcessed(block, blockRoot)
+	go h.notifyBlockProcessed(block)
 
 	return nil
 }
@@ -453,17 +336,15 @@ func (h *BeaconBlockHandler) saveBlockMetadata(ctx context.Context, tx *sql.Tx, 
 	return err
 }
 
-func (h *BeaconBlockHandler) notifyBlockProcessed(block *eth.SignedBeaconBlock, root [32]byte) {
+func (h *BeaconBlockHandler) notifyBlockProcessed(block *eth.SignedBeaconBlock) {
 	// In production, this would notify other components about the new block
 	// For example: update fork choice, trigger state transition, notify API subscribers
 	h.log.WithFields(logrus.Fields{
-		"slot":       uint64(block.Block.Slot),
-		"block_root": fmt.Sprintf("%x", root),
+		"slot": uint64(block.Block.Slot),
 	}).Debug("block processing notification sent")
 }
 
 // Utility functions
-
 func getCurrentSlot() uint64 {
 	// In production, this would calculate based on genesis time and slot duration
 	// For example: (time.Now().Unix() - genesisTime) / secondsPerSlot
@@ -522,33 +403,3 @@ func createTopicScoreParams() *pubsub.TopicScoreParams {
 		InvalidMessageDeliveriesDecay:   0.3,
 	}
 }
-
-// Example database schema for reference:
-/*
-CREATE TABLE beacon_blocks (
-    root BYTEA PRIMARY KEY,
-    slot BIGINT NOT NULL,
-    proposer_index BIGINT NOT NULL,
-    parent_root BYTEA NOT NULL,
-    state_root BYTEA NOT NULL,
-    body_root BYTEA NOT NULL,
-    signature BYTEA NOT NULL,
-    raw_data BYTEA NOT NULL,
-    created_at TIMESTAMP DEFAULT NOW()
-);
-
-CREATE INDEX idx_beacon_blocks_slot ON beacon_blocks(slot);
-CREATE INDEX idx_beacon_blocks_proposer ON beacon_blocks(proposer_index);
-
-CREATE TABLE block_metadata (
-    id SERIAL PRIMARY KEY,
-    block_root BYTEA NOT NULL REFERENCES beacon_blocks(root),
-    received_from TEXT NOT NULL,
-    received_at TIMESTAMP NOT NULL,
-    attestation_count INTEGER NOT NULL,
-    deposit_count INTEGER NOT NULL,
-    created_at TIMESTAMP DEFAULT NOW()
-);
-
-CREATE INDEX idx_block_metadata_root ON block_metadata(block_root);
-*/
