@@ -213,30 +213,27 @@ func TestGossipsubPeerOfflineMidTransmission(t *testing.T) {
 
 	WaitForGossipsubReady(t, nodes, topic.Name(), 4)
 
-	// Start publishing messages in a goroutine
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for i := 0; i < 5; i++ {
-			msg := GossipTestMessage{
-				ID:      fmt.Sprintf("msg-%d", i),
-				Content: fmt.Sprintf("Message %d", i),
-				From:    nodes[0].ID.String(),
-			}
-
-			if pubErr := v1.Publish(nodes[0].Gossipsub, topic, msg); pubErr != nil {
-				t.Logf("Failed to publish message %d: %v", i, pubErr)
-			}
-
-			time.Sleep(200 * time.Millisecond)
+	// Send first 2 messages while connected
+	for i := 0; i < 2; i++ {
+		msg := GossipTestMessage{
+			ID:      fmt.Sprintf("msg-%d", i),
+			Content: fmt.Sprintf("Message %d", i),
+			From:    nodes[0].ID.String(),
 		}
-	}()
 
-	// Disconnect node 1 after a short delay (mid-transmission)
-	time.Sleep(600 * time.Millisecond)
+		err = v1.Publish(nodes[0].Gossipsub, topic, msg)
+		require.NoError(t, err)
+
+		time.Sleep(200 * time.Millisecond)
+	}
+
+	// Wait for initial messages to propagate
+	require.Eventually(t, func() bool {
+		return collectors[1].GetMessageCount() >= 2
+	}, 2*time.Second, 100*time.Millisecond, "Node 1 should receive first 2 messages")
+
+	// Disconnect node 1 mid-transmission
 	t.Log("Disconnecting node 1 mid-transmission")
-
 	err = ti.DisconnectNodes(nodes[0], nodes[1])
 	require.NoError(t, err)
 	err = ti.DisconnectNodes(nodes[2], nodes[1])
@@ -244,16 +241,28 @@ func TestGossipsubPeerOfflineMidTransmission(t *testing.T) {
 	err = ti.DisconnectNodes(nodes[3], nodes[1])
 	require.NoError(t, err)
 
-	// Wait for all messages to be sent
-	wg.Wait()
-	time.Sleep(2 * time.Second)
+	// Send remaining messages while node 1 is disconnected
+	for i := 2; i < 5; i++ {
+		msg := GossipTestMessage{
+			ID:      fmt.Sprintf("msg-%d", i),
+			Content: fmt.Sprintf("Message %d", i),
+			From:    nodes[0].ID.String(),
+		}
+
+		err = v1.Publish(nodes[0].Gossipsub, topic, msg)
+		require.NoError(t, err)
+
+		time.Sleep(200 * time.Millisecond)
+	}
+
+	// Wait for remaining messages to propagate to connected nodes
+	time.Sleep(1 * time.Second)
 
 	// Verify message delivery
-	// Node 1 should have received only the first few messages
+	// Node 1 should have received only the first 2 messages (sent before disconnection)
 	node1Messages := collectors[1].GetMessageCount()
 	t.Logf("Node 1 received %d messages before disconnection", node1Messages)
-	assert.Less(t, node1Messages, 5, "Node 1 should have missed some messages")
-	assert.Greater(t, node1Messages, 0, "Node 1 should have received at least some messages")
+	assert.Equal(t, 2, node1Messages, "Node 1 should have received exactly 2 messages (sent before disconnection)")
 
 	// Other nodes should have received all messages
 	for i := 2; i < 4; i++ {
@@ -508,7 +517,7 @@ func TestGossipsubIntermittentConnectivity(t *testing.T) {
 			From:    nodes[0].ID.String(),
 		}
 
-		err := v1.Publish(nodes[0].Gossipsub, topic, msg)
+		err = v1.Publish(nodes[0].Gossipsub, topic, msg)
 		require.NoError(t, err)
 
 		time.Sleep(500 * time.Millisecond)
