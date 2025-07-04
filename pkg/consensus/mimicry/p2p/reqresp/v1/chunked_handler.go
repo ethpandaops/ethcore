@@ -211,6 +211,7 @@ func (h *ChunkedHandler[TReq, TResp]) readRequest(stream network.Stream) (TReq, 
 	if size == 0 {
 		return req, fmt.Errorf("empty request")
 	}
+
 	if uint64(size) > h.protocol.MaxRequestSize() {
 		return req, fmt.Errorf("request size %d exceeds max %d", size, h.protocol.MaxRequestSize())
 	}
