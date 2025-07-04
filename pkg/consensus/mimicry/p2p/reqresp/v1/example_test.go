@@ -70,15 +70,11 @@ func Example_basicUsage() {
 
 	// Create service configuration
 	config := v1.ServiceConfig{
-		HandlerConfig: v1.HandlerConfig{
-			Encoder:               JSONEncoder{},
-			Compressor:            NoopCompressor{},
-			MaxConcurrentRequests: 100,
-			RequestTimeout:        30 * time.Second,
+		HandlerOptions: v1.HandlerOptions{
+			// Default options - can be overridden per protocol
+			RequestTimeout: 30 * time.Second,
 		},
 		ClientConfig: v1.ClientConfig{
-			Encoder:        JSONEncoder{},
-			Compressor:     NoopCompressor{},
 			DefaultTimeout: 30 * time.Second,
 			MaxRetries:     3,
 			RetryDelay:     time.Second,
@@ -112,20 +108,33 @@ func Example_basicUsage() {
 		}, nil
 	}
 
-	if err := v1.RegisterProtocol(service, pingProto, handler); err != nil {
+	// Register with protocol-specific encoding options
+	pingOpts := v1.HandlerOptions{
+		Encoder:        JSONEncoder{},
+		Compressor:     NoopCompressor{},
+		RequestTimeout: 30 * time.Second,
+	}
+	if err := v1.RegisterProtocol(service, pingProto, handler, pingOpts); err != nil {
 		panic(err)
 	}
 
-	// Send a request using the fluent API
+	// Send a request using the fluent API with protocol-specific encoding
 	targetPeer := peer.ID("QmTargetPeer")
 
-	resp, err := v1.NewRequest[PingRequest, PingResponse](service, pingProto).
-		To(targetPeer).
-		WithTimeout(5*time.Second).
-		Send(ctx, PingRequest{
-			Message: "ping",
-			Nonce:   12345,
-		})
+	// Create request options with encoder and compressor
+	reqOpts := v1.RequestOptions{
+		Encoder:    JSONEncoder{},
+		Compressor: NoopCompressor{},
+		Timeout:    5 * time.Second,
+	}
+
+	req := PingRequest{
+		Message: "ping",
+		Nonce:   12345,
+	}
+	var respData PingResponse
+
+	err := service.SendRequestWithOptions(ctx, targetPeer, pingProto.ID(), &req, &respData, reqOpts)
 
 	if err != nil {
 		fmt.Printf("Request failed: %v\n", err)
@@ -133,7 +142,7 @@ func Example_basicUsage() {
 		return
 	}
 
-	fmt.Printf("Got response: %s at %v\n", resp.Message, resp.Time)
+	fmt.Printf("Got response: %s at %v\n", respData.Message, respData.Time)
 }
 
 // Example demonstrates using custom protocols.
@@ -204,15 +213,75 @@ func (w *wrappedHandler) HandleStream(ctx context.Context, stream network.Stream
 
 // Example demonstrates using middleware.
 func Example_middleware() {
-	// Create a logging middleware
+	// This example shows how to wrap handlers with middleware
+	var h host.Host // = ... initialize your host
+
+	// Create the service
 	logger := logrus.New()
-	middleware := LoggingMiddleware{
-		log: logger,
+	config := v1.ServiceConfig{
+		HandlerOptions: v1.HandlerOptions{
+			RequestTimeout: 30 * time.Second,
+		},
+		ClientConfig: v1.ClientConfig{
+			DefaultTimeout: 30 * time.Second,
+			MaxRetries:     3,
+			RetryDelay:     time.Second,
+		},
+	}
+	service := v1.New(h, config, logger)
+
+	// Create a simple echo protocol
+	echoProto := v1.NewProtocol("/echo/1.0.0", 1024, 1024)
+
+	// Original handler
+	echoHandler := func(ctx context.Context, req string, from peer.ID) (string, error) {
+		return fmt.Sprintf("Echo: %s", req), nil
 	}
 
-	// Usage would involve wrapping handlers before registration
-	fmt.Printf("Middleware has logger: %v\n", middleware.log != nil)
-	fmt.Println("Middleware example completed")
+	// Create a logging middleware that wraps the handler
+	loggingHandler := func(ctx context.Context, req string, from peer.ID) (string, error) {
+		start := time.Now()
+		logger.WithFields(logrus.Fields{
+			"from": from,
+			"req":  req,
+		}).Info("Received request")
+
+		// Call the original handler
+		resp, err := echoHandler(ctx, req, from)
+
+		logger.WithFields(logrus.Fields{
+			"duration": time.Since(start),
+			"error":    err,
+			"resp":     resp,
+		}).Info("Completed request")
+
+		return resp, err
+	}
+
+	// Create a rate limiting middleware
+	rateLimitedHandler := func(ctx context.Context, req string, from peer.ID) (string, error) {
+		// In a real implementation, you'd check rate limits here
+		// For demo, we'll just add a header to the response
+		resp, err := loggingHandler(ctx, req, from)
+		if err != nil {
+			return "", err
+		}
+
+		return fmt.Sprintf("[Rate-Limited] %s", resp), nil
+	}
+
+	// Register the wrapped handler
+	handlerOpts := v1.HandlerOptions{
+		Encoder:        JSONEncoder{},
+		Compressor:     NoopCompressor{},
+		RequestTimeout: 30 * time.Second,
+	}
+
+	if err := v1.RegisterProtocol(service, echoProto, rateLimitedHandler, handlerOpts); err != nil {
+		panic(err)
+	}
+
+	fmt.Println("Middleware example: handler wrapped with logging and rate limiting")
 }
 
 // Example demonstrates chunked responses.
@@ -222,15 +291,11 @@ func Example_chunkedResponses() {
 
 	// Create service configuration
 	config := v1.ServiceConfig{
-		HandlerConfig: v1.HandlerConfig{
-			Encoder:               JSONEncoder{},
-			Compressor:            NoopCompressor{},
-			MaxConcurrentRequests: 100,
-			RequestTimeout:        30 * time.Second,
+		HandlerOptions: v1.HandlerOptions{
+			// Default options - can be overridden per protocol
+			RequestTimeout: 30 * time.Second,
 		},
 		ClientConfig: v1.ClientConfig{
-			Encoder:        JSONEncoder{},
-			Compressor:     NoopCompressor{},
 			DefaultTimeout: 30 * time.Second,
 			MaxRetries:     3,
 			RetryDelay:     time.Second,
@@ -289,7 +354,14 @@ func Example_chunkedResponses() {
 		return nil
 	}
 
-	if err := v1.RegisterChunkedProtocol(service, blocksProtocol, chunkedHandler); err != nil {
+	// Register with protocol-specific encoding options
+	// Different protocols can use different encoders!
+	blocksOpts := v1.HandlerOptions{
+		Encoder:        JSONEncoder{},    // Could be SSZ for real blocks
+		Compressor:     NoopCompressor{}, // Could be Snappy for compression
+		RequestTimeout: 60 * time.Second, // Longer timeout for block streaming
+	}
+	if err := v1.RegisterChunkedProtocol(service, blocksProtocol, chunkedHandler, blocksOpts); err != nil {
 		panic(err)
 	}
 
@@ -297,19 +369,28 @@ func Example_chunkedResponses() {
 	chunkedClient := v1.NewChunkedClient(h, config.ClientConfig, logger)
 	targetPeer := peer.ID("QmTargetPeer")
 
+	// Create request options with encoder and compressor for chunked requests
+	chunkedOpts := v1.RequestOptions{
+		Encoder:    JSONEncoder{},    // Could be different encoder per protocol
+		Compressor: NoopCompressor{}, // Could use Snappy compression
+		Timeout:    60 * time.Second,
+	}
+
 	// Process blocks as they arrive
 	var receivedBlocks []Block
-	err := chunkedClient.SendChunkedRequest(
+	req := BlockRequest{StartSlot: 100, Count: 10}
+	err := chunkedClient.SendChunkedRequestWithOptions(
 		ctx,
 		targetPeer,
 		blocksProtocol.ID(),
-		BlockRequest{StartSlot: 100, Count: 10},
+		&req,
 		func(chunk any) error {
 			// In a real implementation, the chunk would be decoded to Block type
 			fmt.Printf("Received block chunk\n")
 			// receivedBlocks = append(receivedBlocks, decodedBlock)
 			return nil
 		},
+		chunkedOpts,
 	)
 
 	if err != nil {

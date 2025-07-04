@@ -19,14 +19,14 @@ type Handler[TReq, TResp any] struct {
 	compressor Compressor
 	protocol   Protocol[TReq, TResp]
 	log        logrus.FieldLogger
-	config     HandlerConfig
+	config     HandlerOptions
 }
 
 // NewHandler creates a new handler.
 func NewHandler[TReq, TResp any](
 	protocol Protocol[TReq, TResp],
 	handler RequestHandler[TReq, TResp],
-	config HandlerConfig,
+	config HandlerOptions,
 	log logrus.FieldLogger,
 ) *Handler[TReq, TResp] {
 	return &Handler[TReq, TResp]{
@@ -43,8 +43,22 @@ func NewHandler[TReq, TResp any](
 func (h *Handler[TReq, TResp]) HandleStream(ctx context.Context, stream network.Stream) {
 	defer stream.Close()
 
-	// Set deadline if configured
+	// Recover from panics
+	defer func() {
+		if r := recover(); r != nil {
+			h.log.WithField("panic", r).Error("Handler panicked")
+			_ = h.writeErrorResponse(stream, StatusServerError)
+		}
+	}()
+
+	// Create context with timeout if configured
+	handlerCtx := ctx
+
+	var cancel context.CancelFunc
 	if h.config.RequestTimeout > 0 {
+		handlerCtx, cancel = context.WithTimeout(ctx, h.config.RequestTimeout)
+		defer cancel()
+
 		deadline := time.Now().Add(h.config.RequestTimeout)
 		if err := stream.SetDeadline(deadline); err != nil {
 			h.log.WithError(err).Debug("Failed to set stream deadline")
@@ -65,7 +79,7 @@ func (h *Handler[TReq, TResp]) HandleStream(ctx context.Context, stream network.
 	}
 
 	// Process request
-	resp, err := h.handler(ctx, req, peerID)
+	resp, err := h.handler(handlerCtx, req, peerID)
 	if err != nil {
 		h.log.WithError(err).WithField("peer", peerID).Debug("Handler returned error")
 		_ = h.writeErrorResponse(stream, StatusServerError)
@@ -90,6 +104,10 @@ func (h *Handler[TReq, TResp]) readRequest(stream network.Stream) (TReq, error) 
 	}
 
 	size := binary.BigEndian.Uint32(sizeBytes[:])
+	if size == 0 {
+		return req, fmt.Errorf("empty request")
+	}
+
 	if uint64(size) > h.protocol.MaxRequestSize() {
 		return req, fmt.Errorf("request size %d exceeds max %d", size, h.protocol.MaxRequestSize())
 	}
@@ -235,7 +253,7 @@ func RegisterHandler[TReq, TResp any](
 	registry *HandlerRegistry,
 	protocol Protocol[TReq, TResp],
 	handler RequestHandler[TReq, TResp],
-	config HandlerConfig,
+	config HandlerOptions,
 	log logrus.FieldLogger,
 ) error {
 	h := NewHandler(protocol, handler, config, log)

@@ -28,10 +28,6 @@ type ReqResp struct {
 
 // New creates a new ReqResp service.
 func New(h host.Host, config ServiceConfig, log logrus.FieldLogger) *ReqResp {
-	if config.HandlerConfig.Encoder == nil || config.ClientConfig.Encoder == nil {
-		panic("encoder must be provided in config")
-	}
-
 	return &ReqResp{
 		host:     h,
 		client:   NewClient(h, config.ClientConfig, log),
@@ -69,7 +65,7 @@ func (r *ReqResp) Stop() error {
 	defer r.mu.Unlock()
 
 	if !r.started {
-		return fmt.Errorf("service not started")
+		return nil
 	}
 
 	// Remove all handlers from the host
@@ -140,6 +136,15 @@ func (r *ReqResp) SendRequestWithTimeout(ctx context.Context, peerID peer.ID, pr
 	return r.client.SendRequestWithTimeout(ctx, peerID, protocolID, req, resp, timeout)
 }
 
+// SendRequestWithOptions sends a request with custom options including encoding.
+func (r *ReqResp) SendRequestWithOptions(ctx context.Context, peerID peer.ID, protocolID protocol.ID, req any, resp any, opts RequestOptions) error {
+	if !r.started {
+		return ErrServiceStopped
+	}
+
+	return r.client.SendRequestWithOptions(ctx, peerID, protocolID, req, resp, opts)
+}
+
 // Host returns the underlying libp2p host.
 func (r *ReqResp) Host() host.Host {
 	return r.host
@@ -180,8 +185,9 @@ func RegisterProtocol[TReq, TResp any](
 	service *ReqResp,
 	protocol Protocol[TReq, TResp],
 	handler RequestHandler[TReq, TResp],
+	opts HandlerOptions,
 ) error {
-	h := NewHandler(protocol, handler, service.config.HandlerConfig, service.log)
+	h := NewHandler(protocol, handler, opts, service.log)
 
 	return service.Register(protocol.ID(), h)
 }
@@ -191,8 +197,9 @@ func RegisterChunkedProtocol[TReq, TResp any](
 	service *ReqResp,
 	protocol Protocol[TReq, TResp],
 	handler ChunkedRequestHandler[TReq, TResp],
+	opts HandlerOptions,
 ) error {
-	h := NewChunkedHandler(protocol, handler, service.config.HandlerConfig, service.log)
+	h := NewChunkedHandler(protocol, handler, opts, service.log)
 
 	return service.Register(protocol.ID(), h)
 }

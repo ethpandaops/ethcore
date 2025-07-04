@@ -16,21 +16,17 @@ import (
 
 // Client implements the Client interface for sending requests.
 type client struct {
-	host       host.Host
-	encoder    Encoder
-	compressor Compressor
-	config     ClientConfig
-	log        logrus.FieldLogger
+	host   host.Host
+	config ClientConfig
+	log    logrus.FieldLogger
 }
 
 // NewClient creates a new client.
 func NewClient(h host.Host, config ClientConfig, log logrus.FieldLogger) Client {
 	return &client{
-		host:       h,
-		encoder:    config.Encoder,
-		compressor: config.Compressor,
-		config:     config,
-		log:        log.WithField("component", "reqresp_client"),
+		host:   h,
+		config: config,
+		log:    log.WithField("component", "reqresp_client"),
 	}
 }
 
@@ -41,7 +37,22 @@ func (c *client) SendRequest(ctx context.Context, peerID peer.ID, protocolID pro
 
 // SendRequestWithTimeout sends a request with a custom timeout.
 func (c *client) SendRequestWithTimeout(ctx context.Context, peerID peer.ID, protocolID protocol.ID, req any, resp any, timeout time.Duration) error {
+	// Use default encoder and compressor if available
+	opts := RequestOptions{
+		Timeout: timeout,
+	}
+
+	return c.SendRequestWithOptions(ctx, peerID, protocolID, req, resp, opts)
+}
+
+// SendRequestWithOptions sends a request with custom options including encoding.
+func (c *client) SendRequestWithOptions(ctx context.Context, peerID peer.ID, protocolID protocol.ID, req any, resp any, opts RequestOptions) error {
 	// Apply timeout to context
+	timeout := opts.Timeout
+	if timeout == 0 {
+		timeout = c.config.DefaultTimeout
+	}
+
 	if timeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, timeout)
@@ -53,6 +64,11 @@ func (c *client) SendRequestWithTimeout(ctx context.Context, peerID peer.ID, pro
 		"protocol": protocolID,
 		"timeout":  timeout,
 	})
+
+	// Validate encoder is provided
+	if opts.Encoder == nil {
+		return fmt.Errorf("encoder must be provided in RequestOptions")
+	}
 
 	// Retry logic
 	var lastErr error
@@ -67,7 +83,7 @@ func (c *client) SendRequestWithTimeout(ctx context.Context, peerID peer.ID, pro
 			logCtx.WithField("attempt", attempt).Debug("Retrying request")
 		}
 
-		err := c.sendRequestOnce(ctx, peerID, protocolID, req, resp)
+		err := c.sendRequestOnce(ctx, peerID, protocolID, req, resp, opts)
 		if err == nil {
 			return nil
 		}
@@ -80,7 +96,7 @@ func (c *client) SendRequestWithTimeout(ctx context.Context, peerID peer.ID, pro
 }
 
 // sendRequestOnce sends a single request attempt.
-func (c *client) sendRequestOnce(ctx context.Context, peerID peer.ID, protocolID protocol.ID, req any, resp any) error {
+func (c *client) sendRequestOnce(ctx context.Context, peerID peer.ID, protocolID protocol.ID, req any, resp any, opts RequestOptions) error {
 	// Open stream
 	stream, err := c.host.NewStream(ctx, peerID, protocolID)
 	if err != nil {
@@ -97,7 +113,7 @@ func (c *client) sendRequestOnce(ctx context.Context, peerID peer.ID, protocolID
 	}
 
 	// Write request
-	if err := c.writeRequest(stream, req); err != nil {
+	if err := c.writeRequest(stream, req, opts); err != nil {
 		return fmt.Errorf("failed to write request: %w", err)
 	}
 
@@ -107,7 +123,7 @@ func (c *client) sendRequestOnce(ctx context.Context, peerID peer.ID, protocolID
 	}
 
 	// Read response
-	if err := c.readResponse(stream, resp); err != nil {
+	if err := c.readResponse(stream, resp, opts); err != nil {
 		return fmt.Errorf("failed to read response: %w", err)
 	}
 
@@ -115,16 +131,16 @@ func (c *client) sendRequestOnce(ctx context.Context, peerID peer.ID, protocolID
 }
 
 // writeRequest writes a request to the stream.
-func (c *client) writeRequest(stream network.Stream, req any) error {
+func (c *client) writeRequest(stream network.Stream, req any, opts RequestOptions) error {
 	// Encode request
-	data, err := c.encoder.Encode(req)
+	data, err := opts.Encoder.Encode(req)
 	if err != nil {
 		return fmt.Errorf("failed to encode request: %w", err)
 	}
 
 	// Compress if needed
-	if c.compressor != nil {
-		compressed, err := c.compressor.Compress(data)
+	if opts.Compressor != nil {
+		compressed, err := opts.Compressor.Compress(data)
 		if err != nil {
 			return fmt.Errorf("failed to compress request: %w", err)
 		}
@@ -156,7 +172,7 @@ func (c *client) writeRequest(stream network.Stream, req any) error {
 }
 
 // readResponse reads a response from the stream.
-func (c *client) readResponse(stream network.Stream, resp any) error {
+func (c *client) readResponse(stream network.Stream, resp any, opts RequestOptions) error {
 	// Read status byte
 	var status [1]byte
 	if _, err := io.ReadFull(stream, status[:]); err != nil {
@@ -186,8 +202,8 @@ func (c *client) readResponse(stream network.Stream, resp any) error {
 	}
 
 	// Decompress if needed
-	if c.compressor != nil {
-		decompressed, err := c.compressor.Decompress(data)
+	if opts.Compressor != nil {
+		decompressed, err := opts.Compressor.Decompress(data)
 		if err != nil {
 			return fmt.Errorf("failed to decompress response: %w", err)
 		}
@@ -196,7 +212,7 @@ func (c *client) readResponse(stream network.Stream, resp any) error {
 	}
 
 	// Decode response
-	if err := c.encoder.Decode(data, resp); err != nil {
+	if err := opts.Encoder.Decode(data, resp); err != nil {
 		return fmt.Errorf("failed to decode response: %w", err)
 	}
 
@@ -279,6 +295,8 @@ type ChunkedClient interface {
 	Client
 	// SendChunkedRequest sends a request and processes multiple response chunks.
 	SendChunkedRequest(ctx context.Context, peerID peer.ID, protocolID protocol.ID, req any, chunkHandler func(chunk any) error) error
+	// SendChunkedRequestWithOptions sends a request with custom options and processes multiple response chunks.
+	SendChunkedRequestWithOptions(ctx context.Context, peerID peer.ID, protocolID protocol.ID, req any, chunkHandler func(chunk any) error, opts RequestOptions) error
 }
 
 // chunkedClient implements ChunkedClient.
@@ -300,8 +318,21 @@ func NewChunkedClient(h host.Host, config ClientConfig, log logrus.FieldLogger) 
 
 // SendChunkedRequest sends a request and processes multiple response chunks.
 func (c *chunkedClient) SendChunkedRequest(ctx context.Context, peerID peer.ID, protocolID protocol.ID, req any, chunkHandler func(chunk any) error) error {
+	opts := RequestOptions{
+		Timeout: c.config.DefaultTimeout,
+	}
+
+	return c.SendChunkedRequestWithOptions(ctx, peerID, protocolID, req, chunkHandler, opts)
+}
+
+// SendChunkedRequestWithOptions sends a request with custom options and processes multiple response chunks.
+func (c *chunkedClient) SendChunkedRequestWithOptions(ctx context.Context, peerID peer.ID, protocolID protocol.ID, req any, chunkHandler func(chunk any) error, opts RequestOptions) error {
 	// Apply timeout to context
-	timeout := c.config.DefaultTimeout
+	timeout := opts.Timeout
+	if timeout == 0 {
+		timeout = c.config.DefaultTimeout
+	}
+
 	if timeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, timeout)
@@ -313,6 +344,11 @@ func (c *chunkedClient) SendChunkedRequest(ctx context.Context, peerID peer.ID, 
 		"protocol": protocolID,
 		"chunked":  true,
 	})
+
+	// Validate encoder is provided
+	if opts.Encoder == nil {
+		return fmt.Errorf("encoder must be provided in RequestOptions")
+	}
 
 	// Open stream
 	stream, err := c.host.NewStream(ctx, peerID, protocolID)
@@ -330,7 +366,7 @@ func (c *chunkedClient) SendChunkedRequest(ctx context.Context, peerID peer.ID, 
 	}
 
 	// Write request
-	if err := c.writeRequest(stream, req); err != nil {
+	if err := c.writeRequest(stream, req, opts); err != nil {
 		return fmt.Errorf("failed to write request: %w", err)
 	}
 
@@ -383,8 +419,8 @@ func (c *chunkedClient) SendChunkedRequest(ctx context.Context, peerID peer.ID, 
 		}
 
 		// Decompress if needed
-		if c.compressor != nil {
-			decompressed, err := c.compressor.Decompress(data)
+		if opts.Compressor != nil {
+			decompressed, err := opts.Compressor.Decompress(data)
 			if err != nil {
 				return fmt.Errorf("failed to decompress chunk: %w", err)
 			}
