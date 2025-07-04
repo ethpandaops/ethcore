@@ -42,12 +42,7 @@ type BeaconBlockHandler struct {
 
 // BlockMetrics tracks beacon block processing metrics.
 type BlockMetrics struct {
-	blocksReceived   uint64
-	blocksValidated  uint64
-	blocksProcessed  uint64
-	blocksSaved      uint64
-	validationErrors uint64
-	processingErrors uint64
+	// Metrics fields can be added as needed
 }
 
 // 7. Monitor events for debugging and metrics.
@@ -176,7 +171,6 @@ func (h *BeaconBlockHandler) validateBeaconBlock(ctx context.Context, block *eth
 // This is called after validation has passed and the block has been accepted.
 // Any error returned here will be logged but won't affect message propagation.
 func (h *BeaconBlockHandler) processBeaconBlock(ctx context.Context, block *eth.SignedBeaconBlock, from peer.ID) error {
-
 	// Trigger any downstream processing asynchronously
 	// In production, this might update fork choice, notify subscribers, etc.
 	go h.notifyBlockProcessed(block)
@@ -272,69 +266,7 @@ func (h *BeaconBlockHandler) monitorEvents(ctx context.Context, events <-chan v1
 	}
 }
 
-// Helper functions for database operations
-
-func (h *BeaconBlockHandler) hasBlock(blockRoot [32]byte) bool {
-	var exists bool
-
-	query := `SELECT EXISTS(SELECT 1 FROM beacon_blocks WHERE root = $1)`
-	_ = h.db.QueryRow(query, blockRoot[:]).Scan(&exists)
-
-	return exists
-}
-
-func (h *BeaconBlockHandler) saveBlock(ctx context.Context, tx *sql.Tx, block *eth.SignedBeaconBlock, root [32]byte) error {
-	// Serialize block data using SSZ
-	blockData, err := block.MarshalSSZ()
-	if err != nil {
-		return fmt.Errorf("failed to marshal block: %w", err)
-	}
-
-	query := `
-		INSERT INTO beacon_blocks (root, slot, proposer_index, parent_root, state_root, body_root, signature, raw_data)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-		ON CONFLICT (root) DO NOTHING`
-
-	bodyRoot := getBlockBodyRoot(block.Block.Body)
-	_, err = tx.ExecContext(ctx, query,
-		root[:],
-		uint64(block.Block.Slot),
-		uint64(block.Block.ProposerIndex),
-		block.Block.ParentRoot,
-		block.Block.StateRoot,
-		bodyRoot[:],
-		block.Signature,
-		blockData,
-	)
-
-	return err
-}
-
-func (h *BeaconBlockHandler) saveBlockMetadata(ctx context.Context, tx *sql.Tx, block *eth.SignedBeaconBlock, root [32]byte, from peer.ID) error {
-	query := `
-		INSERT INTO block_metadata (block_root, received_from, received_at, attestation_count, deposit_count)
-		VALUES ($1, $2, $3, $4, $5)`
-
-	attestationCount := 0
-	if block.Block.Body != nil && block.Block.Body.Attestations != nil {
-		attestationCount = len(block.Block.Body.Attestations)
-	}
-
-	depositCount := 0
-	if block.Block.Body != nil && block.Block.Body.Deposits != nil {
-		depositCount = len(block.Block.Body.Deposits)
-	}
-
-	_, err := tx.ExecContext(ctx, query,
-		root[:],
-		from.String(),
-		time.Now(),
-		attestationCount,
-		depositCount,
-	)
-
-	return err
-}
+// Helper functions for database operations would go here
 
 func (h *BeaconBlockHandler) notifyBlockProcessed(block *eth.SignedBeaconBlock) {
 	// In production, this would notify other components about the new block
@@ -344,41 +276,7 @@ func (h *BeaconBlockHandler) notifyBlockProcessed(block *eth.SignedBeaconBlock) 
 	}).Debug("block processing notification sent")
 }
 
-// Utility functions
-func getCurrentSlot() uint64 {
-	// In production, this would calculate based on genesis time and slot duration
-	// For example: (time.Now().Unix() - genesisTime) / secondsPerSlot
-	unixTime := time.Now().Unix()
-	if unixTime < 0 {
-		return 0 // Fallback for negative time (should never happen)
-	}
-
-	slotTime := unixTime / 12
-	if slotTime < 0 {
-		return 0
-	}
-
-	return uint64(slotTime) % 1000000 // Simplified calculation
-}
-
-func getBlockRoot(block *eth.SignedBeaconBlock) [32]byte {
-	// In production, this would compute the actual SSZ tree hash root
-	// For now, return a deterministic hash based on slot and proposer
-	var root [32]byte
-	if block.Block != nil {
-		copy(root[:8], []byte(fmt.Sprintf("%08d", block.Block.Slot)))
-		copy(root[8:16], []byte(fmt.Sprintf("%08d", block.Block.ProposerIndex)))
-	}
-
-	return root
-}
-
-func getBlockBodyRoot(body *eth.BeaconBlockBody) [32]byte {
-	// In production, this would compute the actual body root
-	var root [32]byte
-
-	return root
-}
+// Utility functions would go here.
 
 // createTopicScoreParams creates topic-specific scoring parameters.
 // These parameters help protect against spam and encourage good behavior.

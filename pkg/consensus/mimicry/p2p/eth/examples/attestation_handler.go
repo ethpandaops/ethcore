@@ -452,17 +452,7 @@ func (h *AttestationHandler) notifyAttestationProcessed(att *eth.Attestation, su
 	}).Debug("attestation processing notification sent")
 }
 
-// computeSubnetForAttestation calculates which subnet an attestation belongs to.
-func computeSubnetForAttestation(att *eth.Attestation) uint64 {
-	if att.Data == nil {
-		return 0
-	}
-
-	// Simplified subnet calculation (production uses proper spec algorithm)
-	committeeIndex := uint64(att.Data.CommitteeIndex)
-
-	return committeeIndex % topics.AttestationSubnetCount
-}
+// Subnet calculation utilities would go here.
 
 // createAttestationScoreParams creates topic scoring parameters for attestation subnets.
 func createAttestationScoreParams() *pubsub.TopicScoreParams {
@@ -541,25 +531,11 @@ func (m *AttestationMetrics) incrementReceived(subnet uint64) {
 	m.attestationsReceived[subnet]++
 }
 
-func (m *AttestationMetrics) incrementValidated(subnet uint64) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	m.attestationsValidated[subnet]++
-}
-
 func (m *AttestationMetrics) incrementProcessed(subnet uint64) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	m.attestationsProcessed[subnet]++
-}
-
-func (m *AttestationMetrics) incrementValidationError(subnet uint64) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	m.validationErrors[subnet]++
 }
 
 func (m *AttestationMetrics) incrementProcessingError(subnet uint64) {
