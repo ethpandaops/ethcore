@@ -94,12 +94,9 @@ func TestGossipsubMessageDeliveryWithDisconnect(t *testing.T) {
 		return collectors[1].GetMessageCount() >= 1 && collectors[2].GetMessageCount() >= 1
 	}, 5*time.Second, 100*time.Millisecond)
 
-	// Verify message delivery
-	for i := 1; i < 3; i++ {
-		messages := collectors[i].GetMessages()
-		require.Len(t, messages, 1)
-		assert.Equal(t, msg1.ID, messages[0].Message.ID)
-	}
+	// Verify message delivery using count only (don't drain messages yet)
+	assert.Equal(t, 1, collectors[1].GetMessageCount(), "Node 1 should have received 1 message")
+	assert.Equal(t, 1, collectors[2].GetMessageCount(), "Node 2 should have received 1 message")
 
 	// Test 2: Disconnect node 2 from the network
 	t.Log("Disconnecting node 2 from the network")
@@ -155,14 +152,20 @@ func TestGossipsubMessageDeliveryWithDisconnect(t *testing.T) {
 		return collectors[2].GetMessageCount() >= 2
 	}, 5*time.Second, 100*time.Millisecond)
 
+	// Final verification - get messages for validation but save counts first
+	node1Count := collectors[1].GetMessageCount()
+	node2Count := collectors[2].GetMessageCount()
+
 	// Verify node 2 received the new message after reconnection
 	messages := collectors[2].GetMessages()
-	lastMsg := messages[len(messages)-1]
-	assert.Equal(t, msg3.ID, lastMsg.Message.ID)
+	if len(messages) > 0 {
+		lastMsg := messages[len(messages)-1]
+		assert.Equal(t, msg3.ID, lastMsg.Message.ID)
+	}
 
-	// Final verification
-	assert.Equal(t, 3, collectors[1].GetMessageCount(), "Node 1 should have received all 3 messages")
-	assert.Equal(t, 2, collectors[2].GetMessageCount(), "Node 2 should have received 2 messages (missed one during disconnect)")
+	// Final count verification
+	assert.Equal(t, 3, node1Count, "Node 1 should have received all 3 messages")
+	assert.Equal(t, 2, node2Count, "Node 2 should have received 2 messages (missed one during disconnect)")
 }
 
 // TestGossipsubPeerOfflineMidTransmission tests behavior when peer goes offline mid-transmission.
@@ -626,6 +629,7 @@ func TestGossipsubNetworkPartitionRecovery(t *testing.T) {
 
 	// Test 3: Send messages in each partition
 	var wg sync.WaitGroup
+	var messagesMutex sync.Mutex
 	messagesSent := make(map[string][]string)
 	messagesSent["A"] = []string{}
 	messagesSent["B"] = []string{}
@@ -641,7 +645,9 @@ func TestGossipsubNetworkPartitionRecovery(t *testing.T) {
 				From:    nodes[i%4].ID.String(),
 			}
 			if pubErr := v1.Publish(nodes[i%4].Gossipsub, topic, msg); pubErr == nil {
+				messagesMutex.Lock()
 				messagesSent["A"] = append(messagesSent["A"], msg.ID)
+				messagesMutex.Unlock()
 			}
 			time.Sleep(200 * time.Millisecond)
 		}
@@ -658,7 +664,9 @@ func TestGossipsubNetworkPartitionRecovery(t *testing.T) {
 				From:    nodes[4+i%4].ID.String(),
 			}
 			if pubErr := v1.Publish(nodes[4+i%4].Gossipsub, topic, msg); pubErr == nil {
+				messagesMutex.Lock()
 				messagesSent["B"] = append(messagesSent["B"], msg.ID)
+				messagesMutex.Unlock()
 			}
 			time.Sleep(200 * time.Millisecond)
 		}
