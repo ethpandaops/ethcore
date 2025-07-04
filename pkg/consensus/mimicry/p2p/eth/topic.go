@@ -10,6 +10,7 @@ const (
 	ProtocolVersionV2 = "2"
 )
 
+// Request-Response Protocol IDs.
 const (
 	StatusV1ProtocolID  = "/eth2/beacon_chain/req/status/" + ProtocolVersionV1 + "/" + ProtocolSuffix
 	GoodbyeV1ProtocolID = "/eth2/beacon_chain/req/goodbye/" + ProtocolVersionV1 + "/" + ProtocolSuffix
@@ -26,3 +27,6 @@ const (
 	BlobSidecarsByRangeV1ProtocolID = "/eth2/beacon_chain/req/blob_sidecars_by_range/" + ProtocolVersionV1 + "/" + ProtocolSuffix
 	BlobSidecarsByRootV1ProtocolID  = "/eth2/beacon_chain/req/blob_sidecars_by_root/" + ProtocolVersionV1 + "/" + ProtocolSuffix
 )
+
+// Topic format template for Ethereum gossipsub topics.
+var GossipsubTopicFormat = "/eth2/%x/%s/ssz_snappy"

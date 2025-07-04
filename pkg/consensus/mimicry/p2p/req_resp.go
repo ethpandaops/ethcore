@@ -81,3 +81,8 @@ func (r *ReqResp) wrapper(ctx context.Context, handler func(ctx context.Context,
 		}
 	}
 }
+
+// GetHost returns the underlying libp2p host.
+func (r *ReqResp) GetHost() host.Host {
+	return r.host
+}
