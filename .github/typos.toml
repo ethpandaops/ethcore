@@ -3,7 +3,9 @@ extend-ignore-identifiers-re = [
     # Ignore ENR (Ethereum Node Record) strings which are base64 encoded
     "enr:-.*",
     # Ignore enode URLs
-    "enode://.*"
+    "enode://.*",
+    # Ignore git commit hashes (hexadecimal strings)
+    "[0-9a-f]{7,40}"
 ]
 
 [default.extend-words]
@@ -11,3 +13,5 @@ extend-ignore-identifiers-re = [
 Iy = "Iy"
 # Ignore "Dout" which is a valid libp2p gossipsub parameter name
 Dout = "Dout"
+# Ignore "abd" which appears in git commit hashes
+abd = "abd"
