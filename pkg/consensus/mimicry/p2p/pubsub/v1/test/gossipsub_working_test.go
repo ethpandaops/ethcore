@@ -2,6 +2,7 @@ package v1_test
 
 import (
 	"context"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -27,14 +28,14 @@ func TestWorkingMessage(t *testing.T) {
 	require.NoError(t, err)
 
 	// Track messages
-	messageReceived := false
+	var messageReceived atomic.Bool
 
 	// Create handler
 	handler := v1.NewHandlerConfig[GossipTestMessage](
 		v1.WithEncoder[GossipTestMessage](&TestEncoder{}),
 		v1.WithProcessor(func(ctx context.Context, msg GossipTestMessage, from peer.ID) error {
 			t.Logf("Received message: %+v from %s", msg, from)
-			messageReceived = true
+			messageReceived.Store(true)
 
 			return nil
 		}),
@@ -66,5 +67,5 @@ func TestWorkingMessage(t *testing.T) {
 	// Wait for propagation
 	time.Sleep(2 * time.Second)
 
-	require.True(t, messageReceived, "Message should have been received")
+	require.True(t, messageReceived.Load(), "Message should have been received")
 }
