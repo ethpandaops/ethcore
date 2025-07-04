@@ -871,9 +871,15 @@ func (c *Crawler) scheduleRetry(peerID peer.ID, peer *discovery.ConnectablePeer,
 	// Remove from duplicate cache to allow immediate retry
 	c.duplicateCache.GetCache().Delete(peerID.String())
 
-	// Schedule retry
+	// Schedule retry - send a copy to avoid data race
 	select {
-	case c.retryQueue <- retryInfo:
+	case c.retryQueue <- &RetryInfo{
+		Peer:         retryInfo.Peer,
+		ENR:          retryInfo.ENR,
+		Attempts:     retryInfo.Attempts,
+		LastAttempt:  retryInfo.LastAttempt,
+		BackoffDelay: retryInfo.BackoffDelay,
+	}:
 		c.log.WithFields(logrus.Fields{
 			"peer":     peerID,
 			"attempts": retryInfo.Attempts,
