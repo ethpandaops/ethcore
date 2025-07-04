@@ -42,6 +42,7 @@ func TestLibp2pValidation(t *testing.T) {
 
 	// Create handler with validator that rejects messages with "reject" in content
 	validatorHandler := v1.NewHandlerConfig(
+		v1.WithEncoder(&TestEncoder{}),
 		v1.WithValidator(func(ctx context.Context, msg GossipTestMessage, from peer.ID) v1.ValidationResult {
 			validationCount.Add(1)
 			if msg.Content == "reject" {
@@ -63,6 +64,7 @@ func TestLibp2pValidation(t *testing.T) {
 	// Observer handler - needs a validator too to enforce validation at libp2p level
 	observerCollector := NewMessageCollector(10)
 	observerHandler := v1.NewHandlerConfig(
+		v1.WithEncoder(&TestEncoder{}),
 		v1.WithValidator(func(ctx context.Context, msg GossipTestMessage, from peer.ID) v1.ValidationResult {
 			// Observer uses same validation logic - reject "reject" messages
 			if msg.Content == "reject" {
@@ -90,6 +92,16 @@ func TestLibp2pValidation(t *testing.T) {
 	err = v1.Register(validator.Gossipsub.Registry(), topic, validatorHandler)
 	require.NoError(t, err)
 	err = v1.Register(observer.Gossipsub.Registry(), topic, observerHandler)
+	require.NoError(t, err)
+
+	// Register handler for publisher
+	publisherHandler := v1.NewHandlerConfig(
+		v1.WithEncoder(&TestEncoder{}),
+		v1.WithProcessor(func(ctx context.Context, msg GossipTestMessage, from peer.ID) error {
+			return nil
+		}),
+	)
+	err = v1.Register(publisher.Gossipsub.Registry(), topic, publisherHandler)
 	require.NoError(t, err)
 
 	// Subscribe validator and observer
@@ -185,6 +197,7 @@ func TestValidationWithScoreParams(t *testing.T) {
 
 	// Create handler with score parameters
 	handler := v1.NewHandlerConfig(
+		v1.WithEncoder(&TestEncoder{}),
 		v1.WithScoreParams[GossipTestMessage](scoreParams),
 		v1.WithProcessor(func(ctx context.Context, msg GossipTestMessage, from peer.ID) error {
 			return nil
@@ -368,6 +381,7 @@ func TestMultipleValidators(t *testing.T) {
 		validator := v // capture loop variable
 
 		handler := v1.NewHandlerConfig(
+			v1.WithEncoder(&TestEncoder{}),
 			v1.WithValidator(func(ctx context.Context, msg GossipTestMessage, from peer.ID) v1.ValidationResult {
 				for _, acceptID := range validator.acceptIDs {
 					if msg.ID == acceptID {

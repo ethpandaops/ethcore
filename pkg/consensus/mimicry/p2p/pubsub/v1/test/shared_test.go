@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -402,4 +403,110 @@ func WaitForGossipsubReady(t *testing.T, nodes []*TestNode, topic string, expect
 	t.Helper()
 	// Wait for mesh to stabilize
 	time.Sleep(2 * time.Second)
+}
+
+// MalformedEncoder is an encoder that can produce malformed messages.
+type MalformedEncoder struct {
+	// Controls whether encoding produces valid data
+	EncodeValid bool
+	// Controls whether decoding succeeds
+	DecodeSuccess bool
+	// Custom decode error to return
+	DecodeError error
+	// If true, produces data that will trigger decoding errors
+	ProduceMalformed bool
+}
+
+func (e *MalformedEncoder) Encode(msg GossipTestMessage) ([]byte, error) {
+	if !e.EncodeValid {
+		return nil, fmt.Errorf("encoding failed")
+	}
+
+	if e.ProduceMalformed {
+		// Return malformed data that will fail decoding
+		return []byte("malformed|data"), nil
+	}
+
+	// Normal encoding
+	encoded := fmt.Sprintf("%s|%s|%s", msg.ID, msg.Content, msg.From)
+
+	return []byte(encoded), nil
+}
+
+func (e *MalformedEncoder) Decode(data []byte) (GossipTestMessage, error) {
+	if !e.DecodeSuccess {
+		if e.DecodeError != nil {
+			return GossipTestMessage{}, e.DecodeError
+		}
+
+		return GossipTestMessage{}, fmt.Errorf("decoding failed: malformed data")
+	}
+
+	// Use the standard test encoder logic
+	encoder := &TestEncoder{}
+
+	return encoder.Decode(data)
+}
+
+// InvalidPayloadCollector collects invalid payload handler calls.
+type InvalidPayloadCollector struct {
+	mu       sync.Mutex
+	payloads []InvalidPayload
+}
+
+type InvalidPayload struct {
+	Data  []byte
+	Error error
+	From  peer.ID
+	Topic string
+}
+
+func NewInvalidPayloadCollector() *InvalidPayloadCollector {
+	return &InvalidPayloadCollector{
+		payloads: make([]InvalidPayload, 0),
+	}
+}
+
+func (c *InvalidPayloadCollector) Collect(ctx context.Context, data []byte, err error, from peer.ID, topic string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.payloads = append(c.payloads, InvalidPayload{
+		Data:  data,
+		Error: err,
+		From:  from,
+		Topic: topic,
+	})
+}
+
+func (c *InvalidPayloadCollector) CollectWithoutTopic(ctx context.Context, data []byte, err error, from peer.ID) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.payloads = append(c.payloads, InvalidPayload{
+		Data:  data,
+		Error: err,
+		From:  from,
+		Topic: "", // Topic not provided in this handler type
+	})
+}
+
+func (c *InvalidPayloadCollector) GetPayloads() []InvalidPayload {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	result := make([]InvalidPayload, len(c.payloads))
+	copy(result, c.payloads)
+
+	return result
+}
+
+func (c *InvalidPayloadCollector) Count() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	return len(c.payloads)
+}
+
+func (c *InvalidPayloadCollector) Clear() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.payloads = make([]InvalidPayload, 0)
 }

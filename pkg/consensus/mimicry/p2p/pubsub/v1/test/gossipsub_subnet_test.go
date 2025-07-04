@@ -430,6 +430,7 @@ func TestSubnetMessagePropagation(t *testing.T) {
 
 			// Create handler that includes subnet info
 			handler := v1.NewHandlerConfig(
+				v1.WithEncoder(&SubnetTestEncoder{}),
 				v1.WithProcessor(func(ctx context.Context, msg SubnetTestMessage, from peer.ID) error {
 					select {
 					case collector.messages <- ReceivedMessage{
@@ -672,6 +673,7 @@ func TestMultipleSubnetsWithDifferentForkDigests(t *testing.T) {
 		require.NoError(t, topicErr)
 
 		handler := v1.NewHandlerConfig(
+			v1.WithEncoder(&SubnetTestEncoder{}),
 			v1.WithProcessor(func(ctx context.Context, msg SubnetTestMessage, from peer.ID) error {
 				select {
 				case collector.messages <- ReceivedMessage{

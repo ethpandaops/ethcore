@@ -109,6 +109,7 @@ func TestGossipsubMatrix(t *testing.T) {
 			for i, node := range nodes {
 				processor := collectors[i].CreateProcessor(node.ID)
 				handler := v1.NewHandlerConfig(
+					v1.WithEncoder(&TestEncoder{}),
 					v1.WithProcessor(processor),
 					v1.WithValidator(func(ctx context.Context, msg GossipTestMessage, from peer.ID) v1.ValidationResult {
 						return tc.validationResult
