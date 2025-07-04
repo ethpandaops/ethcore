@@ -10,19 +10,22 @@ type Metrics struct {
 	PeerDisconnectsTotal prometheus.Counter
 }
 
-func NewMetrics() *Metrics {
+func NewMetrics(namespace string) *Metrics {
 	m := &Metrics{
 		Peers: prometheus.NewGaugeVec(prometheus.GaugeOpts{
-			Name: "libp2p_peers",
-			Help: "Total number of peers connected",
+			Name:      "libp2p_peers",
+			Help:      "Total number of peers connected",
+			Namespace: namespace,
 		}, []string{"direction", "state"}),
 		PeerConnectsTotal: prometheus.NewCounter(prometheus.CounterOpts{
-			Name: "peer_connects_success_total",
-			Help: "Total number of successful peer connections",
+			Name:      "peer_connects_success_total",
+			Help:      "Total number of successful peer connections",
+			Namespace: namespace,
 		}),
 		PeerDisconnectsTotal: prometheus.NewCounter(prometheus.CounterOpts{
-			Name: "peer_disconnects_success_total",
-			Help: "Total number of successful peer disconnections",
+			Name:      "peer_disconnects_success_total",
+			Help:      "Total number of successful peer disconnections",
+			Namespace: namespace,
 		}),
 	}
 

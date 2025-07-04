@@ -52,33 +52,27 @@ func (c *Config) Validate() error {
 // Node is a Mimicry host
 // It is responsible for managing the libp2p host and the ENR.
 type Node struct {
-	log logrus.FieldLogger
-
-	config    *Config
-	userAgent string
-
-	listenIP net.IP
-
-	host host.Host
-
-	broker *emission.Emitter
-
+	log            logrus.FieldLogger
+	config         *Config
+	userAgent      string
+	listenIP       net.IP
+	host           host.Host
+	broker         *emission.Emitter
 	DerivedPrivKey *crypto.Secp256k1PrivateKey
-
-	metrics *Metrics
+	metrics        *Metrics
 }
 
-func NewNode(ctx context.Context, log logrus.FieldLogger, config *Config, userAgent string) (*Node, error) {
+func NewNode(_ context.Context, log logrus.FieldLogger, config *Config, namespace, userAgent string) (*Node, error) {
 	return &Node{
 		log:       log.WithField("module", "ethcore/consensus/host"),
 		config:    config,
 		broker:    emission.NewEmitter(),
 		userAgent: userAgent,
-		metrics:   NewMetrics(),
+		metrics:   NewMetrics(namespace),
 	}, nil
 }
 
-func (n *Node) Start(ctx context.Context) (host.Host, error) {
+func (n *Node) Start(_ context.Context) (host.Host, error) {
 	n.log.WithFields(logrus.Fields{
 		"ipAddr":  n.config.IPAddr,
 		"udpPort": n.config.UDPPort,

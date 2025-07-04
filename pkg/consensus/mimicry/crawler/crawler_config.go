@@ -14,6 +14,7 @@ import (
 type Config struct {
 	Node             *host.Config `yaml:"node"`
 	UserAgent        string
+	Namespace        string
 	Beacon           *ethereum.Config `yaml:"ethereum"`
 	DialConcurrency  int              `yaml:"dialConcurrency" default:"10"`
 	DialTimeout      time.Duration    `yaml:"dialTimeout" default:"5s"`
@@ -30,6 +31,10 @@ func (c *Config) Validate() error {
 
 	if c.Beacon == nil {
 		return errors.New("beacon config is required")
+	}
+
+	if c.Namespace == "" {
+		return errors.New("namespace is required")
 	}
 
 	if err := c.Node.Validate(); err != nil {
