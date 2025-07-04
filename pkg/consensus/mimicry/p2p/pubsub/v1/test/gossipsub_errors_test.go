@@ -185,7 +185,7 @@ func TestGossipsubErrorHandling(t *testing.T) {
 
 	t.Run("NilContextHandling", func(t *testing.T) {
 		// Test New with nil context
-		//nolint:SA1012 // intentionally testing nil context handling
+		//nolint:staticcheck // intentionally testing nil context handling
 		g, err := v1.New(nil, nil)
 		assert.Error(t, err, "New with nil context should fail")
 		assert.Nil(t, g, "Gossipsub should be nil on error")
