@@ -41,13 +41,16 @@ func TestBasicValidation(t *testing.T) {
 			validationCount.Add(1)
 			if msg.Content == "reject" {
 				rejectedCount.Add(1)
+
 				return v1.ValidationReject
 			}
+
 			return v1.ValidationAccept
 		}),
 		v1.WithProcessor(func(ctx context.Context, msg GossipTestMessage, from peer.ID) error {
 			processedCount.Add(1)
 			t.Logf("Processed message: %s", msg.Content)
+
 			return nil
 		}),
 	)
