@@ -65,7 +65,7 @@ func (r *ReqResp) Stop() error {
 	defer r.mu.Unlock()
 
 	if !r.started {
-		return fmt.Errorf("service not started")
+		return nil
 	}
 
 	// Remove all handlers from the host

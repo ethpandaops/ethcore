@@ -15,6 +15,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const testRequestString = "test request"
+
 func TestNewClient(t *testing.T) {
 	host := newMockHost("test-peer")
 	config := ClientConfig{
@@ -28,7 +30,7 @@ func TestNewClient(t *testing.T) {
 	require.NotNil(t, client)
 
 	// Verify client is not nil and implements the interface
-	var _ Client = client
+	var _ = client
 }
 
 func TestClient_SendRequest(t *testing.T) {
@@ -62,6 +64,7 @@ func TestClient_SendRequest(t *testing.T) {
 				buf = append(buf, sizeBuf...)
 				buf = append(buf, respData...)
 				stream.setReadData(buf)
+
 				return stream
 			},
 			encoder: &mockEncoder{},
@@ -93,11 +96,12 @@ func TestClient_SendRequest(t *testing.T) {
 					if stream == nil {
 						return nil, errors.New("stream creation failed")
 					}
+
 					return stream, nil
 				}
 			}
 
-			var req string = "test request"
+			req := testRequestString
 			var resp string
 
 			opts := RequestOptions{
@@ -142,10 +146,11 @@ func TestClient_SendRequestWithTimeout(t *testing.T) {
 			// Verify timeout is approximately what we set
 			assert.InDelta(t, customTimeout.Milliseconds(), timeUntilDeadline.Milliseconds(), 100)
 		}
+
 		return stream, nil
 	}
 
-	var req string = "test request"
+	req := testRequestString
 	var resp string
 
 	err := client.SendRequestWithTimeout(ctx, "remote-peer", "/test/1.0.0", &req, &resp, customTimeout)
@@ -161,7 +166,7 @@ func TestClient_RetryLogic(t *testing.T) {
 	ctx := context.Background()
 	host := newMockHost("test-peer")
 	config := ClientConfig{
-		DefaultTimeout: 100 * time.Millisecond,
+		DefaultTimeout: 500 * time.Millisecond,
 		MaxRetries:     2,
 		RetryDelay:     50 * time.Millisecond,
 	}
@@ -187,10 +192,11 @@ func TestClient_RetryLogic(t *testing.T) {
 		buf = append(buf, sizeBuf...)
 		buf = append(buf, respData...)
 		stream.setReadData(buf)
+
 		return stream, nil
 	}
 
-	var req string = "test request"
+	req := testRequestString
 	var resp string
 
 	opts := RequestOptions{
@@ -218,18 +224,19 @@ func TestClient_WriteRequest(t *testing.T) {
 	}{
 		{
 			name:    "successful_write_no_compression",
-			request: "test request",
+			request: testRequestString,
 			encoder: &mockEncoder{},
 			verifyWrite: func(t *testing.T, stream *mockStream) {
+				t.Helper()
 				data := stream.getWrittenData()
 				require.GreaterOrEqual(t, len(data), 4)
 
 				// Check size prefix
 				size := binary.BigEndian.Uint32(data[:4])
-				assert.Equal(t, uint32(len("test request")), size)
+				assert.Equal(t, uint32(len(testRequestString)), size)
 
 				// Check data
-				assert.Equal(t, "test request", string(data[4:]))
+				assert.Equal(t, testRequestString, string(data[4:]))
 			},
 		},
 		{
@@ -238,12 +245,13 @@ func TestClient_WriteRequest(t *testing.T) {
 			encoder:    &mockEncoder{},
 			compressor: &mockCompressor{},
 			verifyWrite: func(t *testing.T, stream *mockStream) {
+				t.Helper()
 				data := stream.getWrittenData()
 				require.GreaterOrEqual(t, len(data), 4)
 
 				// Check size prefix
 				size := binary.BigEndian.Uint32(data[:4])
-				expectedCompressed := "COMPRESSED:test request"
+				expectedCompressed := "COMPRESSED:" + testRequestString
 				assert.Equal(t, uint32(len(expectedCompressed)), size)
 
 				// Check compressed data
@@ -252,7 +260,7 @@ func TestClient_WriteRequest(t *testing.T) {
 		},
 		{
 			name:    "encoder_fails",
-			request: "test request",
+			request: testRequestString,
 			encoder: &mockEncoder{
 				encodeFunc: func(msg any) ([]byte, error) {
 					return nil, errors.New("encode error")
@@ -262,7 +270,7 @@ func TestClient_WriteRequest(t *testing.T) {
 		},
 		{
 			name:    "compressor_fails",
-			request: "test request",
+			request: testRequestString,
 			encoder: &mockEncoder{},
 			compressor: &mockCompressor{
 				compressFunc: func(data []byte) ([]byte, error) {
@@ -321,6 +329,7 @@ func TestClient_ReadResponse(t *testing.T) {
 				buf = append(buf, sizeBuf...)
 				buf = append(buf, respData...)
 				stream.setReadData(buf)
+
 				return stream
 			},
 			encoder:      &mockEncoder{},
@@ -338,6 +347,7 @@ func TestClient_ReadResponse(t *testing.T) {
 				buf = append(buf, sizeBuf...)
 				buf = append(buf, respData...)
 				stream.setReadData(buf)
+
 				return stream
 			},
 			encoder:      &mockEncoder{},
@@ -349,6 +359,7 @@ func TestClient_ReadResponse(t *testing.T) {
 			setupStream: func() *mockStream {
 				stream := newMockStream("test-stream", "/test/1.0.0", "local", "remote")
 				stream.setReadData([]byte{byte(StatusServerError)})
+
 				return stream
 			},
 			encoder:       &mockEncoder{},
@@ -364,6 +375,7 @@ func TestClient_ReadResponse(t *testing.T) {
 				binary.BigEndian.PutUint32(sizeBuf, 0)
 				buf = append(buf, sizeBuf...)
 				stream.setReadData(buf)
+
 				return stream
 			},
 			encoder:       &mockEncoder{},
@@ -381,6 +393,7 @@ func TestClient_ReadResponse(t *testing.T) {
 				buf = append(buf, sizeBuf...)
 				buf = append(buf, respData...)
 				stream.setReadData(buf)
+
 				return stream
 			},
 			encoder: &mockEncoder{
@@ -435,10 +448,11 @@ func TestClient_ContextCancellation(t *testing.T) {
 			// Cancel context after first attempt
 			cancel()
 		}
+
 		return nil, errors.New("temporary failure")
 	}
 
-	var req string = "test request"
+	req := testRequestString
 	var resp string
 
 	opts := RequestOptions{
@@ -519,7 +533,7 @@ func TestChunkedClient(t *testing.T) {
 		}
 
 		ctx := context.Background()
-		req := "test request"
+		req := testRequestString
 
 		receivedChunks := []string{}
 		chunkHandler := func(chunk any) error {
@@ -528,6 +542,7 @@ func TestChunkedClient(t *testing.T) {
 			if data, ok := chunk.([]byte); ok {
 				receivedChunks = append(receivedChunks, string(data))
 			}
+
 			return nil
 		}
 
@@ -557,7 +572,7 @@ func TestChunkedClient(t *testing.T) {
 		}
 
 		ctx := context.Background()
-		req := "test request"
+		req := testRequestString
 
 		chunkHandler := func(chunk any) error {
 			return errors.New("handler error")

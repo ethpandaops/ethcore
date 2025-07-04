@@ -65,6 +65,7 @@ func TestHandler_HandleStream(t *testing.T) {
 				buf = append(buf, sizeBuf...)
 				buf = append(buf, reqData...)
 				stream.setReadData(buf)
+
 				return stream
 			},
 			handler: func(ctx context.Context, req testRequest, from peer.ID) (testResponse, error) {
@@ -78,14 +79,17 @@ func TestHandler_HandleStream(t *testing.T) {
 					if resp, ok := msg.(testResponse); ok {
 						return []byte(`{"Message":"` + resp.Message + `","ID":1}`), nil
 					}
+
 					return nil, errors.New("unknown type")
 				},
 				decodeFunc: func(data []byte, msgType any) error {
 					if req, ok := msgType.(*testRequest); ok {
 						req.Message = "ping"
 						req.ID = 1
+
 						return nil
 					}
+
 					return errors.New("unknown type")
 				},
 			},
@@ -103,6 +107,7 @@ func TestHandler_HandleStream(t *testing.T) {
 				binary.BigEndian.PutUint32(sizeBuf, 2048) // Exceeds max size
 				buf = append(buf, sizeBuf...)
 				stream.setReadData(buf)
+
 				return stream
 			},
 			handler: func(ctx context.Context, req testRequest, from peer.ID) (testResponse, error) {
@@ -123,6 +128,7 @@ func TestHandler_HandleStream(t *testing.T) {
 				buf = append(buf, sizeBuf...)
 				buf = append(buf, reqData...)
 				stream.setReadData(buf)
+
 				return stream
 			},
 			handler: func(ctx context.Context, req testRequest, from peer.ID) (testResponse, error) {
@@ -133,8 +139,10 @@ func TestHandler_HandleStream(t *testing.T) {
 					if req, ok := msgType.(*testRequest); ok {
 						req.Message = "ping"
 						req.ID = 1
+
 						return nil
 					}
+
 					return errors.New("unknown type")
 				},
 			},
@@ -152,6 +160,7 @@ func TestHandler_HandleStream(t *testing.T) {
 				buf = append(buf, sizeBuf...)
 				buf = append(buf, reqData...)
 				stream.setReadData(buf)
+
 				return stream
 			},
 			handler: func(ctx context.Context, req testRequest, from peer.ID) (testResponse, error) {
@@ -177,6 +186,7 @@ func TestHandler_HandleStream(t *testing.T) {
 				buf = append(buf, sizeBuf...)
 				buf = append(buf, reqData...)
 				stream.setReadData(buf)
+
 				return stream
 			},
 			handler: func(ctx context.Context, req testRequest, from peer.ID) (testResponse, error) {
@@ -187,14 +197,17 @@ func TestHandler_HandleStream(t *testing.T) {
 					if resp, ok := msg.(testResponse); ok {
 						return []byte(resp.Message), nil
 					}
+
 					return []byte("ping"), nil
 				},
 				decodeFunc: func(data []byte, msgType any) error {
 					if req, ok := msgType.(*testRequest); ok {
 						req.Message = string(data)
 						req.ID = 1
+
 						return nil
 					}
+
 					return nil
 				},
 			},
@@ -278,6 +291,7 @@ func TestHandler_ReadRequest(t *testing.T) {
 				buf = append(buf, sizeBuf...)
 				buf = append(buf, data...)
 				stream.setReadData(buf)
+
 				return stream
 			},
 			maxSize: 1024,
@@ -286,8 +300,10 @@ func TestHandler_ReadRequest(t *testing.T) {
 					if req, ok := msgType.(*testRequest); ok {
 						req.Message = string(data)
 						req.ID = 123
+
 						return nil
 					}
+
 					return errors.New("unknown type")
 				},
 			},
@@ -302,11 +318,12 @@ func TestHandler_ReadRequest(t *testing.T) {
 				binary.BigEndian.PutUint32(sizeBuf, 2048)
 				buf = append(buf, sizeBuf...)
 				stream.setReadData(buf)
+
 				return stream
 			},
 			maxSize:       1024,
 			encoder:       &mockEncoder{},
-			expectedError: "exceeds maximum",
+			expectedError: "exceeds max",
 		},
 		{
 			name: "empty_request",
@@ -317,6 +334,7 @@ func TestHandler_ReadRequest(t *testing.T) {
 				binary.BigEndian.PutUint32(sizeBuf, 0)
 				buf = append(buf, sizeBuf...)
 				stream.setReadData(buf)
+
 				return stream
 			},
 			maxSize:       1024,
@@ -375,6 +393,7 @@ func TestHandler_WriteResponse(t *testing.T) {
 					if resp, ok := msg.(testResponse); ok {
 						return []byte(resp.Message), nil
 					}
+
 					return nil, errors.New("unknown type")
 				},
 			},
@@ -493,8 +512,10 @@ func TestHandler_TimeoutHandling(t *testing.T) {
 			decodeFunc: func(data []byte, msgType any) error {
 				if req, ok := msgType.(*testRequest); ok {
 					req.Message = "test"
+
 					return nil
 				}
+
 				return nil
 			},
 		},
@@ -540,8 +561,10 @@ func TestHandler_PanicRecovery(t *testing.T) {
 			decodeFunc: func(data []byte, msgType any) error {
 				if req, ok := msgType.(*testRequest); ok {
 					req.Message = "test"
+
 					return nil
 				}
+
 				return nil
 			},
 		},

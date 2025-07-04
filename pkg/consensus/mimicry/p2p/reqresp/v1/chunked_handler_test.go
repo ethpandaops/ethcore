@@ -14,6 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const testString = "test"
+
 func TestNewChunkedHandler(t *testing.T) {
 	proto := testChunkedProtocol{
 		testProtocol: testProtocol{
@@ -70,6 +72,7 @@ func TestChunkedHandler_HandleStream(t *testing.T) {
 				buf = append(buf, sizeBuf...)
 				buf = append(buf, reqData...)
 				stream.setReadData(buf)
+
 				return stream
 			},
 			handler: func(ctx context.Context, req testRequest, from peer.ID, writer ChunkedResponseWriter[testResponse]) error {
@@ -80,14 +83,17 @@ func TestChunkedHandler_HandleStream(t *testing.T) {
 					if resp, ok := msg.(testResponse); ok {
 						return []byte(resp.Message), nil
 					}
+
 					return []byte("ping"), nil
 				},
 				decodeFunc: func(data []byte, msgType any) error {
 					if req, ok := msgType.(*testRequest); ok {
 						req.Message = string(data)
 						req.ID = 1
+
 						return nil
 					}
+
 					return nil
 				},
 			},
@@ -107,6 +113,7 @@ func TestChunkedHandler_HandleStream(t *testing.T) {
 				buf = append(buf, sizeBuf...)
 				buf = append(buf, reqData...)
 				stream.setReadData(buf)
+
 				return stream
 			},
 			handler: func(ctx context.Context, req testRequest, from peer.ID, writer ChunkedResponseWriter[testResponse]) error {
@@ -117,6 +124,7 @@ func TestChunkedHandler_HandleStream(t *testing.T) {
 						return err
 					}
 				}
+
 				return nil
 			},
 			encoder: &mockEncoder{
@@ -124,14 +132,17 @@ func TestChunkedHandler_HandleStream(t *testing.T) {
 					if resp, ok := msg.(testResponse); ok {
 						return []byte(resp.Message), nil
 					}
+
 					return []byte("ping"), nil
 				},
 				decodeFunc: func(data []byte, msgType any) error {
 					if req, ok := msgType.(*testRequest); ok {
 						req.Message = string(data)
 						req.ID = 1
+
 						return nil
 					}
+
 					return nil
 				},
 			},
@@ -151,6 +162,7 @@ func TestChunkedHandler_HandleStream(t *testing.T) {
 				buf = append(buf, sizeBuf...)
 				buf = append(buf, reqData...)
 				stream.setReadData(buf)
+
 				return stream
 			},
 			handler: func(ctx context.Context, req testRequest, from peer.ID, writer ChunkedResponseWriter[testResponse]) error {
@@ -161,14 +173,17 @@ func TestChunkedHandler_HandleStream(t *testing.T) {
 					if req, ok := msgType.(*testRequest); ok {
 						req.Message = string(data)
 						req.ID = 1
+
 						return nil
 					}
+
 					return nil
 				},
 			},
 			maxRequestSize: 1024,
-			expectedChunks: 0,
-			expectedError:  true,
+			expectedChunks: 1,
+			expectedStatus: []Status{StatusServerError},
+			expectedError:  false,
 		},
 		{
 			name: "write_chunk_after_error",
@@ -181,6 +196,7 @@ func TestChunkedHandler_HandleStream(t *testing.T) {
 				buf = append(buf, sizeBuf...)
 				buf = append(buf, reqData...)
 				stream.setReadData(buf)
+
 				return stream
 			},
 			handler: func(ctx context.Context, req testRequest, from peer.ID, writer ChunkedResponseWriter[testResponse]) error {
@@ -197,22 +213,25 @@ func TestChunkedHandler_HandleStream(t *testing.T) {
 					if resp, ok := msg.(testResponse); ok {
 						return []byte(resp.Message), nil
 					}
+
 					return []byte("ping"), nil
 				},
 				decodeFunc: func(data []byte, msgType any) error {
 					if req, ok := msgType.(*testRequest); ok {
 						req.Message = string(data)
 						req.ID = 1
+
 						return nil
 					}
+
 					return nil
 				},
 			},
 			maxRequestSize:   1024,
-			expectedChunks:   1,
-			expectedStatus:   []Status{StatusSuccess},
+			expectedChunks:   2,
+			expectedStatus:   []Status{StatusSuccess, StatusServerError},
 			expectedMessages: []string{"chunk1"},
-			expectedError:    true,
+			expectedError:    false,
 		},
 		{
 			name: "with_compression",
@@ -226,6 +245,7 @@ func TestChunkedHandler_HandleStream(t *testing.T) {
 				buf = append(buf, sizeBuf...)
 				buf = append(buf, reqData...)
 				stream.setReadData(buf)
+
 				return stream
 			},
 			handler: func(ctx context.Context, req testRequest, from peer.ID, writer ChunkedResponseWriter[testResponse]) error {
@@ -236,14 +256,17 @@ func TestChunkedHandler_HandleStream(t *testing.T) {
 					if resp, ok := msg.(testResponse); ok {
 						return []byte(resp.Message), nil
 					}
+
 					return []byte("ping"), nil
 				},
 				decodeFunc: func(data []byte, msgType any) error {
 					if req, ok := msgType.(*testRequest); ok {
 						req.Message = string(data)
 						req.ID = 1
+
 						return nil
 					}
+
 					return nil
 				},
 			},
@@ -332,6 +355,7 @@ func parseChunkedResponse(t *testing.T, data []byte) []parsedChunk {
 		// If error status, no data follows
 		if status != StatusSuccess {
 			chunks = append(chunks, parsedChunk{status: status})
+
 			continue
 		}
 
@@ -372,6 +396,7 @@ func TestChunkedResponseWriter(t *testing.T) {
 			name: "write_single_chunk",
 			setupWriter: func() *streamChunkedWriter[testResponse] {
 				stream := newMockStream("test", "/test/1.0.0", "local", "remote")
+
 				return &streamChunkedWriter[testResponse]{
 					stream: stream,
 					encoder: &mockEncoder{
@@ -379,6 +404,7 @@ func TestChunkedResponseWriter(t *testing.T) {
 							if resp, ok := msg.(testResponse); ok {
 								return []byte(resp.Message), nil
 							}
+
 							return nil, errors.New("unknown type")
 						},
 					},
@@ -402,6 +428,7 @@ func TestChunkedResponseWriter(t *testing.T) {
 			name: "write_multiple_chunks",
 			setupWriter: func() *streamChunkedWriter[testResponse] {
 				stream := newMockStream("test", "/test/1.0.0", "local", "remote")
+
 				return &streamChunkedWriter[testResponse]{
 					stream: stream,
 					encoder: &mockEncoder{
@@ -409,6 +436,7 @@ func TestChunkedResponseWriter(t *testing.T) {
 							if resp, ok := msg.(testResponse); ok {
 								return []byte(resp.Message), nil
 							}
+
 							return nil, errors.New("unknown type")
 						},
 					},
@@ -436,6 +464,7 @@ func TestChunkedResponseWriter(t *testing.T) {
 			name: "chunk_exceeds_max_size",
 			setupWriter: func() *streamChunkedWriter[testResponse] {
 				stream := newMockStream("test", "/test/1.0.0", "local", "remote")
+
 				return &streamChunkedWriter[testResponse]{
 					stream: stream,
 					encoder: &mockEncoder{
@@ -457,6 +486,7 @@ func TestChunkedResponseWriter(t *testing.T) {
 			name: "encoder_error",
 			setupWriter: func() *streamChunkedWriter[testResponse] {
 				stream := newMockStream("test", "/test/1.0.0", "local", "remote")
+
 				return &streamChunkedWriter[testResponse]{
 					stream: stream,
 					encoder: &mockEncoder{
@@ -477,6 +507,7 @@ func TestChunkedResponseWriter(t *testing.T) {
 			name: "with_compression",
 			setupWriter: func() *streamChunkedWriter[testResponse] {
 				stream := newMockStream("test", "/test/1.0.0", "local", "remote")
+
 				return &streamChunkedWriter[testResponse]{
 					stream: stream,
 					encoder: &mockEncoder{
@@ -484,6 +515,7 @@ func TestChunkedResponseWriter(t *testing.T) {
 							if resp, ok := msg.(testResponse); ok {
 								return []byte(resp.Message), nil
 							}
+
 							return nil, errors.New("unknown type")
 						},
 					},
@@ -514,6 +546,7 @@ func TestChunkedResponseWriter(t *testing.T) {
 			for _, chunk := range tt.chunks {
 				if e := writer.WriteChunk(chunk); e != nil {
 					err = e
+
 					break
 				}
 			}
@@ -557,9 +590,11 @@ func TestChunkedHandler_TimeoutHandling(t *testing.T) {
 		Encoder: &mockEncoder{
 			decodeFunc: func(data []byte, msgType any) error {
 				if req, ok := msgType.(*testRequest); ok {
-					req.Message = "test"
+					req.Message = testString
+
 					return nil
 				}
+
 				return nil
 			},
 		},
@@ -571,7 +606,7 @@ func TestChunkedHandler_TimeoutHandling(t *testing.T) {
 
 	// Setup stream with valid request
 	stream := newMockStream("test-stream", "/test/chunked/1.0.0", "remote", "local")
-	reqData := []byte("test request")
+	reqData := []byte(testString + " request")
 	var buf []byte
 	sizeBuf := make([]byte, 4)
 	binary.BigEndian.PutUint32(sizeBuf, uint32(len(reqData)))
@@ -607,9 +642,11 @@ func TestChunkedHandler_PanicRecovery(t *testing.T) {
 		Encoder: &mockEncoder{
 			decodeFunc: func(data []byte, msgType any) error {
 				if req, ok := msgType.(*testRequest); ok {
-					req.Message = "test"
+					req.Message = testString
+
 					return nil
 				}
+
 				return nil
 			},
 		},
@@ -621,7 +658,7 @@ func TestChunkedHandler_PanicRecovery(t *testing.T) {
 
 	// Setup stream with valid request
 	stream := newMockStream("test-stream", "/test/chunked/1.0.0", "remote", "local")
-	reqData := []byte("test request")
+	reqData := []byte(testString + " request")
 	var buf []byte
 	sizeBuf := make([]byte, 4)
 	binary.BigEndian.PutUint32(sizeBuf, uint32(len(reqData)))

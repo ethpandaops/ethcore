@@ -259,7 +259,7 @@ func TestErrorConstants(t *testing.T) {
 	assert.Contains(t, ErrInvalidRequest.Error(), "invalid request")
 	assert.Contains(t, ErrInvalidResponse.Error(), "invalid response")
 	assert.Contains(t, ErrStreamReset.Error(), "stream reset")
-	assert.Contains(t, ErrTimeout.Error(), "timeout")
+	assert.Contains(t, ErrTimeout.Error(), "timed out")
 	assert.Contains(t, ErrNoHandler.Error(), "no handler")
 	assert.Contains(t, ErrHandlerExists.Error(), "handler already registered")
 	assert.Contains(t, ErrServiceStopped.Error(), "service stopped")

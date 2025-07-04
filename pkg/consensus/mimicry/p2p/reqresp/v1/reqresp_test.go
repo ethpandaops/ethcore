@@ -65,7 +65,7 @@ func TestService_RegisterUnregister(t *testing.T) {
 	ctx := context.Background()
 	err := service.Start(ctx)
 	require.NoError(t, err)
-	defer service.Stop()
+	defer func() { _ = service.Stop() }()
 
 	protocolID := protocol.ID("/test/1.0.0")
 	handler := &mockStreamHandler{
@@ -107,10 +107,13 @@ func TestService_RegisterBeforeStart(t *testing.T) {
 	protocolID := protocol.ID("/test/1.0.0")
 	handler := &mockStreamHandler{}
 
-	// Register should fail before start
+	// Register should work before start (handlers are queued)
 	err := service.Register(protocolID, handler)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "not started")
+	require.NoError(t, err)
+
+	// Verify handler is registered
+	err = service.Unregister(protocolID)
+	require.NoError(t, err)
 }
 
 func TestService_SendRequestAfterStop(t *testing.T) {
@@ -144,7 +147,7 @@ func TestService_ConcurrentOperations(t *testing.T) {
 	ctx := context.Background()
 	err := service.Start(ctx)
 	require.NoError(t, err)
-	defer service.Stop()
+	defer func() { _ = service.Stop() }()
 
 	// Run concurrent operations
 	var wg sync.WaitGroup
@@ -197,7 +200,7 @@ func TestRegisterProtocol(t *testing.T) {
 	ctx := context.Background()
 	err := service.Start(ctx)
 	require.NoError(t, err)
-	defer service.Stop()
+	defer func() { _ = service.Stop() }()
 
 	proto := testProtocol{
 		id:              "/test/1.0.0",
@@ -233,7 +236,7 @@ func TestRegisterChunkedProtocol(t *testing.T) {
 	ctx := context.Background()
 	err := service.Start(ctx)
 	require.NoError(t, err)
-	defer service.Stop()
+	defer func() { _ = service.Stop() }()
 
 	proto := testChunkedProtocol{
 		testProtocol: testProtocol{
@@ -295,11 +298,11 @@ func TestService_IntegrationScenario(t *testing.T) {
 	// Start both services
 	err := service1.Start(ctx)
 	require.NoError(t, err)
-	defer service1.Stop()
+	defer func() { _ = service1.Stop() }()
 
 	err = service2.Start(ctx)
 	require.NoError(t, err)
-	defer service2.Stop()
+	defer func() { _ = service2.Stop() }()
 
 	// Register a handler on service2
 	proto := NewProtocol("/echo/1.0.0", 1024, 1024)
@@ -313,13 +316,19 @@ func TestService_IntegrationScenario(t *testing.T) {
 				if str, ok := msg.(string); ok {
 					return []byte(str), nil
 				}
+				if strPtr, ok := msg.(*string); ok {
+					return []byte(*strPtr), nil
+				}
+
 				return nil, errors.New("unsupported type")
 			},
 			decodeFunc: func(data []byte, msgType any) error {
 				if ptr, ok := msgType.(*string); ok {
 					*ptr = string(data)
+
 					return nil
 				}
+
 				return errors.New("unsupported type")
 			},
 		},
@@ -359,21 +368,22 @@ func TestService_ChunkedIntegrationScenario(t *testing.T) {
 	// Start both services
 	err := service1.Start(ctx)
 	require.NoError(t, err)
-	defer service1.Stop()
+	defer func() { _ = service1.Stop() }()
 
 	err = service2.Start(ctx)
 	require.NoError(t, err)
-	defer service2.Stop()
+	defer func() { _ = service2.Stop() }()
 
 	// Register a chunked handler on service2
 	proto := NewChunkedProtocol("/blocks/1.0.0", 1024, 1024)
 	blocksHandler := func(ctx context.Context, req int, from peer.ID, writer ChunkedResponseWriter[string]) error {
 		// Send multiple chunks
 		for i := 0; i < req; i++ {
-			if err := writer.WriteChunk(fmt.Sprintf("Block %d", i)); err != nil {
-				return err
+			if writeErr := writer.WriteChunk(fmt.Sprintf("Block %d", i)); writeErr != nil {
+				return writeErr
 			}
 		}
+
 		return nil
 	}
 
@@ -383,20 +393,30 @@ func TestService_ChunkedIntegrationScenario(t *testing.T) {
 				if n, ok := msg.(int); ok {
 					return []byte(fmt.Sprintf("%d", n)), nil
 				}
+				if nPtr, ok := msg.(*int); ok {
+					return []byte(fmt.Sprintf("%d", *nPtr)), nil
+				}
 				if str, ok := msg.(string); ok {
 					return []byte(str), nil
 				}
+				if strPtr, ok := msg.(*string); ok {
+					return []byte(*strPtr), nil
+				}
+
 				return nil, errors.New("unsupported type")
 			},
 			decodeFunc: func(data []byte, msgType any) error {
 				if ptr, ok := msgType.(*int); ok {
-					_, err := fmt.Sscanf(string(data), "%d", ptr)
-					return err
+					_, scanErr := fmt.Sscanf(string(data), "%d", ptr)
+
+					return scanErr
 				}
 				if ptr, ok := msgType.(*string); ok {
 					*ptr = string(data)
+
 					return nil
 				}
+
 				return errors.New("unsupported type")
 			},
 		},
@@ -413,10 +433,11 @@ func TestService_ChunkedIntegrationScenario(t *testing.T) {
 	chunkHandler := func(chunk any) error {
 		if data, ok := chunk.([]byte); ok {
 			var str string
-			if err := opts.Encoder.Decode(data, &str); err == nil {
+			if decodeErr := opts.Encoder.Decode(data, &str); decodeErr == nil {
 				receivedChunks = append(receivedChunks, str)
 			}
 		}
+
 		return nil
 	}
 
@@ -427,8 +448,8 @@ func TestService_ChunkedIntegrationScenario(t *testing.T) {
 		Timeout: 5 * time.Second,
 	}
 
-	err = chunkedClient.SendChunkedRequestWithOptions(ctx, host2.ID(), proto.ID(), &req, chunkHandler, reqOpts)
-	require.NoError(t, err)
+	sendErr := chunkedClient.SendChunkedRequestWithOptions(ctx, host2.ID(), proto.ID(), &req, chunkHandler, reqOpts)
+	require.NoError(t, sendErr)
 
 	// Verify we received the expected chunks
 	assert.Equal(t, 3, len(receivedChunks))

@@ -108,21 +108,23 @@ func (h *mockHost) EventBus() event.Bus {
 
 // mockStream implements a mock network stream for testing.
 type mockStream struct {
-	mu            sync.RWMutex
-	id            string
-	protocol      protocol.ID
-	localPeer     peer.ID
-	remotePeer    peer.ID
-	readBuffer    []byte
-	writeBuffer   []byte
-	readClosed    bool
-	writeClosed   bool
-	resetErr      error
-	closeErr      error
-	deadline      time.Time
-	readDeadline  time.Time
-	writeDeadline time.Time
-	stat          network.Stats
+	mu              sync.RWMutex
+	id              string
+	protocol        protocol.ID
+	localPeer       peer.ID
+	remotePeer      peer.ID
+	readBuffer      []byte
+	writeBuffer     []byte
+	readClosed      bool
+	writeClosed     bool
+	resetErr        error
+	closeErr        error
+	deadline        time.Time
+	readDeadline    time.Time
+	writeDeadline   time.Time
+	stat            network.Stats
+	connectedStream *mockStream
+	readChan        chan []byte // Channel for blocking reads
 }
 
 func newMockStream(id string, proto protocol.ID, local, remote peer.ID) *mockStream {
@@ -131,29 +133,45 @@ func newMockStream(id string, proto protocol.ID, local, remote peer.ID) *mockStr
 		protocol:   proto,
 		localPeer:  local,
 		remotePeer: remote,
+		readChan:   make(chan []byte, 100),
 	}
 }
 
 func (s *mockStream) Read(p []byte) (int, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	// For integration tests, we need to simulate blocking behavior
+	// Try multiple times with small delays to allow the handler to write
+	for i := 0; i < 100; i++ {
+		s.mu.Lock()
 
-	if s.readClosed {
-		return 0, io.EOF
+		if s.readClosed {
+			s.mu.Unlock()
+
+			return 0, io.EOF
+		}
+
+		if s.resetErr != nil {
+			err := s.resetErr
+			s.mu.Unlock()
+
+			return 0, err
+		}
+
+		if len(s.readBuffer) > 0 {
+			n := copy(p, s.readBuffer)
+			s.readBuffer = s.readBuffer[n:]
+			s.mu.Unlock()
+
+			return n, nil
+		}
+
+		s.mu.Unlock()
+
+		// If no data yet and stream is not closed, wait a bit
+		time.Sleep(10 * time.Millisecond)
 	}
 
-	if s.resetErr != nil {
-		return 0, s.resetErr
-	}
-
-	if len(s.readBuffer) == 0 {
-		return 0, io.EOF
-	}
-
-	n := copy(p, s.readBuffer)
-	s.readBuffer = s.readBuffer[n:]
-
-	return n, nil
+	// After timeout, return EOF
+	return 0, io.EOF
 }
 
 func (s *mockStream) Write(p []byte) (int, error) {
@@ -169,6 +187,13 @@ func (s *mockStream) Write(p []byte) (int, error) {
 	}
 
 	s.writeBuffer = append(s.writeBuffer, p...)
+
+	// If this stream has a connected peer, write to their read buffer
+	if s.connectedStream != nil {
+		s.connectedStream.mu.Lock()
+		s.connectedStream.readBuffer = append(s.connectedStream.readBuffer, p...)
+		s.connectedStream.mu.Unlock()
+	}
 
 	return len(p), nil
 }
@@ -307,20 +332,6 @@ func (s *mockStream) getWrittenData() []byte {
 	return data
 }
 
-func (s *mockStream) setResetError(err error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	s.resetErr = err
-}
-
-func (s *mockStream) setCloseError(err error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	s.closeErr = err
-}
-
 // mockEncoder implements a simple encoder for testing.
 type mockEncoder struct {
 	encodeFunc func(msg any) ([]byte, error)
@@ -335,6 +346,11 @@ func (e *mockEncoder) Encode(msg any) ([]byte, error) {
 	// Simple string encoding for testing
 	if str, ok := msg.(string); ok {
 		return []byte(str), nil
+	}
+
+	// Handle string pointer
+	if strPtr, ok := msg.(*string); ok {
+		return []byte(*strPtr), nil
 	}
 
 	return nil, errors.New("unsupported type")
@@ -447,8 +463,17 @@ func createConnectedMockHosts() (*mockHost, *mockHost) {
 			return nil, errors.New("no protocol specified")
 		}
 
-		streamID := fmt.Sprintf("%s-%s-%s", host1.id, p, pids[0])
-		stream := newMockStream(streamID, pids[0], host1.id, p)
+		// Create client stream
+		clientStreamID := fmt.Sprintf("%s-%s-%s-client", host1.id, p, pids[0])
+		clientStream := newMockStream(clientStreamID, pids[0], host1.id, p)
+
+		// Create server stream
+		serverStreamID := fmt.Sprintf("%s-%s-%s-server", p, host1.id, pids[0])
+		serverStream := newMockStream(serverStreamID, pids[0], p, host1.id)
+
+		// Connect the streams bidirectionally
+		clientStream.connectedStream = serverStream
+		serverStream.connectedStream = clientStream
 
 		// Find handler in host2
 		host2.mu.RLock()
@@ -456,19 +481,21 @@ func createConnectedMockHosts() (*mockHost, *mockHost) {
 		host2.mu.RUnlock()
 
 		if ok && handler != nil {
+			// Create bidirectional stream for the server
+			bidiStream := &bidirectionalMockStream{
+				clientStream: clientStream,
+				serverStream: serverStream,
+			}
+
 			// Simulate the remote side handling the stream
+			// We run this in a goroutine to mimic real network behavior
 			go func() {
-				// Create a bidirectional mock stream
-				remoteStream := &bidirectionalMockStream{
-					mockStream:   stream,
-					localStream:  stream,
-					remoteBuffer: make(chan []byte, 100),
-				}
-				handler(remoteStream)
+				// Call the handler with the stream
+				handler(bidiStream)
 			}()
 		}
 
-		return stream, nil
+		return clientStream, nil
 	}
 
 	return host1, host2
@@ -538,31 +565,94 @@ func (c *mockConn) RemoteMultiaddr() ma.Multiaddr {
 
 // bidirectionalMockStream simulates a bidirectional stream.
 type bidirectionalMockStream struct {
-	*mockStream
-	localStream  *mockStream
-	remoteBuffer chan []byte
+	clientStream *mockStream
+	serverStream *mockStream
 }
 
 func (s *bidirectionalMockStream) Write(p []byte) (int, error) {
-	// Write to the local stream's read buffer
-	s.localStream.mu.Lock()
-	s.localStream.readBuffer = append(s.localStream.readBuffer, p...)
-	s.localStream.mu.Unlock()
+	// Server writes to client's read buffer
+	s.clientStream.mu.Lock()
+	s.clientStream.readBuffer = append(s.clientStream.readBuffer, p...)
+	s.clientStream.mu.Unlock()
 
 	return len(p), nil
 }
 
 func (s *bidirectionalMockStream) Read(p []byte) (int, error) {
-	// Read from the local stream's write buffer
-	s.localStream.mu.Lock()
-	defer s.localStream.mu.Unlock()
+	// Server reads from its own read buffer (what client wrote to serverStream via connectedStream)
+	s.serverStream.mu.Lock()
+	defer s.serverStream.mu.Unlock()
 
-	if len(s.localStream.writeBuffer) == 0 {
+	if s.serverStream.readClosed {
 		return 0, io.EOF
 	}
 
-	n := copy(p, s.localStream.writeBuffer)
-	s.localStream.writeBuffer = s.localStream.writeBuffer[n:]
+	if s.serverStream.resetErr != nil {
+		return 0, s.serverStream.resetErr
+	}
+
+	if len(s.serverStream.readBuffer) == 0 {
+		return 0, io.EOF
+	}
+
+	n := copy(p, s.serverStream.readBuffer)
+	s.serverStream.readBuffer = s.serverStream.readBuffer[n:]
 
 	return n, nil
+}
+
+func (s *bidirectionalMockStream) Close() error {
+	return s.serverStream.Close()
+}
+
+func (s *bidirectionalMockStream) CloseRead() error {
+	return s.serverStream.CloseRead()
+}
+
+func (s *bidirectionalMockStream) CloseWrite() error {
+	return s.serverStream.CloseWrite()
+}
+
+func (s *bidirectionalMockStream) Reset() error {
+	return s.serverStream.Reset()
+}
+
+func (s *bidirectionalMockStream) ResetWithError(errCode network.StreamErrorCode) error {
+	return s.serverStream.ResetWithError(errCode)
+}
+
+func (s *bidirectionalMockStream) SetDeadline(t time.Time) error {
+	return s.serverStream.SetDeadline(t)
+}
+
+func (s *bidirectionalMockStream) SetReadDeadline(t time.Time) error {
+	return s.serverStream.SetReadDeadline(t)
+}
+
+func (s *bidirectionalMockStream) SetWriteDeadline(t time.Time) error {
+	return s.serverStream.SetWriteDeadline(t)
+}
+
+func (s *bidirectionalMockStream) ID() string {
+	return s.serverStream.ID()
+}
+
+func (s *bidirectionalMockStream) Protocol() protocol.ID {
+	return s.serverStream.Protocol()
+}
+
+func (s *bidirectionalMockStream) SetProtocol(id protocol.ID) error {
+	return s.serverStream.SetProtocol(id)
+}
+
+func (s *bidirectionalMockStream) Stat() network.Stats {
+	return s.serverStream.Stat()
+}
+
+func (s *bidirectionalMockStream) Conn() network.Conn {
+	return s.serverStream.Conn()
+}
+
+func (s *bidirectionalMockStream) Scope() network.StreamScope {
+	return s.serverStream.Scope()
 }
