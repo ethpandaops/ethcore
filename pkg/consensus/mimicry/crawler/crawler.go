@@ -111,7 +111,7 @@ func New(log logrus.FieldLogger, config *Config, f discovery.NodeFinder) *Crawle
 			Attnets:   common.AttnetBits{},
 			Syncnets:  common.SyncnetBits{},
 		},
-		metrics:            NewMetrics(),
+		metrics:            NewMetrics(config.Namespace),
 		statusFromPeerChan: make(chan eth.PeerStatus, 10000),
 		duplicateCache:     cache.NewDuplicateCache[string, time.Time](log, config.CooloffDuration),
 		discovery:          f,
@@ -141,7 +141,7 @@ func (c *Crawler) Start(ctx context.Context) error {
 	}
 
 	// Create the host
-	h, err := host.NewNode(c.ctx, c.log, c.config.Node, c.userAgent)
+	h, err := host.NewNode(c.ctx, c.log, c.config.Node, c.config.Namespace, c.userAgent)
 	if err != nil {
 		return fmt.Errorf("failed to create host: %w", err)
 	}

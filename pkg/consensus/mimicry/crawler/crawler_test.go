@@ -320,6 +320,7 @@ func setupCrawler(
 		DialConcurrency: config.DialConcurrency,
 		CooloffDuration: config.CooloffDuration,
 		DialTimeout:     config.DialTimeout,
+		Namespace:       "crawler-test",
 		UserAgent:       "ethcore/crawler-test",
 		Node: &host.Config{
 			IPAddr: net.ParseIP("127.0.0.1"),
