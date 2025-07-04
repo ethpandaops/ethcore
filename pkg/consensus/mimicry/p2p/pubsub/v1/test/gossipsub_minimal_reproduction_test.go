@@ -3,6 +3,7 @@ package v1_test
 import (
 	"context"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -189,6 +190,7 @@ func TestMinimalReproduction_NextMethodDirectInspection(t *testing.T) {
 	// Track timing of Next() calls
 	nextCallTimes := make([]time.Time, 0)
 	var processingTimes []time.Duration
+	var processingMutex sync.Mutex
 
 	// Create topic
 	topic, err := CreateTestTopic("next_inspection")
@@ -206,7 +208,10 @@ func TestMinimalReproduction_NextMethodDirectInspection(t *testing.T) {
 			time.Sleep(10 * time.Millisecond)
 
 			processDuration := time.Since(processStart)
+
+			processingMutex.Lock()
 			processingTimes = append(processingTimes, processDuration)
+			processingMutex.Unlock()
 
 			t.Logf("🔍 Processing completed for message: %s (took %v)", msg.ID, processDuration)
 
@@ -248,21 +253,26 @@ func TestMinimalReproduction_NextMethodDirectInspection(t *testing.T) {
 
 		// Wait for this specific message to be processed before sending next
 		require.Eventually(t, func() bool {
+			processingMutex.Lock()
+			defer processingMutex.Unlock()
 			return len(processingTimes) > i
 		}, 10*time.Second, 100*time.Millisecond,
 			fmt.Sprintf("Message %s should be processed", msgID))
 
 		// Calculate time between publish and processing
+		processingMutex.Lock()
 		if len(processingTimes) > i {
 			deliveryTime := time.Since(nextCallStart)
 			t.Logf("📊 Message %s delivery time: %v", msgID, deliveryTime)
 		}
+		processingMutex.Unlock()
 
 		// Delay before next message
 		time.Sleep(500 * time.Millisecond)
 	}
 
 	// Analyze timing patterns
+	processingMutex.Lock()
 	t.Log("📊 TIMING ANALYSIS:")
 	for i, processTime := range processingTimes {
 		if i < len(nextCallTimes) {
@@ -277,6 +287,7 @@ func TestMinimalReproduction_NextMethodDirectInspection(t *testing.T) {
 			t.Errorf("⚠️  Message %d took unusually long to process: %v", i+1, duration)
 		}
 	}
+	processingMutex.Unlock()
 
 	t.Log("✅ Next() method timing inspection completed")
 }
