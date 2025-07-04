@@ -19,14 +19,14 @@ type Handler[TReq, TResp any] struct {
 	compressor Compressor
 	protocol   Protocol[TReq, TResp]
 	log        logrus.FieldLogger
-	config     HandlerConfig
+	config     HandlerOptions
 }
 
 // NewHandler creates a new handler.
 func NewHandler[TReq, TResp any](
 	protocol Protocol[TReq, TResp],
 	handler RequestHandler[TReq, TResp],
-	config HandlerConfig,
+	config HandlerOptions,
 	log logrus.FieldLogger,
 ) *Handler[TReq, TResp] {
 	return &Handler[TReq, TResp]{
@@ -235,7 +235,7 @@ func RegisterHandler[TReq, TResp any](
 	registry *HandlerRegistry,
 	protocol Protocol[TReq, TResp],
 	handler RequestHandler[TReq, TResp],
-	config HandlerConfig,
+	config HandlerOptions,
 	log logrus.FieldLogger,
 ) error {
 	h := NewHandler(protocol, handler, config, log)

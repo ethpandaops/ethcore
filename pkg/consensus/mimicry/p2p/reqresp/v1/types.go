@@ -108,14 +108,12 @@ type ResponseMetadata struct {
 	Duration time.Duration
 }
 
-// HandlerConfig contains configuration for a request handler.
-type HandlerConfig struct {
+// HandlerOptions contains options for a request handler.
+type HandlerOptions struct {
 	// Encoder is used for encoding/decoding messages.
 	Encoder Encoder
-	// Compressor is used for compressing/decompressing messages.
+	// Compressor is used for compressing/decompressing messages (optional).
 	Compressor Compressor
-	// MaxConcurrentRequests limits concurrent request processing.
-	MaxConcurrentRequests int
 	// RequestTimeout is the timeout for processing individual requests.
 	RequestTimeout time.Duration
 	// EnableMetrics enables metrics collection.
@@ -124,10 +122,6 @@ type HandlerConfig struct {
 
 // ClientConfig contains configuration for the client.
 type ClientConfig struct {
-	// Encoder is used for encoding/decoding messages.
-	Encoder Encoder
-	// Compressor is used for compressing/decompressing messages.
-	Compressor Compressor
 	// DefaultTimeout is the default request timeout.
 	DefaultTimeout time.Duration
 	// MaxRetries is the maximum number of retry attempts.
@@ -138,10 +132,20 @@ type ClientConfig struct {
 	EnableMetrics bool
 }
 
+// RequestOptions contains options for sending a request.
+type RequestOptions struct {
+	// Encoder is used for encoding/decoding messages.
+	Encoder Encoder
+	// Compressor is used for compressing/decompressing messages (optional).
+	Compressor Compressor
+	// Timeout overrides the default timeout for this request.
+	Timeout time.Duration
+}
+
 // ServiceConfig contains configuration for the reqresp service.
 type ServiceConfig struct {
-	// HandlerConfig is the configuration for handlers.
-	HandlerConfig HandlerConfig
+	// HandlerOptions is the configuration for handlers.
+	HandlerOptions HandlerOptions
 	// ClientConfig is the configuration for the client.
 	ClientConfig ClientConfig
 }
@@ -149,10 +153,9 @@ type ServiceConfig struct {
 // DefaultServiceConfig returns a default service configuration.
 func DefaultServiceConfig() ServiceConfig {
 	return ServiceConfig{
-		HandlerConfig: HandlerConfig{
-			MaxConcurrentRequests: 100,
-			RequestTimeout:        30 * time.Second,
-			EnableMetrics:         false,
+		HandlerOptions: HandlerOptions{
+			RequestTimeout: 30 * time.Second,
+			EnableMetrics:  false,
 		},
 		ClientConfig: ClientConfig{
 			DefaultTimeout: 30 * time.Second,

@@ -64,6 +64,9 @@ type Client interface {
 	// SendRequestWithTimeout sends a request with a custom timeout.
 	// The req and resp parameters must be pointers to the request and response types.
 	SendRequestWithTimeout(ctx context.Context, peerID peer.ID, protocolID protocol.ID, req any, resp any, timeout time.Duration) error
+	// SendRequestWithOptions sends a request with custom options including encoding.
+	// The req and resp parameters must be pointers to the request and response types.
+	SendRequestWithOptions(ctx context.Context, peerID peer.ID, protocolID protocol.ID, req any, resp any, opts RequestOptions) error
 }
 
 // Registry manages request handlers for different protocols.

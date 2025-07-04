@@ -113,14 +113,14 @@ type ChunkedHandler[TReq, TResp any] struct {
 	compressor Compressor
 	protocol   Protocol[TReq, TResp]
 	log        logrus.FieldLogger
-	config     HandlerConfig
+	config     HandlerOptions
 }
 
 // NewChunkedHandler creates a new chunked handler.
 func NewChunkedHandler[TReq, TResp any](
 	protocol Protocol[TReq, TResp],
 	handler ChunkedRequestHandler[TReq, TResp],
-	config HandlerConfig,
+	config HandlerOptions,
 	log logrus.FieldLogger,
 ) *ChunkedHandler[TReq, TResp] {
 	return &ChunkedHandler[TReq, TResp]{
@@ -238,7 +238,7 @@ func RegisterChunkedHandler[TReq, TResp any](
 	registry *HandlerRegistry,
 	protocol Protocol[TReq, TResp],
 	handler ChunkedRequestHandler[TReq, TResp],
-	config HandlerConfig,
+	config HandlerOptions,
 	log logrus.FieldLogger,
 ) error {
 	h := NewChunkedHandler(protocol, handler, config, log)
