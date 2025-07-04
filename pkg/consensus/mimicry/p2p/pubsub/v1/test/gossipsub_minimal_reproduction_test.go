@@ -255,6 +255,7 @@ func TestMinimalReproduction_NextMethodDirectInspection(t *testing.T) {
 		require.Eventually(t, func() bool {
 			processingMutex.Lock()
 			defer processingMutex.Unlock()
+
 			return len(processingTimes) > i
 		}, 10*time.Second, 100*time.Millisecond,
 			fmt.Sprintf("Message %s should be processed", msgID))
