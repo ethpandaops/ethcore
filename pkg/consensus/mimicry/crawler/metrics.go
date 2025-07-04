@@ -1,6 +1,8 @@
 package crawler
 
-import "github.com/prometheus/client_golang/prometheus"
+import (
+	"github.com/prometheus/client_golang/prometheus"
+)
 
 type Metrics struct {
 	NodesProcessed   prometheus.Counter
@@ -10,9 +12,7 @@ type Metrics struct {
 	FailedRequests   *prometheus.CounterVec
 }
 
-func NewMetrics() *Metrics {
-	namespace := "crawler"
-
+func NewMetrics(namespace string) *Metrics {
 	m := &Metrics{
 		NodesProcessed: prometheus.NewCounter(prometheus.CounterOpts{
 			Name:      "nodes_processed_total",
