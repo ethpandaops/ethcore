@@ -266,6 +266,7 @@ func Example_middleware() {
 		if err != nil {
 			return "", err
 		}
+
 		return fmt.Sprintf("[Rate-Limited] %s", resp), nil
 	}
 
