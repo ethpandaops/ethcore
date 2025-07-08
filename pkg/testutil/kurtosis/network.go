@@ -163,6 +163,9 @@ func setupKurtosisNetwork(ctx context.Context, config *NetworkConfig) (*TestFoun
 		opts = append(opts, ethereum.WithGlobalLogLevel("debug"))
 	}
 
+	// Ensure we use pass-through cache.
+	opts = append(opts, ethereum.WithDockerCacheParams(true, "docker.ethquokkaops.io"))
+
 	// Configure participants from the config
 	participants := createParticipantConfig(config)
 	opts = append(opts, ethereum.WithParticipants(participants))
