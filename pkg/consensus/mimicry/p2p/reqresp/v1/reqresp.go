@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
@@ -13,28 +12,26 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// ReqResp implements the Service interface for request/response communication.
+// ReqResp implements request/response functionality.
 type ReqResp struct {
-	host     host.Host
-	client   Client
-	registry *HandlerRegistry
-	config   ServiceConfig
-	log      logrus.FieldLogger
+	host host.Host
+	log  logrus.FieldLogger
 
 	mu       sync.RWMutex
 	started  bool
-	handlers map[protocol.ID]StreamHandler
+	handlers map[protocol.ID]func(network.Stream)
+}
+
+// Config contains configuration for the ReqResp service.
+type Config struct {
 }
 
 // New creates a new ReqResp service.
-func New(h host.Host, config ServiceConfig, log logrus.FieldLogger) *ReqResp {
+func New(h host.Host, config Config, log logrus.FieldLogger) *ReqResp {
 	return &ReqResp{
 		host:     h,
-		client:   NewClient(h, config.ClientConfig, log),
-		registry: NewHandlerRegistry(log),
-		config:   config,
 		log:      log.WithField("component", "reqresp"),
-		handlers: make(map[protocol.ID]StreamHandler),
+		handlers: make(map[protocol.ID]func(network.Stream)),
 	}
 }
 
@@ -47,15 +44,11 @@ func (r *ReqResp) Start(ctx context.Context) error {
 		return fmt.Errorf("service already started")
 	}
 
-	// Register all handlers with the host
-	for protoID, handler := range r.handlers {
-		r.host.SetStreamHandler(protoID, r.wrapStreamHandler(handler))
-		r.log.WithField("protocol", protoID).Info("Registered protocol handler")
+	for protocolID, handler := range r.handlers {
+		r.host.SetStreamHandler(protocolID, handler)
 	}
 
 	r.started = true
-	r.log.Info("ReqResp service started")
-
 	return nil
 }
 
@@ -65,141 +58,267 @@ func (r *ReqResp) Stop() error {
 	defer r.mu.Unlock()
 
 	if !r.started {
-		return nil
+		return fmt.Errorf("service not started")
 	}
 
-	// Remove all handlers from the host
-	for protoID := range r.handlers {
-		r.host.RemoveStreamHandler(protoID)
-		r.log.WithField("protocol", protoID).Debug("Removed protocol handler")
+	for protocolID := range r.handlers {
+		r.host.RemoveStreamHandler(protocolID)
 	}
 
 	r.started = false
-	r.log.Info("ReqResp service stopped")
-
 	return nil
 }
 
-// Register registers a handler for a protocol.
-func (r *ReqResp) Register(protocolID protocol.ID, handler StreamHandler) error {
+// HandleStream provides a convenient wrapper for handling req/resp streams with marshalling.
+func HandleStream[TReq, TResp any](
+	stream network.Stream,
+	protocol Protocol[TReq, TResp],
+	handler RequestHandler[TReq, TResp],
+) error {
+	defer stream.Close()
+
+	// Read request from stream
+	reqData := make([]byte, protocol.MaxRequestSize())
+
+	n, err := stream.Read(reqData)
+	if err != nil {
+		return fmt.Errorf("failed to read request: %w", err)
+	}
+
+	reqData = reqData[:n]
+
+	// Decode request (includes decompression)
+	var req TReq
+	if err = protocol.NetworkEncoder().DecodeNetwork(reqData, &req); err != nil {
+		return fmt.Errorf("failed to decode request: %w", err)
+	}
+
+	// Handle request
+	resp, err := handler(context.Background(), req, stream.Conn().RemotePeer())
+	if err != nil {
+		return fmt.Errorf("handler error: %w", err)
+	}
+
+	// Encode response (includes compression)
+	respData, err := protocol.NetworkEncoder().EncodeNetwork(resp)
+	if err != nil {
+		return fmt.Errorf("failed to encode response: %w", err)
+	}
+
+	// Write response to stream
+	_, err = stream.Write(respData)
+
+	return err
+}
+
+// HandleChunkedStream provides a convenient wrapper for handling chunked req/resp streams.
+func HandleChunkedStream[TReq, TResp any](
+	stream network.Stream,
+	protocol ChunkedProtocol[TReq, TResp],
+	handler ChunkedRequestHandler[TReq, TResp],
+) error {
+	defer stream.Close()
+
+	// Read request from stream
+	reqData := make([]byte, protocol.MaxRequestSize())
+
+	n, err := stream.Read(reqData)
+	if err != nil {
+		return fmt.Errorf("failed to read request: %w", err)
+	}
+
+	reqData = reqData[:n]
+
+	// Decode request (includes decompression)
+	var req TReq
+	if err = protocol.NetworkEncoder().DecodeNetwork(reqData, &req); err != nil {
+		return fmt.Errorf("failed to decode request: %w", err)
+	}
+
+	// Create response writer
+	writer := &streamChunkedWriter[TResp]{
+		stream:         stream,
+		networkEncoder: protocol.NetworkEncoder(),
+	}
+
+	// Handle request
+	return handler(context.Background(), req, stream.Conn().RemotePeer(), writer)
+}
+
+// streamChunkedWriter implements ChunkedResponseWriter for streams.
+type streamChunkedWriter[TResp any] struct {
+	stream         network.Stream
+	networkEncoder NetworkEncoder
+}
+
+func (w *streamChunkedWriter[TResp]) WriteChunk(resp TResp) error {
+	data, err := w.networkEncoder.EncodeNetwork(resp)
+	if err != nil {
+		return fmt.Errorf("failed to encode chunk: %w", err)
+	}
+
+	_, err = w.stream.Write(data)
+
+	return err
+}
+
+func (w *streamChunkedWriter[TResp]) Close() error {
+	return w.stream.Close()
+}
+
+// RegisterHandler registers a raw stream handler for a protocol.
+func (r *ReqResp) RegisterHandler(protocolID protocol.ID, handler func(network.Stream)) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	if _, exists := r.handlers[protocolID]; exists {
-		return ErrHandlerExists
+		return fmt.Errorf("handler already registered for protocol %s", protocolID)
 	}
 
 	r.handlers[protocolID] = handler
 
-	// If service is already started, register with host immediately
 	if r.started {
-		r.host.SetStreamHandler(protocolID, r.wrapStreamHandler(handler))
+		r.host.SetStreamHandler(protocolID, handler)
 	}
 
-	return r.registry.Register(protocolID, handler)
+	return nil
 }
 
-// Unregister removes a handler for a protocol.
-func (r *ReqResp) Unregister(protocolID protocol.ID) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	if _, exists := r.handlers[protocolID]; !exists {
-		return ErrNoHandler
-	}
-
-	delete(r.handlers, protocolID)
-
-	// If service is running, remove from host
-	if r.started {
-		r.host.RemoveStreamHandler(protocolID)
-	}
-
-	return r.registry.Unregister(protocolID)
-}
-
-// SendRequest sends a request to a peer and waits for a response.
-func (r *ReqResp) SendRequest(ctx context.Context, peerID peer.ID, protocolID protocol.ID, req any, resp any) error {
-	if !r.started {
-		return ErrServiceStopped
-	}
-
-	return r.client.SendRequest(ctx, peerID, protocolID, req, resp)
-}
-
-// SendRequestWithTimeout sends a request with a custom timeout.
-func (r *ReqResp) SendRequestWithTimeout(ctx context.Context, peerID peer.ID, protocolID protocol.ID, req any, resp any, timeout time.Duration) error {
-	if !r.started {
-		return ErrServiceStopped
-	}
-
-	return r.client.SendRequestWithTimeout(ctx, peerID, protocolID, req, resp, timeout)
-}
-
-// SendRequestWithOptions sends a request with custom options including encoding.
-func (r *ReqResp) SendRequestWithOptions(ctx context.Context, peerID peer.ID, protocolID protocol.ID, req any, resp any, opts RequestOptions) error {
-	if !r.started {
-		return ErrServiceStopped
-	}
-
-	return r.client.SendRequestWithOptions(ctx, peerID, protocolID, req, resp, opts)
-}
-
-// Host returns the underlying libp2p host.
-func (r *ReqResp) Host() host.Host {
-	return r.host
-}
-
-// SupportedProtocols returns the list of registered protocols.
-func (r *ReqResp) SupportedProtocols() []protocol.ID {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	protocols := make([]protocol.ID, 0, len(r.handlers))
-	for protoID := range r.handlers {
-		protocols = append(protocols, protoID)
-	}
-
-	return protocols
-}
-
-// wrapStreamHandler wraps a StreamHandler with logging and metrics.
-func (r *ReqResp) wrapStreamHandler(handler StreamHandler) network.StreamHandler {
-	return func(stream network.Stream) {
-		ctx := context.Background()
-		peerID := stream.Conn().RemotePeer()
-		protoID := stream.Protocol()
-
-		r.log.WithFields(logrus.Fields{
-			"peer":     peerID,
-			"protocol": protoID,
-		}).Debug("Handling incoming stream")
-
-		// Call the handler
-		handler.HandleStream(ctx, stream)
-	}
-}
-
-// RegisterProtocol is a convenience function to register a protocol with a typed handler.
-func RegisterProtocol[TReq, TResp any](
+// RegisterStreamHandler registers a handler using the convenient stream wrapper.
+func RegisterStreamHandler[TReq, TResp any](
 	service *ReqResp,
 	protocol Protocol[TReq, TResp],
 	handler RequestHandler[TReq, TResp],
-	opts HandlerOptions,
 ) error {
-	h := NewHandler(protocol, handler, opts, service.log)
-
-	return service.Register(protocol.ID(), h)
+	return service.RegisterHandler(protocol.ID(), func(stream network.Stream) {
+		if err := HandleStream(stream, protocol, handler); err != nil {
+			// Log error but don't crash - let the stream close gracefully
+			service.log.WithError(err).WithField("protocol", protocol.ID()).Error("Stream handler error")
+		}
+	})
 }
 
-// RegisterChunkedProtocol is a convenience function to register a chunked protocol with a typed handler.
-func RegisterChunkedProtocol[TReq, TResp any](
+// RegisterChunkedStreamHandler registers a chunked handler using the convenient stream wrapper.
+func RegisterChunkedStreamHandler[TReq, TResp any](
 	service *ReqResp,
-	protocol Protocol[TReq, TResp],
+	protocol ChunkedProtocol[TReq, TResp],
 	handler ChunkedRequestHandler[TReq, TResp],
-	opts HandlerOptions,
 ) error {
-	h := NewChunkedHandler(protocol, handler, opts, service.log)
+	return service.RegisterHandler(protocol.ID(), func(stream network.Stream) {
+		if err := HandleChunkedStream(stream, protocol, handler); err != nil {
+			// Log error but don't crash - let the stream close gracefully
+			service.log.WithError(err).WithField("protocol", protocol.ID()).Error("Chunked stream handler error")
+		}
+	})
+}
 
-	return service.Register(protocol.ID(), h)
+// SendRequest provides a convenient wrapper for making outbound requests.
+func SendRequest[TReq, TResp any](
+	ctx context.Context,
+	h host.Host,
+	peerID peer.ID,
+	protocol Protocol[TReq, TResp],
+	req TReq,
+) (TResp, error) {
+	var resp TResp
+
+	// Open stream to peer
+	stream, err := h.NewStream(ctx, peerID, protocol.ID())
+	if err != nil {
+		return resp, fmt.Errorf("failed to open stream: %w", err)
+	}
+	defer stream.Close()
+
+	// Encode request (includes compression)
+	reqData, err := protocol.NetworkEncoder().EncodeNetwork(req)
+	if err != nil {
+		return resp, fmt.Errorf("failed to encode request: %w", err)
+	}
+
+	// Send request
+	_, err = stream.Write(reqData)
+	if err != nil {
+		return resp, fmt.Errorf("failed to write request: %w", err)
+	}
+
+	// Read response
+	respData := make([]byte, protocol.MaxResponseSize())
+
+	n, err := stream.Read(respData)
+	if err != nil {
+		return resp, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	respData = respData[:n]
+
+	// Decode response (includes decompression)
+	if err = protocol.NetworkEncoder().DecodeNetwork(respData, &resp); err != nil {
+		return resp, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return resp, nil
+}
+
+// SendChunkedRequest provides a convenient wrapper for making chunked requests.
+func SendChunkedRequest[TReq, TResp any](
+	ctx context.Context,
+	h host.Host,
+	peerID peer.ID,
+	protocol ChunkedProtocol[TReq, TResp],
+	req TReq,
+	chunkHandler func(TResp) error,
+) error {
+	// Open stream to peer
+	stream, err := h.NewStream(ctx, peerID, protocol.ID())
+	if err != nil {
+		return fmt.Errorf("failed to open stream: %w", err)
+	}
+	defer stream.Close()
+
+	// Encode request (includes compression)
+	reqData, err := protocol.NetworkEncoder().EncodeNetwork(req)
+	if err != nil {
+		return fmt.Errorf("failed to encode request: %w", err)
+	}
+
+	// Send request
+	_, err = stream.Write(reqData)
+	if err != nil {
+		return fmt.Errorf("failed to write request: %w", err)
+	}
+
+	// Read chunked responses
+	for {
+		// Read chunk
+		chunkData := make([]byte, protocol.MaxResponseSize())
+
+		n, err := stream.Read(chunkData)
+		if err != nil {
+			// End of stream is expected for chunked responses
+			if err.Error() == "EOF" {
+				break
+			}
+
+			return fmt.Errorf("failed to read chunk: %w", err)
+		}
+
+		if n == 0 {
+			break // No more data
+		}
+
+		chunkData = chunkData[:n]
+
+		// Decode chunk (includes decompression)
+		var chunk TResp
+		if err = protocol.NetworkEncoder().DecodeNetwork(chunkData, &chunk); err != nil {
+			return fmt.Errorf("failed to decode chunk: %w", err)
+		}
+
+		// Handle chunk
+		if err = chunkHandler(chunk); err != nil {
+			return fmt.Errorf("chunk handler error: %w", err)
+		}
+	}
+
+	return nil
 }

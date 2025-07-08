@@ -9,14 +9,16 @@ type BaseProtocol struct {
 	id              protocol.ID
 	maxRequestSize  uint64
 	maxResponseSize uint64
+	networkEncoder  NetworkEncoder
 }
 
 // NewProtocol creates a new base protocol.
-func NewProtocol(id protocol.ID, maxRequestSize, maxResponseSize uint64) *BaseProtocol {
+func NewProtocol(id protocol.ID, maxRequestSize, maxResponseSize uint64, networkEncoder NetworkEncoder) *BaseProtocol {
 	return &BaseProtocol{
 		id:              id,
 		maxRequestSize:  maxRequestSize,
 		maxResponseSize: maxResponseSize,
+		networkEncoder:  networkEncoder,
 	}
 }
 
@@ -35,15 +37,20 @@ func (p *BaseProtocol) MaxResponseSize() uint64 {
 	return p.maxResponseSize
 }
 
+// NetworkEncoder returns the network encoder for this protocol.
+func (p *BaseProtocol) NetworkEncoder() NetworkEncoder {
+	return p.networkEncoder
+}
+
 // BaseChunkedProtocol provides a basic implementation of the ChunkedProtocol interface.
 type BaseChunkedProtocol struct {
 	*BaseProtocol
 }
 
 // NewChunkedProtocol creates a new chunked protocol.
-func NewChunkedProtocol(id protocol.ID, maxRequestSize, maxResponseSize uint64) *BaseChunkedProtocol {
+func NewChunkedProtocol(id protocol.ID, maxRequestSize, maxResponseSize uint64, networkEncoder NetworkEncoder) *BaseChunkedProtocol {
 	return &BaseChunkedProtocol{
-		BaseProtocol: NewProtocol(id, maxRequestSize, maxResponseSize),
+		BaseProtocol: NewProtocol(id, maxRequestSize, maxResponseSize, networkEncoder),
 	}
 }
 
