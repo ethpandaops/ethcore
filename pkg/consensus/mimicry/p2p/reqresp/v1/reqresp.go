@@ -22,12 +22,8 @@ type ReqResp struct {
 	handlers map[protocol.ID]func(network.Stream)
 }
 
-// Config contains configuration for the ReqResp service.
-type Config struct {
-}
-
 // New creates a new ReqResp service.
-func New(h host.Host, config Config, log logrus.FieldLogger) *ReqResp {
+func New(h host.Host, log logrus.FieldLogger) *ReqResp {
 	return &ReqResp{
 		host:     h,
 		log:      log.WithField("component", "reqresp"),
@@ -114,7 +110,7 @@ func HandleStream[TReq, TResp any](
 // HandleChunkedStream provides a convenient wrapper for handling chunked req/resp streams.
 func HandleChunkedStream[TReq, TResp any](
 	stream network.Stream,
-	protocol ChunkedProtocol[TReq, TResp],
+	protocol Protocol[TReq, TResp],
 	handler ChunkedRequestHandler[TReq, TResp],
 ) error {
 	defer stream.Close()
@@ -201,7 +197,7 @@ func RegisterStreamHandler[TReq, TResp any](
 // RegisterChunkedStreamHandler registers a chunked handler using the convenient stream wrapper.
 func RegisterChunkedStreamHandler[TReq, TResp any](
 	service *ReqResp,
-	protocol ChunkedProtocol[TReq, TResp],
+	protocol Protocol[TReq, TResp],
 	handler ChunkedRequestHandler[TReq, TResp],
 ) error {
 	return service.RegisterHandler(protocol.ID(), func(stream network.Stream) {
@@ -264,7 +260,7 @@ func SendChunkedRequest[TReq, TResp any](
 	ctx context.Context,
 	h host.Host,
 	peerID peer.ID,
-	protocol ChunkedProtocol[TReq, TResp],
+	protocol Protocol[TReq, TResp],
 	req TReq,
 	chunkHandler func(TResp) error,
 ) error {

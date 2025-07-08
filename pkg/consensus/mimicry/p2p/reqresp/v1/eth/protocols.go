@@ -57,7 +57,7 @@ func NewMetadataV2[TReq, TResp any](maxRequestSize, maxResponseSize uint64, netw
 }
 
 // NewBeaconBlocksByRangeV1 creates a beacon blocks by range V1 protocol with compile-time validated protocol ID.
-func NewBeaconBlocksByRangeV1[TReq, TResp any](maxRequestSize, maxResponseSize uint64, networkEncoder v1.NetworkEncoder) v1.ChunkedProtocol[TReq, TResp] {
+func NewBeaconBlocksByRangeV1[TReq, TResp any](maxRequestSize, maxResponseSize uint64, networkEncoder v1.NetworkEncoder) v1.Protocol[TReq, TResp] {
 	return v1.NewChunkedProtocol(
 		protocol.ID(eth.BeaconBlocksByRangeV1ProtocolID),
 		maxRequestSize,
@@ -67,7 +67,7 @@ func NewBeaconBlocksByRangeV1[TReq, TResp any](maxRequestSize, maxResponseSize u
 }
 
 // NewBeaconBlocksByRangeV2 creates a beacon blocks by range V2 protocol with compile-time validated protocol ID.
-func NewBeaconBlocksByRangeV2[TReq, TResp any](maxRequestSize, maxResponseSize uint64, networkEncoder v1.NetworkEncoder) v1.ChunkedProtocol[TReq, TResp] {
+func NewBeaconBlocksByRangeV2[TReq, TResp any](maxRequestSize, maxResponseSize uint64, networkEncoder v1.NetworkEncoder) v1.Protocol[TReq, TResp] {
 	return v1.NewChunkedProtocol(
 		protocol.ID(eth.BeaconBlocksByRangeV2ProtocolID),
 		maxRequestSize,
@@ -77,7 +77,7 @@ func NewBeaconBlocksByRangeV2[TReq, TResp any](maxRequestSize, maxResponseSize u
 }
 
 // NewBeaconBlocksByRootV1 creates a beacon blocks by root V1 protocol with compile-time validated protocol ID.
-func NewBeaconBlocksByRootV1[TReq, TResp any](maxRequestSize, maxResponseSize uint64, networkEncoder v1.NetworkEncoder) v1.ChunkedProtocol[TReq, TResp] {
+func NewBeaconBlocksByRootV1[TReq, TResp any](maxRequestSize, maxResponseSize uint64, networkEncoder v1.NetworkEncoder) v1.Protocol[TReq, TResp] {
 	return v1.NewChunkedProtocol(
 		protocol.ID(eth.BeaconBlocksByRootV1ProtocolID),
 		maxRequestSize,
@@ -87,7 +87,7 @@ func NewBeaconBlocksByRootV1[TReq, TResp any](maxRequestSize, maxResponseSize ui
 }
 
 // NewBeaconBlocksByRootV2 creates a beacon blocks by root V2 protocol with compile-time validated protocol ID.
-func NewBeaconBlocksByRootV2[TReq, TResp any](maxRequestSize, maxResponseSize uint64, networkEncoder v1.NetworkEncoder) v1.ChunkedProtocol[TReq, TResp] {
+func NewBeaconBlocksByRootV2[TReq, TResp any](maxRequestSize, maxResponseSize uint64, networkEncoder v1.NetworkEncoder) v1.Protocol[TReq, TResp] {
 	return v1.NewChunkedProtocol(
 		protocol.ID(eth.BeaconBlocksByRootV2ProtocolID),
 		maxRequestSize,
@@ -97,7 +97,7 @@ func NewBeaconBlocksByRootV2[TReq, TResp any](maxRequestSize, maxResponseSize ui
 }
 
 // NewBlobSidecarsByRangeV1 creates a blob sidecars by range V1 protocol with compile-time validated protocol ID.
-func NewBlobSidecarsByRangeV1[TReq, TResp any](maxRequestSize, maxResponseSize uint64, networkEncoder v1.NetworkEncoder) v1.ChunkedProtocol[TReq, TResp] {
+func NewBlobSidecarsByRangeV1[TReq, TResp any](maxRequestSize, maxResponseSize uint64, networkEncoder v1.NetworkEncoder) v1.Protocol[TReq, TResp] {
 	return v1.NewChunkedProtocol(
 		protocol.ID(eth.BlobSidecarsByRangeV1ProtocolID),
 		maxRequestSize,
@@ -107,7 +107,7 @@ func NewBlobSidecarsByRangeV1[TReq, TResp any](maxRequestSize, maxResponseSize u
 }
 
 // NewBlobSidecarsByRootV1 creates a blob sidecars by root V1 protocol with compile-time validated protocol ID.
-func NewBlobSidecarsByRootV1[TReq, TResp any](maxRequestSize, maxResponseSize uint64, networkEncoder v1.NetworkEncoder) v1.ChunkedProtocol[TReq, TResp] {
+func NewBlobSidecarsByRootV1[TReq, TResp any](maxRequestSize, maxResponseSize uint64, networkEncoder v1.NetworkEncoder) v1.Protocol[TReq, TResp] {
 	return v1.NewChunkedProtocol(
 		protocol.ID(eth.BlobSidecarsByRootV1ProtocolID),
 		maxRequestSize,

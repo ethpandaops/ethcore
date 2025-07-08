@@ -36,10 +36,5 @@ type Protocol[TReq, TResp any] interface {
 	MaxRequestSize() uint64
 	MaxResponseSize() uint64
 	NetworkEncoder() NetworkEncoder
-}
-
-// ChunkedProtocol represents a protocol that supports chunked responses.
-type ChunkedProtocol[TReq, TResp any] interface {
-	Protocol[TReq, TResp]
 	IsChunked() bool
 }
