@@ -868,6 +868,17 @@ func (c *Crawler) scheduleRetry(peerID peer.ID, peer *discovery.ConnectablePeer,
 	retryInfo.LastAttempt = time.Now()
 	retryInfo.BackoffDelay = time.Duration(float64(c.config.RetryBackoff) * float64(retryInfo.Attempts))
 
+	// Check if we're shutting down before sending to channel
+	c.shutdownMu.RLock()
+	if c.isShutdown {
+		c.shutdownMu.RUnlock()
+
+		c.log.WithField("peer", peerID).Debug("Crawler is shutting down, not scheduling retry")
+
+		return
+	}
+	c.shutdownMu.RUnlock()
+
 	// Remove from duplicate cache to allow immediate retry
 	c.duplicateCache.GetCache().Delete(peerID.String())
 
