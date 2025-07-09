@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethpandaops/beacon/pkg/beacon"
 	"github.com/ethpandaops/beacon/pkg/beacon/api/types"
 	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/crawler"
@@ -17,8 +16,6 @@ import (
 	"github.com/ethpandaops/ethcore/pkg/ethereum"
 	"github.com/ethpandaops/ethcore/pkg/testutil/kurtosis"
 	"github.com/ethpandaops/ethereum-package-go/pkg/network"
-	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 )
@@ -351,12 +348,12 @@ func setupCrawlerEventHandlers(
 ) {
 	t.Helper()
 
-	cr.OnSuccessfulCrawl(func(peerID peer.ID, enr *enode.Node, status *common.Status, metadata *common.MetaData) {
+	cr.OnSuccessfulCrawl(func(crawl *crawler.SuccessfulCrawl) {
 		// Get the service name
 		found := false
 
 		for name, identity := range identities {
-			if identity.PeerID == peerID.String() {
+			if identity.PeerID == crawl.PeerID.String() {
 				logger.Infof("Successfully crawled %s (status received and metadata exchanged)", name)
 
 				mu.Lock()
@@ -370,15 +367,15 @@ func setupCrawlerEventHandlers(
 		}
 
 		if !found {
-			logger.Warnf("Received successful crawl for unknown peer ID: %s", peerID)
+			logger.Warnf("Received successful crawl for unknown peer ID: %s", crawl.PeerID)
 		}
 	})
 
-	cr.OnFailedCrawl(func(peerID peer.ID, err crawler.CrawlError) {
+	cr.OnFailedCrawl(func(crawl *crawler.FailedCrawl) {
 		// Check if this peer is one we're tracking
 		peerName := "unknown"
 		for name, identity := range identities {
-			if identity.PeerID == peerID.String() {
+			if identity.PeerID == crawl.PeerID.String() {
 				peerName = name
 
 				break
@@ -388,9 +385,9 @@ func setupCrawlerEventHandlers(
 		// Log detailed error information to help debug connection issues
 		logger.WithFields(logrus.Fields{
 			"peer_name": peerName,
-			"peer_id":   peerID,
-			"error":     err.Error(),
-			"err_type":  fmt.Sprintf("%T", err),
+			"peer_id":   crawl.PeerID,
+			"error":     crawl.Error.Error(),
+			"err_type":  fmt.Sprintf("%T", crawl.Error),
 		}).Error("Failed to crawl peer")
 	})
 }
