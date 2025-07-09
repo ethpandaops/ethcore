@@ -1,3 +1,4 @@
+comment: false
 ignore:
   - ".github"
   - "README.md"
