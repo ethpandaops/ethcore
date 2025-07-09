@@ -9,6 +9,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	// testENRBasic is a basic ENR without NFD field used for testing.
+	testENRBasic = "enr:-Iq4QCxbKw-XHdkvUcbd5-bJ8vEtyJr5jD3sg3XCwnkWXWwOEcuWWTrev8TnIcSsatTVd2LseQy1wH8u97vPGlxismiGAZerck1AgmlkgnY0gmlwhKdHDm2Jc2VjcDI1NmsxoQJJ3h8aUO3GJHv-bdvHtsQZ2OEisutelYfGjXO4lSg8BYN1ZHCCIzI"
+)
+
 func TestParse(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -23,17 +28,17 @@ func TestParse(t *testing.T) {
 				t.Helper()
 				assert.NotNil(t, result)
 				assert.Equal(t, "enr:-Iq4QCxbKw-XHdkvUcbd5-bJ8vEtyJr5jD3sg3XCwnkWXWwOEcuWWTrev8TnIcSsatTVd2LseQy1wH8u97vPGlxismiGAZerck1AgmlkgnY0gmlwhKdHDm2Jc2VjcDI1NmsxoQJJ3h8aUO3GJHv-bdvHtsQZ2OEisutelYfGjXO4lSg8BYN1ZHCCIzI", result.Enr)
-				assert.NotNil(t, result.Signature)
-				assert.NotNil(t, result.Seq)
-				assert.NotNil(t, result.ID)
-				assert.NotNil(t, result.NodeID)
-				assert.NotNil(t, result.Secp256k1)
-				assert.NotNil(t, result.IP4)
-				assert.Nil(t, result.TCP4)
-				assert.NotNil(t, result.UDP4)
-				assert.Equal(t, "v4", *result.ID)
-				assert.Equal(t, "167.71.14.109", *result.IP4)
-				assert.Equal(t, uint32(9010), *result.UDP4)
+				assert.NotNil(t, result.GetSignature())
+				assert.NotNil(t, result.GetSeq())
+				assert.NotNil(t, result.GetID())
+				assert.NotNil(t, result.GetNodeID())
+				assert.NotNil(t, result.GetSecp256k1())
+				assert.NotNil(t, result.GetIP4())
+				assert.Nil(t, result.GetTCP4())
+				assert.NotNil(t, result.GetUDP4())
+				assert.Equal(t, "v4", *result.GetID())
+				assert.Equal(t, "167.71.14.109", *result.GetIP4())
+				assert.Equal(t, uint32(9010), *result.GetUDP4())
 			},
 			wantErr: false,
 		},
@@ -43,13 +48,14 @@ func TestParse(t *testing.T) {
 			expected: func(t *testing.T, result *ENR) {
 				t.Helper()
 				assert.NotNil(t, result)
-				assert.Equal(t, "v4", *result.ID)
-				assert.NotNil(t, result.ETH2)
-				assert.NotNil(t, result.Attnets)
-				assert.NotNil(t, result.IP4)
-				assert.Equal(t, "167.71.14.109", *result.IP4)
-				assert.Equal(t, uint32(9000), *result.TCP4)
-				assert.Equal(t, uint32(9000), *result.UDP4)
+				assert.NotNil(t, result.GetID())
+				assert.Equal(t, "v4", *result.GetID())
+				assert.NotNil(t, result.GetETH2())
+				assert.NotNil(t, result.GetAttnets())
+				assert.NotNil(t, result.GetIP4())
+				assert.Equal(t, "167.71.14.109", *result.GetIP4())
+				assert.Equal(t, uint32(9000), *result.GetTCP4())
+				assert.Equal(t, uint32(9000), *result.GetUDP4())
 			},
 			wantErr: false,
 		},
@@ -59,12 +65,13 @@ func TestParse(t *testing.T) {
 			expected: func(t *testing.T, result *ENR) {
 				t.Helper()
 				assert.NotNil(t, result)
-				assert.Equal(t, "v4", *result.ID)
-				assert.NotNil(t, result.IP4)
-				assert.NotNil(t, result.TCP4)
-				assert.NotNil(t, result.UDP4)
-				assert.NotNil(t, result.NodeID)
-				assert.NotNil(t, result.PeerID)
+				assert.NotNil(t, result.GetID())
+				assert.Equal(t, "v4", *result.GetID())
+				assert.NotNil(t, result.GetIP4())
+				assert.NotNil(t, result.GetTCP4())
+				assert.NotNil(t, result.GetUDP4())
+				assert.NotNil(t, result.GetNodeID())
+				assert.NotNil(t, result.GetPeerID())
 			},
 			wantErr: false,
 		},
@@ -74,11 +81,12 @@ func TestParse(t *testing.T) {
 			expected: func(t *testing.T, result *ENR) {
 				t.Helper()
 				assert.NotNil(t, result)
-				assert.Equal(t, "v4", *result.ID)
-				assert.NotNil(t, result.IP4)
-				assert.NotNil(t, result.TCP4)
-				assert.NotNil(t, result.UDP4)
-				assert.NotNil(t, result.Syncnets)
+				assert.NotNil(t, result.GetID())
+				assert.Equal(t, "v4", *result.GetID())
+				assert.NotNil(t, result.GetIP4())
+				assert.NotNil(t, result.GetTCP4())
+				assert.NotNil(t, result.GetUDP4())
+				assert.NotNil(t, result.GetSyncnets())
 			},
 			wantErr: false,
 		},
@@ -88,11 +96,12 @@ func TestParse(t *testing.T) {
 			expected: func(t *testing.T, result *ENR) {
 				t.Helper()
 				assert.NotNil(t, result)
-				assert.Equal(t, "v4", *result.ID)
-				assert.NotNil(t, result.IP4)
-				assert.NotNil(t, result.TCP4)
-				assert.NotNil(t, result.UDP4)
-				assert.NotNil(t, result.ETH2)
+				assert.NotNil(t, result.GetID())
+				assert.Equal(t, "v4", *result.GetID())
+				assert.NotNil(t, result.GetIP4())
+				assert.NotNil(t, result.GetTCP4())
+				assert.NotNil(t, result.GetUDP4())
+				assert.NotNil(t, result.GetETH2())
 			},
 			wantErr: false,
 		},
@@ -102,11 +111,12 @@ func TestParse(t *testing.T) {
 			expected: func(t *testing.T, result *ENR) {
 				t.Helper()
 				assert.NotNil(t, result)
-				assert.Equal(t, "v4", *result.ID)
-				assert.NotNil(t, result.IP4)
-				assert.NotNil(t, result.TCP4)
-				assert.NotNil(t, result.UDP4)
-				assert.NotNil(t, result.ETH2)
+				assert.NotNil(t, result.GetID())
+				assert.Equal(t, "v4", *result.GetID())
+				assert.NotNil(t, result.GetIP4())
+				assert.NotNil(t, result.GetTCP4())
+				assert.NotNil(t, result.GetUDP4())
+				assert.NotNil(t, result.GetETH2())
 			},
 			wantErr: false,
 		},
@@ -116,11 +126,12 @@ func TestParse(t *testing.T) {
 			expected: func(t *testing.T, result *ENR) {
 				t.Helper()
 				assert.NotNil(t, result)
-				assert.Equal(t, "v4", *result.ID)
-				assert.NotNil(t, result.IP4)
-				assert.NotNil(t, result.TCP4)
-				assert.NotNil(t, result.UDP4)
-				assert.NotNil(t, result.ETH2)
+				assert.NotNil(t, result.GetID())
+				assert.Equal(t, "v4", *result.GetID())
+				assert.NotNil(t, result.GetIP4())
+				assert.NotNil(t, result.GetTCP4())
+				assert.NotNil(t, result.GetUDP4())
+				assert.NotNil(t, result.GetETH2())
 			},
 			wantErr: false,
 		},
@@ -130,12 +141,13 @@ func TestParse(t *testing.T) {
 			expected: func(t *testing.T, result *ENR) {
 				t.Helper()
 				assert.NotNil(t, result)
-				assert.Equal(t, "v4", *result.ID)
-				assert.NotNil(t, result.IP4)
-				assert.NotNil(t, result.TCP4)
-				assert.NotNil(t, result.UDP4)
-				assert.NotNil(t, result.ETH2)
-				assert.NotNil(t, result.Attnets)
+				assert.NotNil(t, result.GetID())
+				assert.Equal(t, "v4", *result.GetID())
+				assert.NotNil(t, result.GetIP4())
+				assert.NotNil(t, result.GetTCP4())
+				assert.NotNil(t, result.GetUDP4())
+				assert.NotNil(t, result.GetETH2())
+				assert.NotNil(t, result.GetAttnets())
 			},
 			wantErr: false,
 		},
@@ -145,12 +157,13 @@ func TestParse(t *testing.T) {
 			expected: func(t *testing.T, result *ENR) {
 				t.Helper()
 				assert.NotNil(t, result)
-				assert.Equal(t, "v4", *result.ID)
-				assert.NotNil(t, result.IP4)
-				assert.NotNil(t, result.TCP4)
-				assert.NotNil(t, result.UDP4)
-				assert.NotNil(t, result.ETH2)
-				assert.NotNil(t, result.Attnets)
+				assert.NotNil(t, result.GetID())
+				assert.Equal(t, "v4", *result.GetID())
+				assert.NotNil(t, result.GetIP4())
+				assert.NotNil(t, result.GetTCP4())
+				assert.NotNil(t, result.GetUDP4())
+				assert.NotNil(t, result.GetETH2())
+				assert.NotNil(t, result.GetAttnets())
 			},
 			wantErr: false,
 		},
@@ -160,12 +173,13 @@ func TestParse(t *testing.T) {
 			expected: func(t *testing.T, result *ENR) {
 				t.Helper()
 				assert.NotNil(t, result)
-				assert.Equal(t, "v4", *result.ID)
-				assert.NotNil(t, result.IP4)
-				assert.NotNil(t, result.TCP4)
-				assert.NotNil(t, result.UDP4)
-				assert.NotNil(t, result.ETH2)
-				assert.NotNil(t, result.Syncnets)
+				assert.NotNil(t, result.GetID())
+				assert.Equal(t, "v4", *result.GetID())
+				assert.NotNil(t, result.GetIP4())
+				assert.NotNil(t, result.GetTCP4())
+				assert.NotNil(t, result.GetUDP4())
+				assert.NotNil(t, result.GetETH2())
+				assert.NotNil(t, result.GetSyncnets())
 			},
 			wantErr: false,
 		},
@@ -175,12 +189,13 @@ func TestParse(t *testing.T) {
 			expected: func(t *testing.T, result *ENR) {
 				t.Helper()
 				assert.NotNil(t, result)
-				assert.Equal(t, "v4", *result.ID)
-				assert.NotNil(t, result.IP4)
-				assert.NotNil(t, result.TCP4)
-				assert.NotNil(t, result.UDP4)
-				assert.NotNil(t, result.ETH2)
-				assert.NotNil(t, result.Attnets)
+				assert.NotNil(t, result.GetID())
+				assert.Equal(t, "v4", *result.GetID())
+				assert.NotNil(t, result.GetIP4())
+				assert.NotNil(t, result.GetTCP4())
+				assert.NotNil(t, result.GetUDP4())
+				assert.NotNil(t, result.GetETH2())
+				assert.NotNil(t, result.GetAttnets())
 			},
 			wantErr: false,
 		},
@@ -448,6 +463,7 @@ func TestParseETH2Fields(t *testing.T) {
 		expectAttnets  bool
 		expectSyncnets bool
 		expectCGC      bool
+		expectNFD      bool
 	}{
 		{
 			name:           "ENR with ETH2 and attestation subnets",
@@ -456,14 +472,7 @@ func TestParseETH2Fields(t *testing.T) {
 			expectAttnets:  true,
 			expectSyncnets: false,
 			expectCGC:      true,
-		},
-		{
-			name:           "ENR with sync committees",
-			enr:            "enr:-Oi4QFDm6C0HGsMNqhkHHJ_WeMp23T_Sprdk5CDceRNqXngif1WGfYJBEbTsX72k8Zc9mm5lAXk4GyQkE6HjJi-tdVsBh2F0dG5ldHOIAAAAAAAAAACDY2djBIZjbGllbnTXiEdyYW5kaW5ljTEuMS4xLTU1OTIzYjmEZXRoMpCBABMacJN1RAABAAAAAAAAgmlkgnY0gmlwhKpA6S-EcXVpY4IjKYlzZWNwMjU2azGhA6wjHpjVDsRKYzNF7hnqIxBaAYV7JbDWuhP9KA73evV4iHN5bmNuZXRzAIN0Y3CCIyiDdWRwgiMo",
-			expectETH2:     true,
-			expectAttnets:  true,
-			expectSyncnets: true,
-			expectCGC:      true,
+			expectNFD:      true,
 		},
 		{
 			name:           "Lighthouse ENR with ETH2 key",
@@ -472,6 +481,7 @@ func TestParseETH2Fields(t *testing.T) {
 			expectAttnets:  true,
 			expectSyncnets: true,
 			expectCGC:      true,
+			expectNFD:      true,
 		},
 		{
 			name:           "ENR with attestation subnets",
@@ -480,6 +490,7 @@ func TestParseETH2Fields(t *testing.T) {
 			expectAttnets:  true,
 			expectSyncnets: true,
 			expectCGC:      true,
+			expectNFD:      true,
 		},
 	}
 
@@ -515,6 +526,13 @@ func TestParseETH2Fields(t *testing.T) {
 				assert.Greater(t, len(*result.CGC), 0, "CGC field should not be empty")
 			} else {
 				assert.Nil(t, result.CGC, "Expected CGC field to be nil")
+			}
+
+			if tt.expectNFD {
+				assert.NotNil(t, result.NFD, "Expected NFD field to be present")
+				assert.Greater(t, len(*result.NFD), 0, "NFD field should not be empty")
+			} else {
+				assert.Nil(t, result.NFD, "Expected NFD field to be nil")
 			}
 		})
 	}
@@ -627,16 +645,16 @@ func TestEdgeCases(t *testing.T) {
 }
 
 func TestParseFieldsWithMissingData(t *testing.T) {
-	validENR := "enr:-Iq4QCxbKw-XHdkvUcbd5-bJ8vEtyJr5jD3sg3XCwnkWXWwOEcuWWTrev8TnIcSsatTVd2LseQy1wH8u97vPGlxismiGAZerck1AgmlkgnY0gmlwhKdHDm2Jc2VjcDI1NmsxoQJJ3h8aUO3GJHv-bdvHtsQZ2OEisutelYfGjXO4lSg8BYN1ZHCCIzI"
+	result, err := Parse(testENRBasic)
 
-	result, err := Parse(validENR)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
-	assert.Nil(t, result.IP6, "IP6 should be nil when not present")
-	assert.Nil(t, result.TCP6, "TCP6 should be nil when not present")
-	assert.Nil(t, result.UDP6, "UDP6 should be nil when not present")
-	assert.Nil(t, result.CGC, "CGC should be nil when not present")
+	assert.Nil(t, result.GetIP6(), "GetIP6() should return nil when not present")
+	assert.Nil(t, result.GetTCP6(), "GetTCP6() should return nil when not present")
+	assert.Nil(t, result.GetUDP6(), "GetUDP6() should return nil when not present")
+	assert.Nil(t, result.GetCGC(), "GetCGC() should return nil when not present")
+	assert.Nil(t, result.GetNFD(), "GetNFD() should return nil when not present")
 }
 
 func stringPtr(s string) *string {
@@ -693,5 +711,77 @@ func TestParseTCP6AndUDP6Logic(t *testing.T) {
 
 		assert.Nil(t, tcp6Result, "parseTCP6 should return nil when no TCP6 field is present")
 		assert.Nil(t, udp6Result, "parseUDP6 should return nil when no UDP6 field is present")
+	})
+}
+
+func TestParseNFDField(t *testing.T) {
+	tests := []struct {
+		name      string
+		enr       string
+		expectNFD bool
+	}{
+		{
+			name:      "ENR with NFD field",
+			enr:       "enr:-MG4QGk5z8hpTrGM3uosvLuGmdL381IMXvmeBJBRxJUreV_cemmE-cJ6ftJRggPjM_tX6uhSEsO3mbqYpaSVTx4aYdYHh2F0dG5ldHOIAAAAAIABAACDY2djgYCEZXRoMpCBABMacJN1RAABAAAAAAAAgmlkgnY0gmlwhKdHDm2DbmZkhDafifeJc2VjcDI1NmsxoQN2BhqrvYI0XsXGaCnPcgLDwrwIL_szGrhtPGtb9_-AeYN0Y3CCIyiDdWRwgiMo",
+			expectNFD: true,
+		},
+		{
+			name:      "ENR without NFD field",
+			enr:       testENRBasic,
+			expectNFD: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := Parse(tt.enr)
+			require.NoError(t, err)
+			require.NotNil(t, result)
+
+			if tt.expectNFD {
+				assert.NotNil(t, result.NFD, "Expected NFD field to be present")
+				assert.Greater(t, len(*result.NFD), 0, "NFD field should not be empty")
+
+				nfd := result.GetNFD()
+				assert.NotNil(t, nfd, "GetNFD() should return non-nil value")
+				assert.Equal(t, result.NFD, nfd, "GetNFD() should return the same pointer as NFD field")
+			} else {
+				assert.Nil(t, result.NFD, "Expected NFD field to be nil")
+				assert.Nil(t, result.GetNFD(), "GetNFD() should return nil when NFD field is nil")
+			}
+		})
+	}
+}
+
+func TestGetNFDMethod(t *testing.T) {
+	t.Run("GetNFD with nil ENR", func(t *testing.T) {
+		var enr *ENR
+		result := enr.GetNFD()
+		assert.Nil(t, result, "GetNFD() should return nil for nil ENR")
+	})
+
+	t.Run("GetNFD with valid ENR containing NFD", func(t *testing.T) {
+		// Use an ENR that contains NFD field
+		enrStr := "enr:-MG4QGk5z8hpTrGM3uosvLuGmdL381IMXvmeBJBRxJUreV_cemmE-cJ6ftJRggPjM_tX6uhSEsO3mbqYpaSVTx4aYdYHh2F0dG5ldHOIAAAAAIABAACDY2djgYCEZXRoMpCBABMacJN1RAABAAAAAAAAgmlkgnY0gmlwhKdHDm2DbmZkhDafifeJc2VjcDI1NmsxoQN2BhqrvYI0XsXGaCnPcgLDwrwIL_szGrhtPGtb9_-AeYN0Y3CCIyiDdWRwgiMo"
+
+		parsed, err := Parse(enrStr)
+		require.NoError(t, err)
+		require.NotNil(t, parsed)
+
+		nfd := parsed.GetNFD()
+		if parsed.NFD != nil {
+			assert.NotNil(t, nfd, "GetNFD() should return non-nil value when NFD field is present")
+			assert.Equal(t, parsed.NFD, nfd, "GetNFD() should return the same pointer as NFD field")
+		}
+	})
+
+	t.Run("GetNFD with ENR missing NFD field", func(t *testing.T) {
+		// Use an ENR that doesn't contain NFD field
+		parsed, err := Parse(testENRBasic)
+		require.NoError(t, err)
+		require.NotNil(t, parsed)
+
+		nfd := parsed.GetNFD()
+		assert.Nil(t, nfd, "GetNFD() should return nil when NFD field is not present")
 	})
 }

@@ -36,4 +36,6 @@ type ENR struct {
 	Syncnets *[]byte
 	// CGC is the custody group count of the node record.
 	CGC *[]byte
+	// NFD is the next fork digest of the next scheduled fork.
+	NFD *[]byte
 }

@@ -66,7 +66,11 @@ func (c *Crawler) handleStatus(ctx context.Context, stream network.Stream) error
 	status := c.GetStatus()
 
 	if status.ForkDigest != theirStatus.ForkDigest {
-		c.emitPeerStatusUpdated(stream.Conn().RemotePeer(), &status)
+		c.emitPeerStatusUpdated(&PeerStatusUpdated{
+			PeerID: stream.Conn().RemotePeer(),
+			ENR:    c.GetPeerENR(stream.Conn().RemotePeer()),
+			Status: &status,
+		})
 	}
 
 	if err := c.reqResp.WriteResponse(ctx, stream, &status, nil); err != nil {

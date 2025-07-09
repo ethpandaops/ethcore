@@ -12,8 +12,6 @@ import (
 	"github.com/ethpandaops/ethcore/pkg/discovery"
 	"github.com/ethpandaops/ethcore/pkg/ethereum/clients"
 	"github.com/libp2p/go-libp2p/core/network"
-	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/sirupsen/logrus"
 )
 
@@ -85,12 +83,12 @@ func (c *Crawler) wireUpComponents(ctx context.Context) error {
 		return fmt.Errorf("failed to register dummy RPC handler: %w", err)
 	}
 
-	c.OnFailedCrawl(func(peerID peer.ID, reason CrawlError) {
-		c.metrics.RecordFailedCrawl(reason.Error())
+	c.OnFailedCrawl(func(crawl *FailedCrawl) {
+		c.metrics.RecordFailedCrawl(crawl.Error.Error())
 	})
 
-	c.OnSuccessfulCrawl(func(peerID peer.ID, enr *enode.Node, status *common.Status, metadata *common.MetaData) {
-		c.metrics.RecordSuccessfulCrawl(string(clients.ClientFromString(c.GetPeerAgentVersion(peerID))))
+	c.OnSuccessfulCrawl(func(crawl *SuccessfulCrawl) {
+		c.metrics.RecordSuccessfulCrawl(string(clients.ClientFromString(c.GetPeerAgentVersion(crawl.PeerID))))
 	})
 
 	return nil
@@ -278,7 +276,16 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 	delete(c.retryTracker, conn.RemotePeer())
 	c.retryMu.Unlock()
 
-	c.emitSuccessfulCrawl(conn.RemotePeer(), status, metadata)
+	enr := c.GetPeerENR(conn.RemotePeer())
+
+	c.emitSuccessfulCrawl(&SuccessfulCrawl{
+		PeerID:       conn.RemotePeer(),
+		NodeID:       enr.ID().String(),
+		AgentVersion: agentVersion,
+		ENR:          enr,
+		Metadata:     metadata,
+		Status:       status,
+	})
 }
 
 func (c *Crawler) handlePeerDisconnected(net network.Network, conn network.Conn) {

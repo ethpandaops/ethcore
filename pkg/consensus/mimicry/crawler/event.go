@@ -20,10 +20,37 @@ var (
 	OnFailedCrawl       = fmt.Sprintf("%s:crawl:failed", ModuleName)
 )
 
-type OnPeerStatusUpdatedCallback func(peerID peer.ID, status *common.Status)
-type OnMetadataReceivedCallback func(peerID peer.ID, metadata *common.MetaData)
-type OnSuccessfulCrawlCallback func(peerID peer.ID, enr *enode.Node, status *common.Status, metadata *common.MetaData)
-type OnFailedCrawlCallback func(peerID peer.ID, err CrawlError)
+type SuccessfulCrawl struct {
+	PeerID       peer.ID
+	NodeID       string
+	AgentVersion string
+	ENR          *enode.Node
+	Status       *common.Status
+	Metadata     *common.MetaData
+}
+
+type FailedCrawl struct {
+	PeerID peer.ID
+	ENR    *enode.Node
+	Error  CrawlError
+}
+
+type MetadataReceived struct {
+	PeerID   peer.ID
+	ENR      *enode.Node
+	Metadata *common.MetaData
+}
+
+type PeerStatusUpdated struct {
+	PeerID peer.ID
+	ENR    *enode.Node
+	Status *common.Status
+}
+
+type OnPeerStatusUpdatedCallback func(statusUpdated *PeerStatusUpdated)
+type OnMetadataReceivedCallback func(mdReceived *MetadataReceived)
+type OnSuccessfulCrawlCallback func(successfulCrawl *SuccessfulCrawl)
+type OnFailedCrawlCallback func(failedCrawl *FailedCrawl)
 
 // OnPeerStatusUpdated subscribes to the peer status updated event.
 func (n *Crawler) OnPeerStatusUpdated(callback OnPeerStatusUpdatedCallback) {
@@ -45,18 +72,18 @@ func (n *Crawler) OnFailedCrawl(callback OnFailedCrawlCallback) {
 	n.broker.On(OnFailedCrawl, callback)
 }
 
-func (n *Crawler) emitPeerStatusUpdated(peerID peer.ID, status *common.Status) {
-	n.broker.Emit(OnUpdatedPeerStatus, peerID, status)
+func (n *Crawler) emitPeerStatusUpdated(statusUpdated *PeerStatusUpdated) {
+	n.broker.Emit(OnUpdatedPeerStatus, statusUpdated)
 }
 
-func (n *Crawler) emitMetadataReceived(peerID peer.ID, metadata *common.MetaData) {
-	n.broker.Emit(OnMetadataReceived, peerID, metadata)
+func (n *Crawler) emitMetadataReceived(mdReceived *MetadataReceived) {
+	n.broker.Emit(OnMetadataReceived, mdReceived)
 }
 
-func (n *Crawler) emitSuccessfulCrawl(peerID peer.ID, status *common.Status, metadata *common.MetaData) {
-	n.broker.Emit(OnSuccessfulCrawl, peerID, n.GetPeerENR(peerID), status, metadata)
+func (n *Crawler) emitSuccessfulCrawl(successfulCrawl *SuccessfulCrawl) {
+	n.broker.Emit(OnSuccessfulCrawl, successfulCrawl)
 }
 
-func (n *Crawler) emitFailedCrawl(peerID peer.ID, err CrawlError) {
-	n.broker.Emit(OnFailedCrawl, peerID, err)
+func (n *Crawler) emitFailedCrawl(failedCrawl *FailedCrawl) {
+	n.broker.Emit(OnFailedCrawl, failedCrawl)
 }

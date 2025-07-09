@@ -619,7 +619,11 @@ func (c *Crawler) RequestStatusFromPeer(ctx context.Context, peerID peer.ID) (*c
 	}
 
 	if status.ForkDigest != rsp.ForkDigest {
-		c.emitPeerStatusUpdated(peerID, rsp)
+		c.emitPeerStatusUpdated(&PeerStatusUpdated{
+			PeerID: peerID,
+			ENR:    c.GetPeerENR(peerID),
+			Status: rsp,
+		})
 	}
 
 	return rsp, nil
@@ -650,7 +654,11 @@ func (c *Crawler) RequestMetadataFromPeer(ctx context.Context, peerID peer.ID) (
 		"attnets":    fmt.Sprintf("%x", rsp.Attnets),
 	}).Debug("Successfully received metadata")
 
-	c.emitMetadataReceived(peerID, rsp)
+	c.emitMetadataReceived(&MetadataReceived{
+		PeerID:   peerID,
+		ENR:      c.GetPeerENR(peerID),
+		Metadata: rsp,
+	})
 
 	return rsp, nil
 }
@@ -747,7 +755,11 @@ func (c *Crawler) fetchAndSetStatus(ctx context.Context) error {
 func (c *Crawler) handleCrawlFailure(peerID peer.ID, err CrawlError) {
 	// Check if error is retryable, if not, emit failure.
 	if !c.isRetryableError(err) {
-		c.emitFailedCrawl(peerID, err)
+		c.emitFailedCrawl(&FailedCrawl{
+			PeerID: peerID,
+			ENR:    c.GetPeerENR(peerID),
+			Error:  err,
+		})
 
 		return
 	}
@@ -759,7 +771,11 @@ func (c *Crawler) handleCrawlFailure(peerID peer.ID, err CrawlError) {
 			"error": err,
 		}).Debug("Max retry attempts is 0, emitting failure without retry")
 
-		c.emitFailedCrawl(peerID, err)
+		c.emitFailedCrawl(&FailedCrawl{
+			PeerID: peerID,
+			ENR:    c.GetPeerENR(peerID),
+			Error:  err,
+		})
 
 		return
 	}
@@ -783,7 +799,11 @@ func (c *Crawler) handleCrawlFailure(peerID peer.ID, err CrawlError) {
 		delete(c.retryTracker, peerID)
 		c.retryMu.Unlock()
 
-		c.emitFailedCrawl(peerID, err)
+		c.emitFailedCrawl(&FailedCrawl{
+			PeerID: peerID,
+			ENR:    c.GetPeerENR(peerID),
+			Error:  err,
+		})
 
 		return
 	}
@@ -791,7 +811,11 @@ func (c *Crawler) handleCrawlFailure(peerID peer.ID, err CrawlError) {
 	// Try to schedule a retry; if no ENR is stored, can't retry, emit failure
 	enr := c.GetPeerENR(peerID)
 	if enr == nil {
-		c.emitFailedCrawl(peerID, err)
+		c.emitFailedCrawl(&FailedCrawl{
+			PeerID: peerID,
+			ENR:    c.GetPeerENR(peerID),
+			Error:  err,
+		})
 
 		return
 	}
@@ -799,7 +823,11 @@ func (c *Crawler) handleCrawlFailure(peerID peer.ID, err CrawlError) {
 	// Create a ConnectablePeer from the ENR, if we can't derive peer details, emit failure.
 	peer, convErr := discovery.DeriveDetailsFromNode(enr)
 	if convErr != nil {
-		c.emitFailedCrawl(peerID, err)
+		c.emitFailedCrawl(&FailedCrawl{
+			PeerID: peerID,
+			ENR:    c.GetPeerENR(peerID),
+			Error:  err,
+		})
 
 		return
 	}
