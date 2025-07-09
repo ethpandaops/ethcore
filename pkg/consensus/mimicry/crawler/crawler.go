@@ -877,7 +877,9 @@ func (c *Crawler) scheduleRetry(peerID peer.ID, peer *discovery.ConnectablePeer,
 
 		return
 	}
-	c.shutdownMu.RUnlock()
+
+	// Keep the lock while sending to race on channel close when shutting down.
+	defer c.shutdownMu.RUnlock()
 
 	// Remove from duplicate cache to allow immediate retry
 	c.duplicateCache.GetCache().Delete(peerID.String())
