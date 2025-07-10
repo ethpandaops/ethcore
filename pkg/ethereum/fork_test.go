@@ -109,21 +109,21 @@ func TestComputeForkDigest_FusakaDevnet(t *testing.T) {
 	// Genesis validators root: 0xe6f92d486d5d64c6d44342906b5674137733a48bae65a6e0d75dc4fb4dec030d
 	genesisValidatorsRoot := phase0.Root{0xe6, 0xf9, 0x2d, 0x48, 0x6d, 0x5d, 0x64, 0xc6, 0xd4, 0x43, 0x42, 0x90, 0x6b, 0x56, 0x74, 0x13, 0x77, 0x33, 0xa4, 0x8b, 0xae, 0x65, 0xa6, 0xe0, 0xd7, 0x5d, 0xc4, 0xfb, 0x4d, 0xec, 0x03, 0x0d}
 
-	// Test electra fork version: 0x60355025
-	electraForkVersion := [4]byte{0x60, 0x35, 0x50, 0x25}
+	// Test electra fork version: 0x60937544 (from fusaka-devnet config)
+	electraForkVersion := [4]byte{0x60, 0x93, 0x75, 0x44}
 	electraDigest, err := ComputeForkDigest(genesisValidatorsRoot, electraForkVersion, nil)
 	require.NoError(t, err)
 	t.Logf("Electra fork digest: 0x%x", electraDigest)
 
-	// Test fulu fork version: 0x70355025
-	fuluForkVersion := [4]byte{0x70, 0x35, 0x50, 0x25}
+	// Test fulu fork version: 0x70937544 (from fusaka-devnet config)
+	fuluForkVersion := [4]byte{0x70, 0x93, 0x75, 0x44}
 	fuluDigest, err := ComputeForkDigest(genesisValidatorsRoot, fuluForkVersion, nil)
 	require.NoError(t, err)
 	t.Logf("Fulu fork digest: 0x%x", fuluDigest)
 
-	// Expected values for debugging
-	expectedElectraDigest := [4]byte{0x81, 0x00, 0x13, 0x1a}
-	expectedFuluDigest := [4]byte{0xb6, 0x2f, 0x2b, 0x0e}
+	// Expected values for fusaka-devnet config
+	expectedElectraDigest := phase0.ForkDigest{0x72, 0xe1, 0x45, 0xaf}
+	expectedFuluDigest := phase0.ForkDigest{0x57, 0x83, 0xa4, 0xb8}
 
 	// Check if we're getting the expected values
 	assert.Equal(t, expectedElectraDigest, electraDigest, "Electra fork digest should match expected value")
@@ -133,7 +133,7 @@ func TestComputeForkDigest_FusakaDevnet(t *testing.T) {
 func TestComputeForkDigest_WithBlobParams(t *testing.T) {
 	// Test Fulu fork digest computation with blob parameters
 	genesisValidatorsRoot := phase0.Root{0xe6, 0xf9, 0x2d, 0x48, 0x6d, 0x5d, 0x64, 0xc6, 0xd4, 0x43, 0x42, 0x90, 0x6b, 0x56, 0x74, 0x13, 0x77, 0x33, 0xa4, 0x8b, 0xae, 0x65, 0xa6, 0xe0, 0xd7, 0x5d, 0xc4, 0xfb, 0x4d, 0xec, 0x03, 0x0d}
-	fuluForkVersion := [4]byte{0x70, 0x35, 0x50, 0x25}
+	fuluForkVersion := [4]byte{0x70, 0x93, 0x75, 0x44}
 
 	// Test without blob parameters (standard fork digest)
 	digestWithoutBlobs, err := ComputeForkDigest(genesisValidatorsRoot, fuluForkVersion, nil)
