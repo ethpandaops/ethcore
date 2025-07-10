@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/attestantio/go-eth2-client/spec"
 	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/ethpandaops/beacon/pkg/beacon"
 	"github.com/ethpandaops/ethcore/pkg/ethereum/beacon/services"
@@ -199,13 +200,47 @@ func (b *BeaconNode) IsHealthy() bool {
 	return b.healthy.Load()
 }
 
+// GetCurrentBlobSchedule returns the current blob schedule for the current epoch.
+func (b *BeaconNode) GetCurrentBlobSchedule() (*BlobScheduleEntry, error) {
+	spec, err := b.beacon.Spec()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get spec")
+	}
+
+	_, epoch, err := b.beacon.Wallclock().Now()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get wallclock")
+	}
+
+	currentEpoch := epoch.Number()
+
+	// Use the spec's built-in blob schedule logic
+	maxBlobs := spec.GetMaxBlobsPerBlock(phase0.Epoch(currentEpoch))
+
+	// Find the current epoch from blob schedule
+	var scheduleEpoch uint64
+
+	for _, entry := range spec.BlobSchedule {
+		if uint64(entry.Epoch) <= currentEpoch {
+			scheduleEpoch = uint64(entry.Epoch)
+		} else {
+			break
+		}
+	}
+
+	return &BlobScheduleEntry{
+		Epoch:            scheduleEpoch,
+		MaxBlobsPerBlock: maxBlobs,
+	}, nil
+}
+
 func (b *BeaconNode) ForkDigest() (phase0.ForkDigest, error) {
 	genesis := b.Metadata().GetGenesis()
 	if genesis == nil {
 		return phase0.ForkDigest{}, errors.New("missing genesis")
 	}
 
-	spec, err := b.beacon.Spec()
+	beaconSpec, err := b.beacon.Spec()
 	if err != nil {
 		return phase0.ForkDigest{}, errors.Wrap(err, "failed to get spec")
 	}
@@ -215,7 +250,7 @@ func (b *BeaconNode) ForkDigest() (phase0.ForkDigest, error) {
 		return phase0.ForkDigest{}, errors.Wrap(err, "failed to get wallclock")
 	}
 
-	current, err := spec.ForkEpochs.CurrentFork(phase0.Epoch(epoch.Number()))
+	current, err := beaconSpec.ForkEpochs.CurrentFork(phase0.Epoch(epoch.Number()))
 	if err != nil {
 		return phase0.ForkDigest{}, errors.Wrap(err, "failed to get current fork")
 	}
@@ -234,7 +269,20 @@ func (b *BeaconNode) ForkDigest() (phase0.ForkDigest, error) {
 		copy(forkVersion[:], version)
 	}
 
-	forkDigest, err := ComputeForkDigest(genesis.GenesisValidatorsRoot, forkVersion)
+	// Get blob parameters for Fulu fork and later, nil for earlier forks.
+	var blobParams *BlobScheduleEntry
+
+	if current.Name >= spec.DataVersionFulu {
+		var blobErr error
+
+		blobParams, blobErr = b.GetCurrentBlobSchedule()
+		if blobErr != nil {
+			return phase0.ForkDigest{}, errors.Wrap(blobErr, "failed to get blob schedule entry")
+		}
+	}
+
+	// Compute fork digest with optional blob parameters.
+	forkDigest, err := ComputeForkDigest(genesis.GenesisValidatorsRoot, forkVersion, blobParams)
 	if err != nil {
 		return phase0.ForkDigest{}, errors.Wrap(err, "failed to compute fork digest")
 	}
