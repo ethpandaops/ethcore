@@ -282,6 +282,7 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 		PeerID:       conn.RemotePeer(),
 		NodeID:       enr.ID().String(),
 		AgentVersion: agentVersion,
+		NetworkID:    c.beacon.Metadata().GetNetwork().ID,
 		ENR:          enr,
 		Metadata:     metadata,
 		Status:       status,

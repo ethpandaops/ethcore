@@ -24,6 +24,7 @@ type SuccessfulCrawl struct {
 	PeerID       peer.ID
 	NodeID       string
 	AgentVersion string
+	NetworkID    uint64
 	ENR          *enode.Node
 	Status       *common.Status
 	Metadata     *common.MetaData
