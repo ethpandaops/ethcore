@@ -119,8 +119,6 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 		return
 	}
 
-	goodbyeReason := eth.GoodbyeReasonClientShutdown
-
 	c.log.WithFields(logrus.Fields{
 		"peer": peerID.String(),
 	}).Info("Peer connected")
@@ -197,17 +195,6 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 	c.duplicateCache.GetCache().Set(peerID.String(), time.Now(), c.config.CooloffDuration)
 	logCtx.WithField("cooloff_duration", c.config.CooloffDuration).Debug("Added peer to duplicate cache")
 
-	defer func() {
-		// Disconnect them regardless of what happens
-		// Use a fresh context with timeout for cleanup
-		disconnectCtx, disconnectCancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer disconnectCancel()
-
-		if err := c.DisconnectFromPeer(disconnectCtx, conn.RemotePeer(), goodbyeReason); err != nil {
-			logCtx.WithError(err).Error("Failed to disconnect from peer")
-		}
-	}()
-
 	// Request status from peer.
 	statusCtx, statusCancel := context.WithTimeout(c.ctx, 30*time.Second)
 
@@ -234,8 +221,6 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 
 	if status != nil && status.ForkDigest != ourStatus.ForkDigest {
 		// They're on a different fork
-		goodbyeReason = eth.GoodbyeReasonIrrelevantNetwork
-
 		c.handleCrawlFailure(conn.RemotePeer(), ErrCrawlStatusForkDigest.WithDetails(fmt.Sprintf("ours %s != theirs %s", ourStatus.ForkDigest, status.ForkDigest)))
 
 		return
@@ -276,7 +261,19 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 	delete(c.retryTracker, conn.RemotePeer())
 	c.retryMu.Unlock()
 
+	// Check if peer is still connected to prevent race conditions
+	if c.node.Connectedness(conn.RemotePeer()) != network.Connected {
+		c.log.WithField("peer", conn.RemotePeer()).Debug("Peer no longer connected, skipping successful crawl emit")
+
+		return
+	}
+
 	enr := c.GetPeerENR(conn.RemotePeer())
+	if enr == nil {
+		c.log.WithField("peer", conn.RemotePeer()).Debug("ENR not available for peer, skipping successful crawl emit")
+
+		return
+	}
 
 	// Calculate datetime values for finalized epoch and head slot
 	var (
@@ -316,6 +313,11 @@ func (c *Crawler) handlePeerDisconnected(net network.Network, conn network.Conn)
 		"peer":          conn.RemotePeer(),
 		"agent_version": c.GetPeerAgentVersion(conn.RemotePeer()),
 	}).Debug("Disconnected from peer")
+
+	// Clean up ENR storage for naturally disconnected peers
+	c.peerENRsMu.Lock()
+	delete(c.peerENRs, conn.RemotePeer())
+	c.peerENRsMu.Unlock()
 }
 
 //nolint:unused // Will revisit if not-needed.
