@@ -4,6 +4,9 @@ go 1.24.0
 
 toolchain go1.24.2
 
+// Use PK's fork supporting fulu spec, until upstream is updated (https://github.com/pk910/go-eth2-client/pull/2)
+replace github.com/attestantio/go-eth2-client => github.com/pk910/go-eth2-client v0.0.0-20250603065335-ce8ba1e2c627
+
 require (
 	github.com/OffchainLabs/prysm/v6 v6.0.4
 	github.com/attestantio/go-eth2-client v0.26.0
@@ -11,7 +14,7 @@ require (
 	github.com/chuckpreslar/emission v0.0.0-20170206194824-a7ddd980baf9
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0
 	github.com/ethereum/go-ethereum v1.15.11
-	github.com/ethpandaops/beacon v0.61.0
+	github.com/ethpandaops/beacon v0.62.1-0.20250710044500-b1a6c7fe376a
 	github.com/ethpandaops/ethereum-package-go v0.5.0
 	github.com/ethpandaops/ethwallclock v0.4.0
 	github.com/go-co-op/gocron/v2 v2.16.2
