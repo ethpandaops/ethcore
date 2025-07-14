@@ -785,3 +785,86 @@ func TestGetNFDMethod(t *testing.T) {
 		assert.Nil(t, nfd, "GetNFD() should return nil when NFD field is not present")
 	})
 }
+
+func TestParseQUICPorts(t *testing.T) {
+	tests := []struct {
+		name          string
+		enr           string
+		expectedQUIC4 *uint32
+		expectedQUIC6 *uint32
+	}{
+		{
+			name:          "ENR with QUIC port",
+			enr:           "enr:-Oi4QCzSI8rVN8DU8j45y58rUPGS7beoY93MPFfQRFiMFGcbJ5wbhqx-7QFfIVJGMnIsQC_W2NboCTsLRaBa5YEpjsYBh2F0dG5ldHOIAAAAAAAAAACDY2djBIZjbGllbnTXiEdyYW5kaW5ljTEuMS4xLTU1OTIzYjmEZXRoMpCBABMacJN1RAABAAAAAAAAgmlkgnY0gmlwhIs7KJuEcXVpY4IjKYlzZWNwMjU2azGhAqUx7lrYtjPLL5wKpdtTG1o6fMxO7VfkGtNYm2fHiKRliHN5bmNuZXRzAIN0Y3CCIyiDdWRwgiMo",
+			expectedQUIC4: uint32Ptr(9001),
+			expectedQUIC6: nil,
+		},
+		{
+			name:          "ENR without QUIC port",
+			enr:           testENRBasic,
+			expectedQUIC4: nil,
+			expectedQUIC6: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := Parse(tt.enr)
+			require.NoError(t, err)
+			require.NotNil(t, result)
+
+			if tt.expectedQUIC4 != nil {
+				require.NotNil(t, result.QUIC4)
+				assert.Equal(t, *tt.expectedQUIC4, *result.QUIC4)
+			} else {
+				assert.Nil(t, result.QUIC4)
+			}
+
+			if tt.expectedQUIC6 != nil {
+				require.NotNil(t, result.QUIC6)
+				assert.Equal(t, *tt.expectedQUIC6, *result.QUIC6)
+			} else {
+				assert.Nil(t, result.QUIC6)
+			}
+		})
+	}
+}
+
+func TestGetQUICMethods(t *testing.T) {
+	t.Run("GetQUIC4 and GetQUIC6 with nil ENR", func(t *testing.T) {
+		var enr *ENR
+		assert.Nil(t, enr.GetQUIC4(), "GetQUIC4() should return nil for nil ENR")
+		assert.Nil(t, enr.GetQUIC6(), "GetQUIC6() should return nil for nil ENR")
+	})
+
+	t.Run("GetQUIC4 and GetQUIC6 with ENR containing QUIC port", func(t *testing.T) {
+		// Use the provided ENR that contains a QUIC port
+		enrStr := "enr:-Oi4QCzSI8rVN8DU8j45y58rUPGS7beoY93MPFfQRFiMFGcbJ5wbhqx-7QFfIVJGMnIsQC_W2NboCTsLRaBa5YEpjsYBh2F0dG5ldHOIAAAAAAAAAACDY2djBIZjbGllbnTXiEdyYW5kaW5ljTEuMS4xLTU1OTIzYjmEZXRoMpCBABMacJN1RAABAAAAAAAAgmlkgnY0gmlwhIs7KJuEcXVpY4IjKYlzZWNwMjU2azGhAqUx7lrYtjPLL5wKpdtTG1o6fMxO7VfkGtNYm2fHiKRliHN5bmNuZXRzAIN0Y3CCIyiDdWRwgiMo"
+
+		parsed, err := Parse(enrStr)
+		require.NoError(t, err)
+		require.NotNil(t, parsed)
+
+		quic4 := parsed.GetQUIC4()
+		if parsed.QUIC4 != nil {
+			assert.NotNil(t, quic4, "GetQUIC4() should return non-nil value when QUIC4 field is present")
+			assert.Equal(t, parsed.QUIC4, quic4, "GetQUIC4() should return the same pointer as QUIC4 field")
+			assert.Equal(t, uint32(9001), *quic4, "QUIC4 port should be 9001")
+		}
+
+		quic6 := parsed.GetQUIC6()
+		assert.Nil(t, quic6, "GetQUIC6() should return nil when QUIC6 field is not present")
+	})
+
+	t.Run("GetQUIC4 and GetQUIC6 with ENR missing QUIC fields", func(t *testing.T) {
+		// Use an ENR that doesn't contain QUIC fields
+		parsed, err := Parse(testENRBasic)
+		require.NoError(t, err)
+		require.NotNil(t, parsed)
+
+		quic4 := parsed.GetQUIC4()
+		quic6 := parsed.GetQUIC6()
+		assert.Nil(t, quic4, "GetQUIC4() should return nil when QUIC4 field is not present")
+		assert.Nil(t, quic6, "GetQUIC6() should return nil when QUIC6 field is not present")
+	})
+}
