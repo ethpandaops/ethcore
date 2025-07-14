@@ -309,6 +309,20 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 		FinalizedEpochStartDateTime: finalizedEpochStartDateTime,
 		HeadSlotStartDateTime:       headSlotStartDateTime,
 	})
+
+	// Explicitly disconnect from peer after successful crawl
+	// Use a fresh context with timeout for cleanup to avoid blocking on shutdown
+	disconnectCtx, disconnectCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer disconnectCancel()
+
+	// Check if peer is still connected before attempting disconnect to prevent race conditions
+	if c.node.Connectedness(conn.RemotePeer()) == network.Connected {
+		if err := c.DisconnectFromPeer(disconnectCtx, conn.RemotePeer(), eth.GoodbyeReasonClientShutdown); err != nil {
+			logCtx.WithError(err).Debug("Failed to disconnect from peer after successful crawl")
+		} else {
+			logCtx.Debug("Successfully disconnected from peer after crawl completion")
+		}
+	}
 }
 
 func (c *Crawler) handlePeerDisconnected(net network.Network, conn network.Conn) {
