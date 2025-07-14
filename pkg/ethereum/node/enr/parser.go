@@ -54,6 +54,18 @@ type nfd []byte
 // ENRKey returns the key identifier for the next fork digest field.
 func (nfd) ENRKey() string { return "nfd" }
 
+// quic represents the QUIC port field for IPv4 in an ENR record.
+type quic uint16
+
+// ENRKey returns the key identifier for the QUIC port field.
+func (quic) ENRKey() string { return "quic" }
+
+// quic6 represents the QUIC port field for IPv6 in an ENR record.
+type quic6 uint16
+
+// ENRKey returns the key identifier for the QUIC6 port field.
+func (quic6) ENRKey() string { return "quic6" }
+
 // Parse parses an ENR record string and extracts all available fields.
 // It returns a populated ENR struct with all parsed values or an error if parsing fails.
 func Parse(record string) (*ENR, error) {
@@ -74,6 +86,8 @@ func Parse(record string) (*ENR, error) {
 		TCP6:      parseTCP6(n),
 		UDP4:      parseUDP4(n),
 		UDP6:      parseUDP6(n),
+		QUIC4:     parseQUIC4(n),
+		QUIC6:     parseQUIC6(n),
 		ETH2:      parseETH2(n),
 		Attnets:   parseAttnets(n),
 		Syncnets:  parseSyncnets(n),
@@ -211,6 +225,26 @@ func (e *ENR) GetUDP6() *uint32 {
 	}
 
 	return e.UDP6
+}
+
+// GetQUIC4 returns the QUIC port for IPv4 from the ENR record.
+// Returns nil if the ENR is nil or the port is not present.
+func (e *ENR) GetQUIC4() *uint32 {
+	if e == nil {
+		return nil
+	}
+
+	return e.QUIC4
+}
+
+// GetQUIC6 returns the QUIC port for IPv6 from the ENR record.
+// Returns nil if the ENR is nil or the port is not present.
+func (e *ENR) GetQUIC6() *uint32 {
+	if e == nil {
+		return nil
+	}
+
+	return e.QUIC6
 }
 
 // GetETH2 returns the Ethereum 2.0 public key from the ENR record.
@@ -384,6 +418,44 @@ func parseUDP4(node *enode.Node) *uint32 {
 // Returns a pointer to the port number, or nil if not present or zero.
 func parseUDP6(node *enode.Node) *uint32 {
 	var field enr.UDP6
+
+	err := node.Record().Load(&field)
+	if err != nil {
+		return nil
+	}
+
+	f := uint32(field)
+
+	if f == 0 {
+		return nil
+	}
+
+	return &f
+}
+
+// parseQUIC4 extracts the QUIC port for IPv4 from an ENR record.
+// Returns a pointer to the port number, or nil if not present or zero.
+func parseQUIC4(node *enode.Node) *uint32 {
+	var field quic
+
+	err := node.Record().Load(&field)
+	if err != nil {
+		return nil
+	}
+
+	f := uint32(field)
+
+	if f == 0 {
+		return nil
+	}
+
+	return &f
+}
+
+// parseQUIC6 extracts the QUIC port for IPv6 from an ENR record.
+// Returns a pointer to the port number, or nil if not present or zero.
+func parseQUIC6(node *enode.Node) *uint32 {
+	var field quic6
 
 	err := node.Record().Load(&field)
 	if err != nil {

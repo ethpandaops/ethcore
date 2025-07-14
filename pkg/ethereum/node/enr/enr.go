@@ -28,6 +28,10 @@ type ENR struct {
 	UDP4 *uint32
 	// UDP6 is the UDP port of the node record.
 	UDP6 *uint32
+	// QUIC4 is the QUIC port for IPv4 of the node record.
+	QUIC4 *uint32
+	// QUIC6 is the QUIC port for IPv6 of the node record.
+	QUIC6 *uint32
 	// Eth2 is the eth2 public key of the node record.
 	ETH2 *[]byte
 	// Attnets is the attestation subnet bitfield of the node record.
