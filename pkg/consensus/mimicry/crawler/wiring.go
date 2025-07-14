@@ -278,14 +278,36 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 
 	enr := c.GetPeerENR(conn.RemotePeer())
 
+	// Calculate datetime values for finalized epoch and head slot
+	var (
+		finalizedEpochStartDateTime *time.Time
+		headSlotStartDateTime       *time.Time
+	)
+
+	if status != nil {
+		wallclock := c.beacon.Node().Wallclock()
+
+		// Calculate finalized epoch start datetime
+		finalizedEpoch := wallclock.Epochs().FromNumber(uint64(status.FinalizedEpoch))
+		startTime := finalizedEpoch.TimeWindow().Start()
+		finalizedEpochStartDateTime = &startTime
+
+		// Calculate head slot start datetime
+		headSlot := wallclock.Slots().FromNumber(uint64(status.HeadSlot))
+		startTime = headSlot.TimeWindow().Start()
+		headSlotStartDateTime = &startTime
+	}
+
 	c.emitSuccessfulCrawl(&SuccessfulCrawl{
-		PeerID:       conn.RemotePeer(),
-		NodeID:       enr.ID().String(),
-		AgentVersion: agentVersion,
-		NetworkID:    c.beacon.Metadata().GetNetwork().ID,
-		ENR:          enr,
-		Metadata:     metadata,
-		Status:       status,
+		PeerID:                      conn.RemotePeer(),
+		NodeID:                      enr.ID().String(),
+		AgentVersion:                agentVersion,
+		NetworkID:                   c.beacon.Metadata().GetNetwork().ID,
+		ENR:                         enr,
+		Metadata:                    metadata,
+		Status:                      status,
+		FinalizedEpochStartDateTime: finalizedEpochStartDateTime,
+		HeadSlotStartDateTime:       headSlotStartDateTime,
 	})
 }
 
