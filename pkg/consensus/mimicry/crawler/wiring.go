@@ -261,7 +261,10 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 	delete(c.retryTracker, conn.RemotePeer())
 	c.retryMu.Unlock()
 
-	// Check if peer is still connected to prevent race conditions
+	// Check if peer is still connected before proceeding. This prevents a race condition where
+	// libp2p callbacks can execute after peer disconnection has begun but before network state
+	// fully reflects the disconnection. Without this check, we could attempt to emit successful
+	// crawl events for peers that are in the process of being cleaned up.
 	if c.node.Connectedness(conn.RemotePeer()) != network.Connected {
 		c.log.WithField("peer", conn.RemotePeer()).Debug("Peer no longer connected, skipping successful crawl emit")
 
