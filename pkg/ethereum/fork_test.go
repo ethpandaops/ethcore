@@ -5,7 +5,6 @@ import (
 
 	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestComputeForkDigest(t *testing.T) {
@@ -13,32 +12,27 @@ func TestComputeForkDigest(t *testing.T) {
 		name                  string
 		genesisValidatorsRoot phase0.Root
 		forkVersion           [4]byte
-		wantErr               bool
 		errMsg                string
 	}{
 		{
 			name:                  "valid fork digest computation",
 			genesisValidatorsRoot: phase0.Root{0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f},
 			forkVersion:           [4]byte{0x00, 0x00, 0x00, 0x01},
-			wantErr:               false,
 		},
 		{
 			name:                  "another valid fork digest",
 			genesisValidatorsRoot: phase0.Root{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
 			forkVersion:           [4]byte{0x01, 0x02, 0x03, 0x04},
-			wantErr:               false,
 		},
 		{
 			name:                  "zero genesis validators root",
 			genesisValidatorsRoot: phase0.Root{},
 			forkVersion:           [4]byte{0x00, 0x00, 0x00, 0x00},
-			wantErr:               false,
 		},
 		{
 			name:                  "invalid genesis validators root length",
 			genesisValidatorsRoot: phase0.Root{}, // This will be modified in the test
 			forkVersion:           [4]byte{0x00, 0x00, 0x00, 0x01},
-			wantErr:               true,
 			errMsg:                "invalid genesis validators root",
 		},
 	}
@@ -54,16 +48,10 @@ func TestComputeForkDigest(t *testing.T) {
 				t.Skip("Cannot test invalid length with fixed-size array type")
 			}
 
-			digest, err := ComputeForkDigest(tt.genesisValidatorsRoot, tt.forkVersion, nil)
+			digest := ComputeForkDigest(tt.genesisValidatorsRoot, tt.forkVersion, nil)
 
-			if tt.wantErr {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), tt.errMsg)
-			} else {
-				require.NoError(t, err)
-				// Verify the digest is not empty
-				assert.NotEqual(t, phase0.ForkDigest{}, digest)
-			}
+			// Verify the digest is not empty
+			assert.NotEqual(t, phase0.ForkDigest{}, digest)
 		})
 	}
 }
@@ -73,11 +61,9 @@ func TestComputeForkDigest_Deterministic(t *testing.T) {
 	genesisValidatorsRoot := phase0.Root{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20}
 	forkVersion := [4]byte{0x00, 0x00, 0x00, 0x01}
 
-	digest1, err1 := ComputeForkDigest(genesisValidatorsRoot, forkVersion, nil)
-	require.NoError(t, err1)
+	digest1 := ComputeForkDigest(genesisValidatorsRoot, forkVersion, nil)
 
-	digest2, err2 := ComputeForkDigest(genesisValidatorsRoot, forkVersion, nil)
-	require.NoError(t, err2)
+	digest2 := ComputeForkDigest(genesisValidatorsRoot, forkVersion, nil)
 
 	assert.Equal(t, digest1, digest2, "Fork digest should be deterministic")
 }
@@ -88,18 +74,15 @@ func TestComputeForkDigest_DifferentInputs(t *testing.T) {
 	genesisValidatorsRoot2 := phase0.Root{0x20, 0x1f, 0x1e, 0x1d, 0x1c, 0x1b, 0x1a, 0x19, 0x18, 0x17, 0x16, 0x15, 0x14, 0x13, 0x12, 0x11, 0x10, 0x0f, 0x0e, 0x0d, 0x0c, 0x0b, 0x0a, 0x09, 0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01}
 	forkVersion := [4]byte{0x00, 0x00, 0x00, 0x01}
 
-	digest1, err1 := ComputeForkDigest(genesisValidatorsRoot1, forkVersion, nil)
-	require.NoError(t, err1)
+	digest1 := ComputeForkDigest(genesisValidatorsRoot1, forkVersion, nil)
 
-	digest2, err2 := ComputeForkDigest(genesisValidatorsRoot2, forkVersion, nil)
-	require.NoError(t, err2)
+	digest2 := ComputeForkDigest(genesisValidatorsRoot2, forkVersion, nil)
 
 	assert.NotEqual(t, digest1, digest2, "Different genesis validators roots should produce different digests")
 
 	// Test with different fork versions
 	forkVersion2 := [4]byte{0x00, 0x00, 0x00, 0x02}
-	digest3, err3 := ComputeForkDigest(genesisValidatorsRoot1, forkVersion2, nil)
-	require.NoError(t, err3)
+	digest3 := ComputeForkDigest(genesisValidatorsRoot1, forkVersion2, nil)
 
 	assert.NotEqual(t, digest1, digest3, "Different fork versions should produce different digests")
 }
@@ -111,14 +94,12 @@ func TestComputeForkDigest_FusakaDevnet(t *testing.T) {
 
 	// Test electra fork version: 0x60937544 (from fusaka-devnet config)
 	electraForkVersion := [4]byte{0x60, 0x93, 0x75, 0x44}
-	electraDigest, err := ComputeForkDigest(genesisValidatorsRoot, electraForkVersion, nil)
-	require.NoError(t, err)
+	electraDigest := ComputeForkDigest(genesisValidatorsRoot, electraForkVersion, nil)
 	t.Logf("Electra fork digest: 0x%x", electraDigest)
 
 	// Test fulu fork version: 0x70937544 (from fusaka-devnet config)
 	fuluForkVersion := [4]byte{0x70, 0x93, 0x75, 0x44}
-	fuluDigest, err := ComputeForkDigest(genesisValidatorsRoot, fuluForkVersion, nil)
-	require.NoError(t, err)
+	fuluDigest := ComputeForkDigest(genesisValidatorsRoot, fuluForkVersion, nil)
 	t.Logf("Fulu fork digest: 0x%x", fuluDigest)
 
 	// Expected values for fusaka-devnet config
@@ -136,16 +117,14 @@ func TestComputeForkDigest_WithBlobParams(t *testing.T) {
 	fuluForkVersion := [4]byte{0x70, 0x93, 0x75, 0x44}
 
 	// Test without blob parameters (standard fork digest)
-	digestWithoutBlobs, err := ComputeForkDigest(genesisValidatorsRoot, fuluForkVersion, nil)
-	require.NoError(t, err)
+	digestWithoutBlobs := ComputeForkDigest(genesisValidatorsRoot, fuluForkVersion, nil)
 
 	// Test with blob parameters (Fulu fork digest)
 	blobParams := &BlobScheduleEntry{
 		Epoch:            0,
 		MaxBlobsPerBlock: 6,
 	}
-	digestWithBlobs, err := ComputeForkDigest(genesisValidatorsRoot, fuluForkVersion, blobParams)
-	require.NoError(t, err)
+	digestWithBlobs := ComputeForkDigest(genesisValidatorsRoot, fuluForkVersion, blobParams)
 
 	// The digests should be different when blob parameters are used
 	assert.NotEqual(t, digestWithoutBlobs, digestWithBlobs, "Fork digest should be different with blob parameters")
@@ -155,8 +134,7 @@ func TestComputeForkDigest_WithBlobParams(t *testing.T) {
 		Epoch:            10,
 		MaxBlobsPerBlock: 8,
 	}
-	digestWithDifferentBlobs, err := ComputeForkDigest(genesisValidatorsRoot, fuluForkVersion, blobParams2)
-	require.NoError(t, err)
+	digestWithDifferentBlobs := ComputeForkDigest(genesisValidatorsRoot, fuluForkVersion, blobParams2)
 
 	// Different blob parameters should produce different digests
 	assert.NotEqual(t, digestWithBlobs, digestWithDifferentBlobs, "Different blob parameters should produce different digests")

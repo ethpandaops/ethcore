@@ -3,9 +3,7 @@ package ethereum
 import (
 	"crypto/sha256"
 
-	"github.com/OffchainLabs/prysm/v6/beacon-chain/core/signing"
 	"github.com/attestantio/go-eth2-client/spec/phase0"
-	"github.com/pkg/errors"
 )
 
 // BlobScheduleEntry represents a blob parameter configuration for a specific epoch.
@@ -14,20 +12,17 @@ type BlobScheduleEntry struct {
 	MaxBlobsPerBlock uint64
 }
 
-func ComputeForkDigest(genesisValidatorsRoot phase0.Root, forkVersion [4]byte, blobParams *BlobScheduleEntry) (phase0.ForkDigest, error) {
-	if len(genesisValidatorsRoot) != 32 {
-		return phase0.ForkDigest{}, errors.New("invalid genesis validators root")
+func ComputeForkDigest(genesisValidatorsRoot phase0.Root, forkVersion phase0.Version, blobParams *BlobScheduleEntry) phase0.ForkDigest {
+	forkData := phase0.ForkData{
+		CurrentVersion:        forkVersion,
+		GenesisValidatorsRoot: genesisValidatorsRoot,
 	}
 
-	// Compute the base fork digest
-	baseDigest, err := signing.ComputeForkDigest(forkVersion[:], genesisValidatorsRoot[:])
-	if err != nil {
-		return phase0.ForkDigest{}, errors.Wrap(err, "failed to compute base fork digest")
-	}
+	forkDataRoot, _ := forkData.HashTreeRoot()
 
 	// For Fulu fork and later, modify the fork digest with blob parameters
 	if blobParams != nil {
-		// Serialize epoch and max_blobs_per_block as uint64 little-endian
+		// serialize epoch and max_blobs_per_block as uint64 little-endian
 		epochBytes := make([]byte, 8)
 		maxBlobsBytes := make([]byte, 8)
 
@@ -45,14 +40,14 @@ func ComputeForkDigest(genesisValidatorsRoot phase0.Root, forkVersion [4]byte, b
 			copy(blobParamHash[:], h.Sum(nil))
 		}
 
-		// XOR baseDigest with first 4 bytes of blobParamHash
+		// xor baseDigest with first 4 bytes of blobParamHash
 		forkDigest := make([]byte, 4)
 		for i := 0; i < 4; i++ {
-			forkDigest[i] = baseDigest[i] ^ blobParamHash[i]
+			forkDigest[i] = forkDataRoot[i] ^ blobParamHash[i]
 		}
 
-		return phase0.ForkDigest(forkDigest), nil
+		return phase0.ForkDigest(forkDigest)
 	}
 
-	return phase0.ForkDigest(baseDigest[:4]), nil
+	return phase0.ForkDigest(forkDataRoot[:4])
 }
