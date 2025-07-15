@@ -214,17 +214,18 @@ func (b *BeaconNode) GetCurrentBlobSchedule() (*BlobScheduleEntry, error) {
 
 	currentEpoch := epoch.Number()
 
-	// Use the spec's built-in blob schedule logic
+	// Use the spec's built-in blob schedule logic.
 	maxBlobs := spec.GetMaxBlobsPerBlock(phase0.Epoch(currentEpoch))
 
-	// Find the current epoch from blob schedule
+	// Find the most recent epoch from blob schedule that is <= currentEpoch.
 	var scheduleEpoch uint64
 
 	for _, entry := range spec.BlobSchedule {
 		if uint64(entry.Epoch) <= currentEpoch {
-			scheduleEpoch = uint64(entry.Epoch)
-		} else {
-			break
+			// Keep the highest epoch that is still <= currentEpoch.
+			if uint64(entry.Epoch) > scheduleEpoch {
+				scheduleEpoch = uint64(entry.Epoch)
+			}
 		}
 	}
 
@@ -282,10 +283,7 @@ func (b *BeaconNode) ForkDigest() (phase0.ForkDigest, error) {
 	}
 
 	// Compute fork digest with optional blob parameters.
-	forkDigest, err := ComputeForkDigest(genesis.GenesisValidatorsRoot, forkVersion, blobParams)
-	if err != nil {
-		return phase0.ForkDigest{}, errors.Wrap(err, "failed to compute fork digest")
-	}
+	forkDigest := ComputeForkDigest(genesis.GenesisValidatorsRoot, forkVersion, blobParams)
 
 	return forkDigest, nil
 }
