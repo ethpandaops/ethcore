@@ -25,10 +25,12 @@ func ComputeForkDigest(genesisValidatorsRoot phase0.Root, forkVersion phase0.Ver
 		// serialize epoch and max_blobs_per_block as uint64 little-endian
 		epochBytes := make([]byte, 8)
 		maxBlobsBytes := make([]byte, 8)
+
 		for i := 0; i < 8; i++ {
 			epochBytes[i] = byte((blobParams.Epoch >> (8 * i)) & 0xff)
 			maxBlobsBytes[i] = byte((blobParams.MaxBlobsPerBlock >> (8 * i)) & 0xff)
 		}
+
 		blobParamBytes := append(epochBytes, maxBlobsBytes...)
 
 		blobParamHash := [32]byte{}
