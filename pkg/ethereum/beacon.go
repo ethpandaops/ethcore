@@ -78,7 +78,6 @@ func (b *BeaconNode) Start(ctx context.Context) error {
 		for !b.beacon.Healthy() {
 			select {
 			case <-time.After(100 * time.Millisecond):
-				b.log.Debug("Awaiting healthy status from beacon node")
 			case <-ctx.Done():
 				return ctx.Err()
 			}
