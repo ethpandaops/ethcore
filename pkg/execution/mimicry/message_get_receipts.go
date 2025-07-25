@@ -38,8 +38,8 @@ func (c *Client) handleGetReceipts(ctx context.Context, code uint64, data []byte
 	}
 
 	err = c.sendReceipts(ctx, &Receipts{
-		RequestId:        blockBodies.RequestId,
-		ReceiptsResponse: [][]*types.Receipt{},
+		RequestId: blockBodies.RequestId,
+		List:      []*eth.ReceiptList69{eth.NewReceiptList69([]*types.Receipt{})},
 	})
 	if err != nil {
 		c.handleSessionError(ctx, err)

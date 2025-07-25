@@ -14,7 +14,7 @@ const (
 	StatusCode = 0x10
 )
 
-type Status eth.StatusPacket
+type Status eth.StatusPacket69
 
 func (msg *Status) Code() int { return StatusCode }
 

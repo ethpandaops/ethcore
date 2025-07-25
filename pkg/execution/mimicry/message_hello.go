@@ -16,7 +16,7 @@ const (
 	P2PProtocolVersion    = 5
 	minP2PProtocolVersion = 5
 	minETHProtocolVersion = uint(68)
-	maxETHProtocolVersion = uint(68)
+	maxETHProtocolVersion = uint(69)
 	ETHCapName            = "eth"
 )
 
