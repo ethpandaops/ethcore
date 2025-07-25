@@ -10,20 +10,20 @@ replace github.com/attestantio/go-eth2-client => github.com/pk910/go-eth2-client
 require (
 	github.com/OffchainLabs/prysm/v6 v6.0.4
 	github.com/attestantio/go-eth2-client v0.26.0
-	github.com/cenkalti/backoff/v5 v5.0.2
+	github.com/cenkalti/backoff/v5 v5.0.3
 	github.com/chuckpreslar/emission v0.0.0-20170206194824-a7ddd980baf9
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0
 	github.com/ethereum/go-ethereum v1.16.1
-	github.com/ethpandaops/beacon v0.62.1-0.20250710044500-b1a6c7fe376a
+	github.com/ethpandaops/beacon v0.64.0
 	github.com/ethpandaops/ethereum-package-go v0.5.0
 	github.com/ethpandaops/ethwallclock v0.4.0
 	github.com/go-co-op/gocron/v2 v2.16.2
 	github.com/golang/snappy v1.0.0
 	github.com/jellydator/ttlcache/v3 v3.4.0
-	github.com/kurtosis-tech/kurtosis/api/golang v1.10.1
+	github.com/kurtosis-tech/kurtosis/api/golang v1.10.2
 	github.com/libp2p/go-libp2p v0.41.1
 	github.com/libp2p/go-libp2p-mplex v0.10.0
-	github.com/libp2p/go-libp2p-pubsub v0.13.0
+	github.com/libp2p/go-libp2p-pubsub v0.14.2
 	github.com/multiformats/go-multiaddr v0.16.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.22.0
