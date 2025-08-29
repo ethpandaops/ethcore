@@ -1,5 +1,8 @@
 [files]
 extend-exclude = [
+  "go.mod",
+  "pkg/discovery/peer_test.go",
+  "pkg/discovery/node_test.go",
   "pkg/ethereum/node/enr/enr_test.go",
   "pkg/consensus/events/types_test.go"
 ]
