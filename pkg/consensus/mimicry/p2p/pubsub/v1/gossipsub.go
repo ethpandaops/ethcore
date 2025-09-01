@@ -303,7 +303,9 @@ func Subscribe[T any](ctx context.Context, g *Gossipsub, topic *Topic[T]) (*Subs
 
 	go func() {
 		defer g.wg.Done()
+
 		<-subCtx.Done()
+
 		g.removeProcessor(topicName)
 	}()
 
@@ -420,7 +422,9 @@ func (g *Gossipsub) createProcessor(ctx context.Context, topic *Topic[any], hand
 	}
 
 	g.procMutex.Lock()
+
 	g.processors[topic.Name()] = proc
+
 	g.procMutex.Unlock()
 
 	return proc, procCtx, nil
@@ -434,6 +438,7 @@ func (g *Gossipsub) removeProcessor(topicName string) {
 	if exists {
 		delete(g.processors, topicName)
 	}
+
 	g.procMutex.Unlock()
 
 	if exists && proc != nil {
@@ -480,16 +485,20 @@ func (g *Gossipsub) Stop() error {
 
 	// Cancel all subscriptions
 	g.subMutex.Lock()
+
 	for _, sub := range g.subscriptions {
 		sub.Cancel()
 	}
+
 	g.subMutex.Unlock()
 
 	// Stop all processors
 	g.procMutex.Lock()
+
 	for _, proc := range g.processors {
 		proc.stop()
 	}
+
 	g.procMutex.Unlock()
 
 	// Wait for all goroutines to finish

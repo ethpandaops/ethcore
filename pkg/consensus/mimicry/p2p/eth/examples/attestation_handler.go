@@ -328,6 +328,7 @@ func (h *AttestationHandler) rotateSubnets(ctx context.Context, forkDigest [4]by
 	for subnet := range h.activeSubnets {
 		currentSubnets = append(currentSubnets, subnet)
 	}
+
 	h.mu.RUnlock()
 
 	// Simulate new duty assignment (in production, get this from beacon node)

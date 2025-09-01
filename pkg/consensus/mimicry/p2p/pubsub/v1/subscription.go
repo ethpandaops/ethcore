@@ -282,6 +282,7 @@ func newProcessor[T any](ctx context.Context, topic *Topic[T], handler *HandlerC
 // start begins processing messages from the subscription.
 func (p *processor[T]) start(ctx context.Context) {
 	p.wg.Add(1)
+
 	go p.run(ctx)
 }
 

@@ -286,6 +286,7 @@ func GetBeaconClientByType(foundation *TestFoundation, epgNetwork network.Networ
 		if strings.ToLower(ct) == targetType {
 			// Verify this client is in the foundation's list
 			foundation.mu.Lock()
+
 			for _, beaconClient := range foundation.BeaconClients {
 				if beaconClient == consensusClient.Name() {
 					foundation.mu.Unlock()

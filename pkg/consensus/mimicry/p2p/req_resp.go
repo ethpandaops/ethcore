@@ -71,6 +71,7 @@ func (r *ReqResp) wrapper(ctx context.Context, handler func(ctx context.Context,
 		}
 
 		start := time.Now()
+
 		defer func() {
 			logCtx.WithField("duration", time.Since(start)).Debug("Handled message")
 		}()

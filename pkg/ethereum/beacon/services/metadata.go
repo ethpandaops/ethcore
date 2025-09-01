@@ -134,7 +134,6 @@ func (m *MetadataService) Start(ctx context.Context) error {
 				m.log.WithError(err).Warnf("Failed to refresh metadata, retrying in %s", duration)
 			}),
 		}
-
 		if _, err := backoff.Retry(ctx, operation, retryOpts...); err != nil {
 			m.log.WithError(err).Warn("Failed to refresh metadata")
 		}
