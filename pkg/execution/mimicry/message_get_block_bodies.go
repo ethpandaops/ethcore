@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	GetBlockBodiesCode = 0x15
+	GetBlockBodiesCode = RLPXOffset + eth.GetBlockBodiesMsg
 )
 
 type GetBlockBodies eth.GetBlockBodiesPacket

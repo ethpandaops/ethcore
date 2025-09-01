@@ -11,31 +11,70 @@ import (
 )
 
 const (
-	StatusCode = 0x10
+	StatusCode = RLPXOffset + eth.StatusMsg
 )
 
-type Status eth.StatusPacket69
+// Status is a wrapper interface for both StatusPacket68 and StatusPacket69.
+type Status interface {
+	Code() int
+	ReqID() uint64
+}
 
-func (msg *Status) Code() int { return StatusCode }
+type Status68 struct {
+	eth.StatusPacket68
+}
 
-func (msg *Status) ReqID() uint64 { return 0 }
+type Status69 struct {
+	eth.StatusPacket69
+}
 
-func (c *Client) receiveStatus(ctx context.Context, data []byte) (*Status, error) {
-	s := new(Status)
-	if err := rlp.DecodeBytes(data, &s); err != nil {
-		return nil, fmt.Errorf("error decoding status: %w", err)
+func (msg *Status68) Code() int { return StatusCode }
+
+func (msg *Status68) ReqID() uint64 { return 0 }
+
+func (msg *Status69) Code() int { return StatusCode }
+
+func (msg *Status69) ReqID() uint64 { return 0 }
+
+func (c *Client) receiveStatus(ctx context.Context, data []byte) (Status, error) {
+	if c.ethCapVersion == 68 {
+		s := new(Status68)
+		if err := rlp.DecodeBytes(data, &s.StatusPacket68); err != nil {
+			return nil, fmt.Errorf("error decoding status68: %w", err)
+		}
+
+		return s, nil
+	}
+
+	// Default to eth/69
+	s := new(Status69)
+	if err := rlp.DecodeBytes(data, &s.StatusPacket69); err != nil {
+		return nil, fmt.Errorf("error decoding status69: %w", err)
 	}
 
 	return s, nil
 }
 
-func (c *Client) sendStatus(ctx context.Context, status *Status) error {
+func (c *Client) sendStatus(ctx context.Context, status Status) error {
 	c.log.WithFields(logrus.Fields{
-		"code":   StatusCode,
-		"status": status,
+		"code":          StatusCode,
+		"status":        status,
+		"ethCapVersion": c.ethCapVersion,
 	}).Debug("sending Status")
 
-	encodedData, err := rlp.EncodeToBytes(status)
+	var encodedData []byte
+
+	var err error
+
+	switch s := status.(type) {
+	case *Status68:
+		encodedData, err = rlp.EncodeToBytes(&s.StatusPacket68)
+	case *Status69:
+		encodedData, err = rlp.EncodeToBytes(&s.StatusPacket69)
+	default:
+		return fmt.Errorf("unsupported status type: %T", status)
+	}
+
 	if err != nil {
 		return fmt.Errorf("error encoding status: %w", err)
 	}
@@ -48,7 +87,10 @@ func (c *Client) sendStatus(ctx context.Context, status *Status) error {
 }
 
 func (c *Client) handleStatus(ctx context.Context, code uint64, data []byte) error {
-	c.log.WithField("code", code).Debug("received Status")
+	c.log.WithFields(logrus.Fields{
+		"code":          code,
+		"ethCapVersion": c.ethCapVersion,
+	}).Debug("received Status")
 
 	status, err := c.receiveStatus(ctx, data)
 	if err != nil {

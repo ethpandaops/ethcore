@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	BlockBodiesCode = 0x16
+	BlockBodiesCode = RLPXOffset + eth.BlockBodiesMsg
 )
 
 type BlockBodies eth.BlockBodiesPacket

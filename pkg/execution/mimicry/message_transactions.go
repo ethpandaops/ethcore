@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	TransactionsCode = 0x12
+	TransactionsCode = RLPXOffset + eth.TransactionsMsg
 )
 
 type Transactions eth.TransactionsPacket

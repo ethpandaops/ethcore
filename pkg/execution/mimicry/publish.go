@@ -20,7 +20,7 @@ func (c *Client) publishHello(ctx context.Context, status *Hello) {
 	c.broker.Emit(topicHello, status)
 }
 
-func (c *Client) publishStatus(ctx context.Context, status *Status) {
+func (c *Client) publishStatus(ctx context.Context, status Status) {
 	c.broker.Emit(topicStatus, status)
 }
 
@@ -50,8 +50,8 @@ func (c *Client) OnHello(ctx context.Context, handler func(ctx context.Context, 
 	})
 }
 
-func (c *Client) OnStatus(ctx context.Context, handler func(ctx context.Context, status *Status) error) {
-	c.broker.On(topicStatus, func(status *Status) {
+func (c *Client) OnStatus(ctx context.Context, handler func(ctx context.Context, status Status) error) {
+	c.broker.On(topicStatus, func(status Status) {
 		c.handleSubscriberError(handler(ctx, status), topicStatus)
 	})
 }

@@ -19,6 +19,10 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const (
+	RLPXOffset = 0x10 // https://github.com/ethereum/devp2p/blob/master/rlpx.md#message-id-based-multiplexing
+)
+
 type Client struct {
 	log logrus.FieldLogger
 
@@ -238,6 +242,12 @@ func (c *Client) startSession(ctx context.Context) {
 			}
 		case GetReceiptsCode:
 			if err := c.handleGetReceipts(ctx, code, data); err != nil {
+				c.handleSessionError(ctx, err)
+
+				return
+			}
+		case BlockRangeUpdateCode:
+			if err := c.handleBlockRangeUpdate(ctx, code, data); err != nil {
 				c.handleSessionError(ctx, err)
 
 				return
