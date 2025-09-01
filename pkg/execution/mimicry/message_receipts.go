@@ -14,20 +14,57 @@ const (
 	ReceiptsCode = 0x20
 )
 
-type Receipts eth.ReceiptsPacket[*eth.ReceiptList69]
+// Receipts is a wrapper interface for both ReceiptsPacket68 and ReceiptsPacket69.
+type Receipts interface {
+	Code() int
+	ReqID() uint64
+}
 
-func (msg *Receipts) Code() int { return ReceiptsCode }
+type Receipts68 struct {
+	eth.ReceiptsPacket[*eth.ReceiptList68]
+}
 
-func (msg *Receipts) ReqID() uint64 { return msg.RequestId }
+type Receipts69 struct {
+	eth.ReceiptsPacket[*eth.ReceiptList69]
+}
 
-func (c *Client) sendReceipts(ctx context.Context, r *Receipts) error {
+func (msg *Receipts68) Code() int { return ReceiptsCode }
+
+func (msg *Receipts68) ReqID() uint64 { return msg.RequestId }
+
+func (msg *Receipts69) Code() int { return ReceiptsCode }
+
+func (msg *Receipts69) ReqID() uint64 { return msg.RequestId }
+
+func (c *Client) sendReceipts(ctx context.Context, r Receipts) error {
+	var requestID uint64
+
+	var listCount int
+
+	var encodedData []byte
+
+	var err error
+
+	switch receipts := r.(type) {
+	case *Receipts68:
+		requestID = receipts.RequestId
+		listCount = len(receipts.List)
+		encodedData, err = rlp.EncodeToBytes(&receipts.ReceiptsPacket)
+	case *Receipts69:
+		requestID = receipts.RequestId
+		listCount = len(receipts.List)
+		encodedData, err = rlp.EncodeToBytes(&receipts.ReceiptsPacket)
+	default:
+		return fmt.Errorf("unsupported receipts type: %T", r)
+	}
+
 	c.log.WithFields(logrus.Fields{
 		"code":           ReceiptsCode,
-		"request_id":     r.RequestId,
-		"receipts_count": len(r.List),
+		"request_id":     requestID,
+		"receipts_count": listCount,
+		"ethCapVersion":  c.ethCapVersion,
 	}).Debug("sending Receipts")
 
-	encodedData, err := rlp.EncodeToBytes(r)
 	if err != nil {
 		return fmt.Errorf("error encoding block receipts: %w", err)
 	}

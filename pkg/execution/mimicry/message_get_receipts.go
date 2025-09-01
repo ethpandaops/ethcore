@@ -37,10 +37,25 @@ func (c *Client) handleGetReceipts(ctx context.Context, code uint64, data []byte
 		return err
 	}
 
-	err = c.sendReceipts(ctx, &Receipts{
-		RequestId: blockBodies.RequestId,
-		List:      []*eth.ReceiptList69{eth.NewReceiptList69([]*types.Receipt{})},
-	})
+	var receipts Receipts
+	if c.ethCapVersion == 68 {
+		receipts = &Receipts68{
+			ReceiptsPacket: eth.ReceiptsPacket[*eth.ReceiptList68]{
+				RequestId: blockBodies.RequestId,
+				List:      []*eth.ReceiptList68{eth.NewReceiptList68([]*types.Receipt{})},
+			},
+		}
+	} else {
+		// Default to eth/69
+		receipts = &Receipts69{
+			ReceiptsPacket: eth.ReceiptsPacket[*eth.ReceiptList69]{
+				RequestId: blockBodies.RequestId,
+				List:      []*eth.ReceiptList69{eth.NewReceiptList69([]*types.Receipt{})},
+			},
+		}
+	}
+
+	err = c.sendReceipts(ctx, receipts)
 	if err != nil {
 		c.handleSessionError(ctx, err)
 

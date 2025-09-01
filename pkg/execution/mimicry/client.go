@@ -242,6 +242,12 @@ func (c *Client) startSession(ctx context.Context) {
 
 				return
 			}
+		case BlockRangeUpdateCode:
+			if err := c.handleBlockRangeUpdate(ctx, code, data); err != nil {
+				c.handleSessionError(ctx, err)
+
+				return
+			}
 		default:
 			c.log.WithField("code", code).Debug("received unhandled message code")
 		}
