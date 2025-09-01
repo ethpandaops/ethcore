@@ -18,6 +18,11 @@ const (
 type Status interface {
 	Code() int
 	ReqID() uint64
+	GetGenesis() []byte
+	GetHead() []byte
+	GetNetworkID() uint64
+	GetForkIDHash() []byte
+	GetForkIDNext() uint64
 }
 
 type Status68 struct {
@@ -32,9 +37,29 @@ func (msg *Status68) Code() int { return StatusCode }
 
 func (msg *Status68) ReqID() uint64 { return 0 }
 
+func (msg *Status68) GetGenesis() []byte { return msg.Genesis[:] }
+
+func (msg *Status68) GetHead() []byte { return msg.Head[:] }
+
+func (msg *Status68) GetNetworkID() uint64 { return msg.NetworkID }
+
+func (msg *Status68) GetForkIDHash() []byte { return msg.ForkID.Hash[:] }
+
+func (msg *Status68) GetForkIDNext() uint64 { return msg.ForkID.Next }
+
 func (msg *Status69) Code() int { return StatusCode }
 
 func (msg *Status69) ReqID() uint64 { return 0 }
+
+func (msg *Status69) GetGenesis() []byte { return msg.Genesis[:] }
+
+func (msg *Status69) GetHead() []byte { return msg.LatestBlockHash[:] }
+
+func (msg *Status69) GetNetworkID() uint64 { return msg.NetworkID }
+
+func (msg *Status69) GetForkIDHash() []byte { return msg.ForkID.Hash[:] }
+
+func (msg *Status69) GetForkIDNext() uint64 { return msg.ForkID.Next }
 
 func (c *Client) receiveStatus(ctx context.Context, data []byte) (Status, error) {
 	if c.ethCapVersion == 68 {
