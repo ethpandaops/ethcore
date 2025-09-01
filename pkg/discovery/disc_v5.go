@@ -74,10 +74,13 @@ func (d *DiscV5) Start(ctx context.Context) error {
 
 func (d *DiscV5) startListener(ctx context.Context) error {
 	d.mu.Lock()
+
 	if d.listener != nil {
 		d.listener.Close()
+
 		d.listener = nil
 	}
+
 	d.mu.Unlock()
 
 	privKey, err := gcrypto.GenerateKey()
@@ -191,11 +194,13 @@ func (d *DiscV5) OnNodeRecord(ctx context.Context, handler func(ctx context.Cont
 
 func (d *DiscV5) startCrons(ctx context.Context) error {
 	d.mu.Lock()
+
 	if d.scheduler != nil {
 		d.mu.Unlock()
 
 		return nil
 	}
+
 	d.mu.Unlock()
 
 	c, err := gocron.NewScheduler(gocron.WithLocation(time.Local))

@@ -25,6 +25,7 @@ func (c *Crawler) wireUpComponents(ctx context.Context) error {
 	c.beacon.Node().OnHead(ctx, func(ctx context.Context, event *v1.HeadEvent) error {
 		// If we're shutting down, we're done. Dont process any further.
 		c.shutdownMu.RLock()
+
 		if c.isShutdown {
 			c.shutdownMu.RUnlock()
 
@@ -97,6 +98,7 @@ func (c *Crawler) wireUpComponents(ctx context.Context) error {
 func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 	// Don't process the peer any further if we're shutting down.
 	c.shutdownMu.RLock()
+
 	if c.isShutdown {
 		c.shutdownMu.RUnlock()
 
@@ -104,6 +106,7 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 
 		return
 	}
+
 	c.shutdownMu.RUnlock()
 
 	peerID := conn.RemotePeer()
@@ -392,11 +395,13 @@ func (c *Crawler) startDialer(ctx context.Context) error {
 
 					// Check if we're shutting down before connecting.
 					c.shutdownMu.RLock()
+
 					if c.isShutdown {
 						c.shutdownMu.RUnlock()
 
 						return
 					}
+
 					c.shutdownMu.RUnlock()
 
 					if err := c.ConnectToPeer(c.ctx, node.AddrInfo, node.Enode); err != nil {
@@ -437,11 +442,13 @@ func (c *Crawler) startRetryWorker(ctx context.Context) error {
 
 				// Check if we're shutting down
 				c.shutdownMu.RLock()
+
 				if c.isShutdown {
 					c.shutdownMu.RUnlock()
 
 					return
 				}
+
 				c.shutdownMu.RUnlock()
 
 				// Wait for backoff period
@@ -482,11 +489,13 @@ func (c *Crawler) startRetryWorker(ctx context.Context) error {
 func (c *Crawler) handleNewDiscoveryNode(_ context.Context, node *enode.Node) error {
 	// Dont proceed further if we're shutting down.
 	c.shutdownMu.RLock()
+
 	if c.isShutdown {
 		c.shutdownMu.RUnlock()
 
 		return nil
 	}
+
 	c.shutdownMu.RUnlock()
 
 	enr := ""
@@ -524,11 +533,13 @@ func (c *Crawler) handleNewDiscoveryNode(_ context.Context, node *enode.Node) er
 
 	// Check again if we're shutting down before sending.
 	c.shutdownMu.RLock()
+
 	if c.isShutdown {
 		c.shutdownMu.RUnlock()
 
 		return nil
 	}
+
 	c.shutdownMu.RUnlock()
 
 	select {

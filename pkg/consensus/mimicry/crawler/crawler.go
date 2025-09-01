@@ -197,7 +197,6 @@ func (c *Crawler) Start(ctx context.Context) error {
 				c.log.WithError(err).Warnf("Failed to fetch initial status, retrying in %s", duration)
 			}),
 		}
-
 		if _, err := backoff.Retry(ctx, operation, retryOpts...); err != nil {
 			c.log.WithError(err).Warn("Failed to fetch initial status")
 		}
@@ -346,8 +345,10 @@ func (c *Crawler) Stop(ctx context.Context) error {
 
 		// Wait for dialer workers to finish with timeout
 		dialerDone := make(chan struct{})
+
 		go func() {
 			c.dialerWg.Wait()
+
 			close(dialerDone)
 		}()
 
@@ -416,11 +417,13 @@ func (c *Crawler) startCrons(ctx context.Context) error {
 			func() {
 				// Check if we're shutting down
 				c.shutdownMu.RLock()
+
 				if c.isShutdown {
 					c.shutdownMu.RUnlock()
 
 					return
 				}
+
 				c.shutdownMu.RUnlock()
 
 				// Use a timeout context for the status fetch.
@@ -898,6 +901,7 @@ func (c *Crawler) scheduleRetry(peerID peer.ID, peer *discovery.ConnectablePeer,
 
 	// Check if we're shutting down before sending to channel
 	c.shutdownMu.RLock()
+
 	if c.isShutdown {
 		c.shutdownMu.RUnlock()
 
@@ -905,6 +909,7 @@ func (c *Crawler) scheduleRetry(peerID peer.ID, peer *discovery.ConnectablePeer,
 
 		return
 	}
+
 	c.shutdownMu.RUnlock()
 
 	// Remove from duplicate cache to allow immediate retry

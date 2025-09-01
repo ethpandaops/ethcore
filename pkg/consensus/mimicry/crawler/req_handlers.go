@@ -19,6 +19,7 @@ func (c *Crawler) handleStatus(ctx context.Context, stream network.Stream) error
 	})
 
 	start := time.Now()
+
 	defer func() {
 		logCtx.WithField("duration", time.Since(start)).Debug("Handled status message")
 
@@ -92,6 +93,7 @@ func (c *Crawler) handleGoodbye(ctx context.Context, stream network.Stream) erro
 	})
 
 	start := time.Now()
+
 	defer func() {
 		logCtx.WithField("duration", time.Since(start)).Debug("Handled goodbye message")
 
@@ -145,6 +147,7 @@ func (c *Crawler) handlePing(ctx context.Context, stream network.Stream) error {
 	})
 
 	start := time.Now()
+
 	defer func() {
 		logCtx.WithField("duration", time.Since(start)).Debug("Handled ping message")
 
@@ -189,6 +192,7 @@ func (c *Crawler) handleMetadata(ctx context.Context, stream network.Stream) err
 	})
 
 	start := time.Now()
+
 	defer func() {
 		logCtx.WithField("duration", time.Since(start)).Debug("Handled metadata message")
 

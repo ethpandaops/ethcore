@@ -195,8 +195,10 @@ func TestDuplicateCache_StructValues(t *testing.T) {
 	ctx := context.Background()
 	err := cache.Start(ctx)
 	assert.NoError(t, err)
+
 	defer func() {
 		err := cache.Stop()
+
 		assert.NoError(t, err)
 	}()
 

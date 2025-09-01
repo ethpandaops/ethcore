@@ -325,8 +325,8 @@ func parseID(node *enode.Node) *string {
 // Returns a pointer to the public key bytes, or nil if not present.
 func parseSecp256k1(node *enode.Node) *[]byte {
 	field := s256raw{}
-	err := node.Record().Load(&field)
 
+	err := node.Record().Load(&field)
 	if err != nil {
 		return nil
 	}
@@ -477,7 +477,6 @@ func parseETH2(node *enode.Node) *[]byte {
 	field := eth2{}
 
 	err := node.Record().Load(&field)
-
 	if err != nil {
 		return nil
 	}
@@ -493,7 +492,6 @@ func parseAttnets(node *enode.Node) *[]byte {
 	field := attnets{}
 
 	err := node.Record().Load(&field)
-
 	if err != nil {
 		return nil
 	}
@@ -509,7 +507,6 @@ func parseSyncnets(node *enode.Node) *[]byte {
 	field := syncnets{}
 
 	err := node.Record().Load(&field)
-
 	if err != nil {
 		return nil
 	}
@@ -525,7 +522,6 @@ func parseCGC(node *enode.Node) *[]byte {
 	field := cgc{}
 
 	err := node.Record().Load(&field)
-
 	if err != nil {
 		return nil
 	}
@@ -541,7 +537,6 @@ func parseNFD(node *enode.Node) *[]byte {
 	field := nfd{}
 
 	err := node.Record().Load(&field)
-
 	if err != nil {
 		return nil
 	}
