@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	StatusCode = 0x10
+	StatusCode = RLPXOffset + eth.StatusMsg
 )
 
 // Status is a wrapper interface for both StatusPacket68 and StatusPacket69.

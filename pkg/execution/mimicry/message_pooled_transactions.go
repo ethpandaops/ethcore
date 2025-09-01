@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	PooledTransactionsCode = 0x1a
+	PooledTransactionsCode = RLPXOffset + eth.PooledTransactionsMsg
 )
 
 type PooledTransactions eth.PooledTransactionsPacket

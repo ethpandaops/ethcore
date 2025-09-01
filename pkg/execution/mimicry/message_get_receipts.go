@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	GetReceiptsCode = 0x1f
+	GetReceiptsCode = RLPXOffset + eth.GetReceiptsMsg
 )
 
 type GetReceipts eth.GetReceiptsPacket

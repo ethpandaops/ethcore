@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	GetPooledTransactionsCode = 0x19
+	GetPooledTransactionsCode = RLPXOffset + eth.GetPooledTransactionsMsg
 )
 
 type GetPooledTransactions eth.GetPooledTransactionsPacket

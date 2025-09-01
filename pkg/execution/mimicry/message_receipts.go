@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	ReceiptsCode = 0x20
+	ReceiptsCode = RLPXOffset + eth.ReceiptsMsg
 )
 
 // Receipts is a wrapper interface for both ReceiptsPacket68 and ReceiptsPacket69.

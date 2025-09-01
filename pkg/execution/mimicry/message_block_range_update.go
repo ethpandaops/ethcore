@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	BlockRangeUpdateCode = 0x21
+	BlockRangeUpdateCode = RLPXOffset + eth.BlockRangeUpdateMsg
 )
 
 type BlockRangeUpdate eth.BlockRangeUpdatePacket

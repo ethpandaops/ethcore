@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	BlockHeadersCode = 0x14
+	BlockHeadersCode = RLPXOffset + eth.BlockHeadersMsg
 )
 
 type BlockHeaders eth.BlockHeadersPacket

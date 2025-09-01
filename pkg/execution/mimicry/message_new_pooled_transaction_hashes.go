@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	NewPooledTransactionHashesCode = 0x18
+	NewPooledTransactionHashesCode = RLPXOffset + eth.NewPooledTransactionHashesMsg
 )
 
 type NewPooledTransactionHashes eth.NewPooledTransactionHashesPacket

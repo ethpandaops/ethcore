@@ -19,6 +19,10 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const (
+	RLPXOffset = 0x10 // https://github.com/ethereum/devp2p/blob/master/rlpx.md#message-id-based-multiplexing
+)
+
 type Client struct {
 	log logrus.FieldLogger
 
