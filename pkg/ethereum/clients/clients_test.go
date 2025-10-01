@@ -200,6 +200,7 @@ func TestAllConsensusClients(t *testing.T) {
 		ClientLodestar,
 		ClientGrandine,
 		ClientCaplin,
+		ClientTysm,
 	}
 
 	if len(AllConsensusClients) != len(expectedConsensusClients) {
