@@ -3,7 +3,7 @@ package topics_test
 import (
 	"testing"
 
-	eth "github.com/OffchainLabs/prysm/v6/proto/prysm/v1alpha1"
+	eth "github.com/OffchainLabs/prysm/v7/proto/prysm/v1alpha1"
 	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/eth/topics"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
