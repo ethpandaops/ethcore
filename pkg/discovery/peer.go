@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/OffchainLabs/prysm/v6/crypto/ecdsa"
+	"github.com/OffchainLabs/prysm/v7/crypto/ecdsa"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/libp2p/go-libp2p/core/peer"
 	ma "github.com/multiformats/go-multiaddr"

@@ -3,7 +3,7 @@ package topics
 import (
 	"fmt"
 
-	eth "github.com/OffchainLabs/prysm/v6/proto/prysm/v1alpha1"
+	eth "github.com/OffchainLabs/prysm/v7/proto/prysm/v1alpha1"
 	v1 "github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub/v1"
 )
 

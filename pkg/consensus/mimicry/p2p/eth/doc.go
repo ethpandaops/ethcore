@@ -81,7 +81,7 @@
 //		"context"
 //		"log"
 //
-//		eth "github.com/OffchainLabs/prysm/v6/proto/prysm/v1alpha1"
+//		eth "github.com/OffchainLabs/prysm/v7/proto/prysm/v1alpha1"
 //		"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/eth/topics"
 //		v1 "github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/pubsub/v1"
 //		"github.com/libp2p/go-libp2p"

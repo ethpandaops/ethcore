@@ -3,9 +3,9 @@ package topics_test
 import (
 	"testing"
 
-	eth "github.com/OffchainLabs/prysm/v6/proto/prysm/v1alpha1"
+	"github.com/OffchainLabs/go-bitfield"
+	eth "github.com/OffchainLabs/prysm/v7/proto/prysm/v1alpha1"
 	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/eth/topics"
-	"github.com/prysmaticlabs/go-bitfield"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
