@@ -323,3 +323,231 @@ func TestClientIdentifiersConsistency(t *testing.T) {
 		}
 	}
 }
+
+func TestParseExecutionClientVersion(t *testing.T) {
+	tests := []struct {
+		name           string
+		input          string
+		implementation string
+		version        string
+		versionMajor   string
+		versionMinor   string
+		versionPatch   string
+	}{
+		// Real-world examples from docstring
+		{
+			name:           "geth standard format",
+			input:          "Geth/v1.16.4-stable-41714b49/linux-amd64/go1.24.7",
+			implementation: "Geth",
+			version:        "1.16.4-stable-41714b49",
+			versionMajor:   "1",
+			versionMinor:   "16",
+			versionPatch:   "4",
+		},
+		{
+			name:           "erigon lowercase no v prefix",
+			input:          "erigon/3.0.14/linux-amd64/go1.23.11",
+			implementation: "erigon",
+			version:        "3.0.14",
+			versionMajor:   "3",
+			versionMinor:   "0",
+			versionPatch:   "14",
+		},
+		{
+			name:           "nethermind plus separator",
+			input:          "Nethermind/v1.32.4+1c4c7c0a/linux-x64/dotnet9.0.7",
+			implementation: "Nethermind",
+			version:        "1.32.4+1c4c7c0a",
+			versionMajor:   "1",
+			versionMinor:   "32",
+			versionPatch:   "4",
+		},
+		{
+			name:           "besu lowercase",
+			input:          "besu/v25.7.0/linux-x86_64/openjdk-java-21",
+			implementation: "besu",
+			version:        "25.7.0",
+			versionMajor:   "25",
+			versionMinor:   "7",
+			versionPatch:   "0",
+		},
+		{
+			name:           "reth dash separator for commit",
+			input:          "reth/v1.8.2-9c30bf7/x86_64-unknown-linux-gnu",
+			implementation: "reth",
+			version:        "1.8.2-9c30bf7",
+			versionMajor:   "1",
+			versionMinor:   "8",
+			versionPatch:   "2",
+		},
+		// Edge cases
+		{
+			name:           "empty string",
+			input:          "",
+			implementation: "",
+			version:        "",
+			versionMajor:   "",
+			versionMinor:   "",
+			versionPatch:   "",
+		},
+		{
+			name:           "implementation only",
+			input:          "Geth",
+			implementation: "Geth",
+			version:        "",
+			versionMajor:   "",
+			versionMinor:   "",
+			versionPatch:   "",
+		},
+		{
+			name:           "implementation with trailing slash",
+			input:          "Geth/",
+			implementation: "Geth",
+			version:        "",
+			versionMajor:   "",
+			versionMinor:   "",
+			versionPatch:   "",
+		},
+		{
+			name:           "major only",
+			input:          "Geth/v1",
+			implementation: "Geth",
+			version:        "1",
+			versionMajor:   "1",
+			versionMinor:   "",
+			versionPatch:   "",
+		},
+		{
+			name:           "major.minor only",
+			input:          "Geth/v1.16",
+			implementation: "Geth",
+			version:        "1.16",
+			versionMajor:   "1",
+			versionMinor:   "16",
+			versionPatch:   "",
+		},
+		{
+			name:           "version without v prefix",
+			input:          "client/1.2.3",
+			implementation: "client",
+			version:        "1.2.3",
+			versionMajor:   "1",
+			versionMinor:   "2",
+			versionPatch:   "3",
+		},
+		{
+			name:           "alpha version suffix",
+			input:          "reth/v0.1.0-alpha.13",
+			implementation: "reth",
+			version:        "0.1.0-alpha.13",
+			versionMajor:   "0",
+			versionMinor:   "1",
+			versionPatch:   "0",
+		},
+		{
+			name:           "complex suffix",
+			input:          "Client/v2.3.4-beta+build.567",
+			implementation: "Client",
+			version:        "2.3.4-beta+build.567",
+			versionMajor:   "2",
+			versionMinor:   "3",
+			versionPatch:   "4",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			impl, ver, major, minor, patch := ParseExecutionClientVersion(tt.input)
+
+			if impl != tt.implementation {
+				t.Errorf("implementation = %q, want %q", impl, tt.implementation)
+			}
+
+			if ver != tt.version {
+				t.Errorf("version = %q, want %q", ver, tt.version)
+			}
+
+			if major != tt.versionMajor {
+				t.Errorf("versionMajor = %q, want %q", major, tt.versionMajor)
+			}
+
+			if minor != tt.versionMinor {
+				t.Errorf("versionMinor = %q, want %q", minor, tt.versionMinor)
+			}
+
+			if patch != tt.versionPatch {
+				t.Errorf("versionPatch = %q, want %q", patch, tt.versionPatch)
+			}
+		})
+	}
+}
+
+func TestSplitVersionString(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		sep      string
+		expected []string
+	}{
+		{
+			name:     "simple split by slash",
+			input:    "a/b/c",
+			sep:      "/",
+			expected: []string{"a", "b", "c"},
+		},
+		{
+			name:     "split by dot",
+			input:    "1.2.3",
+			sep:      ".",
+			expected: []string{"1", "2", "3"},
+		},
+		{
+			name:     "empty string",
+			input:    "",
+			sep:      "/",
+			expected: nil,
+		},
+		{
+			name:     "no separator found",
+			input:    "abc",
+			sep:      "/",
+			expected: []string{"abc"},
+		},
+		{
+			name:     "consecutive separators",
+			input:    "a//b",
+			sep:      "/",
+			expected: []string{"a", "b"},
+		},
+		{
+			name:     "trailing separator",
+			input:    "a/b/",
+			sep:      "/",
+			expected: []string{"a", "b"},
+		},
+		{
+			name:     "leading separator",
+			input:    "/a/b",
+			sep:      "/",
+			expected: []string{"a", "b"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := splitVersionString(tt.input, tt.sep)
+
+			if len(result) != len(tt.expected) {
+				t.Errorf("len(result) = %d, want %d", len(result), len(tt.expected))
+
+				return
+			}
+
+			for i := range result {
+				if result[i] != tt.expected[i] {
+					t.Errorf("result[%d] = %q, want %q", i, result[i], tt.expected[i])
+				}
+			}
+		})
+	}
+}
