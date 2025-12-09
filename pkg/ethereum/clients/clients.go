@@ -111,3 +111,98 @@ func ClientFromString(client string) Client {
 
 	return ClientUnknown
 }
+
+// ParseExecutionClientVersion parses the web3_clientVersion string.
+// Example inputs from real EL implementations:
+// - "Geth/v1.16.4-stable-41714b49/linux-amd64/go1.24.7"
+// - "erigon/3.0.14/linux-amd64/go1.23.11" (lowercase, no 'v' prefix)
+// - "Nethermind/v1.32.4+1c4c7c0a/linux-x64/dotnet9.0.7" (uses + for commit hash)
+// - "besu/v25.7.0/linux-x86_64/openjdk-java-21" (lowercase)
+// - "reth/v1.8.2-9c30bf7/x86_64-unknown-linux-gnu" (uses - for commit hash)
+// Returns: implementation, version, versionMajor, versionMinor, versionPatch.
+func ParseExecutionClientVersion(clientVersion string) (implementation, version, versionMajor, versionMinor, versionPatch string) {
+	if clientVersion == "" {
+		return "", "", "", "", ""
+	}
+
+	// Split by "/" to get parts
+	parts := splitVersionString(clientVersion, "/")
+	if len(parts) == 0 {
+		return clientVersion, "", "", "", ""
+	}
+
+	// First part is the implementation
+	implementation = parts[0]
+
+	// Second part is typically the version
+	if len(parts) < 2 {
+		return implementation, "", "", "", ""
+	}
+
+	versionStr := parts[1]
+
+	// Remove "v" prefix if present
+	if versionStr != "" && versionStr[0] == 'v' {
+		versionStr = versionStr[1:]
+	}
+
+	// Parse semantic version (major.minor.patch)
+	// Version might have suffixes like "-stable-41714b49" or "+abcdef"
+	// Split on "-" or "+" to get the core version
+	coreVersion := versionStr
+
+	for i, c := range versionStr {
+		if c == '-' || c == '+' {
+			coreVersion = versionStr[:i]
+
+			break
+		}
+	}
+
+	// Split by "." to get major.minor.patch
+	versionParts := splitVersionString(coreVersion, ".")
+
+	if len(versionParts) > 0 {
+		versionMajor = versionParts[0]
+	}
+
+	if len(versionParts) > 1 {
+		versionMinor = versionParts[1]
+	}
+
+	if len(versionParts) > 2 {
+		versionPatch = versionParts[2]
+	}
+
+	version = versionStr
+
+	return implementation, version, versionMajor, versionMinor, versionPatch
+}
+
+// splitVersionString is a helper to split strings by a separator.
+func splitVersionString(s, sep string) []string {
+	if s == "" {
+		return nil
+	}
+
+	var parts []string
+
+	start := 0
+
+	for i := 0; i <= len(s)-len(sep); i++ {
+		if s[i:i+len(sep)] == sep {
+			if part := s[start:i]; part != "" {
+				parts = append(parts, part)
+			}
+
+			start = i + len(sep)
+			i += len(sep) - 1
+		}
+	}
+
+	if part := s[start:]; part != "" {
+		parts = append(parts, part)
+	}
+
+	return parts
+}
