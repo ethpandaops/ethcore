@@ -3,22 +3,22 @@ module github.com/ethpandaops/ethcore
 go 1.25.1
 
 require (
-	github.com/OffchainLabs/prysm/v6 v6.1.1
-	github.com/attestantio/go-eth2-client v0.27.1
+	github.com/OffchainLabs/prysm/v6 v6.1.4
+	github.com/attestantio/go-eth2-client v0.28.0
 	github.com/cenkalti/backoff/v5 v5.0.3
 	github.com/chuckpreslar/emission v0.0.0-20170206194824-a7ddd980baf9
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0
 	github.com/ethereum/go-ethereum v1.16.7
-	github.com/ethpandaops/beacon v0.65.0
-	github.com/ethpandaops/ethereum-package-go v0.8.0
+	github.com/ethpandaops/beacon v0.66.0
+	github.com/ethpandaops/ethereum-package-go v0.8.1
 	github.com/ethpandaops/ethwallclock v0.4.0
-	github.com/go-co-op/gocron/v2 v2.16.6
+	github.com/go-co-op/gocron/v2 v2.18.2
 	github.com/golang/snappy v1.0.0
 	github.com/jellydator/ttlcache/v3 v3.4.0
-	github.com/kurtosis-tech/kurtosis/api/golang v1.11.1
+	github.com/kurtosis-tech/kurtosis/api/golang v1.14.0
 	github.com/libp2p/go-libp2p v0.41.1
 	github.com/libp2p/go-libp2p-mplex v0.11.0
-	github.com/libp2p/go-libp2p-pubsub v0.14.2
+	github.com/libp2p/go-libp2p-pubsub v0.15.0
 	github.com/multiformats/go-multiaddr v0.16.1
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.23.2
@@ -35,6 +35,7 @@ require (
 	github.com/DataDog/zstd v1.5.7 // indirect
 	github.com/Masterminds/semver/v3 v3.1.1 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
+	github.com/OffchainLabs/go-bitfield v0.0.0-20251031151322-f427d04d8506 // indirect
 	github.com/ProjectZKM/Ziren/crates/go-runtime/zkvm_runtime v0.0.0-20251001021608-1fe7b43fc4d6 // indirect
 	github.com/VictoriaMetrics/fastcache v1.13.0 // indirect
 	github.com/adrg/xdg v0.4.0 // indirect
