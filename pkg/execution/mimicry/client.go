@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/chuckpreslar/emission"
@@ -82,8 +83,22 @@ func (c *Client) Start(ctx context.Context) error {
 
 	var err error
 
-	// set a deadline for dialing
-	d := net.Dialer{Deadline: time.Now().Add(5 * time.Second)}
+	// set a deadline for dialing with aggressive socket reuse to prevent ephemeral port exhaustion
+	// Note: For full TIME_WAIT reuse, also set: sysctl -w net.ipv4.tcp_tw_reuse=1
+	d := net.Dialer{
+		Deadline: time.Now().Add(5 * time.Second),
+		Control: func(network, address string, conn syscall.RawConn) error {
+			// Best effort socket options - don't fail if they can't be set
+			_ = conn.Control(func(fd uintptr) {
+				// SO_REUSEADDR allows reuse of local addresses
+				_ = syscall.SetsockoptInt(int(fd), syscall.SOL_SOCKET, syscall.SO_REUSEADDR, 1)
+				// SO_REUSEPORT allows multiple sockets to bind to same port (Linux 3.9+)
+				_ = syscall.SetsockoptInt(int(fd), syscall.SOL_SOCKET, 0xf /* SO_REUSEPORT */, 1)
+			})
+
+			return nil
+		},
+	}
 
 	c.conn, err = d.Dial("tcp", address)
 	if err != nil {
