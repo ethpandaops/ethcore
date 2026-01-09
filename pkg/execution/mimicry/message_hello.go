@@ -3,6 +3,7 @@ package mimicry
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/crypto"
@@ -92,7 +93,7 @@ func (h *Hello) ETHProtocolVersion() uint {
 }
 
 func SupportedEthCaps() []p2p.Cap {
-	caps := []p2p.Cap{}
+	caps := make([]p2p.Cap, 0, maxETHProtocolVersion-minETHProtocolVersion+1)
 	for i := minETHProtocolVersion; i <= maxETHProtocolVersion; i++ {
 		caps = append(caps, p2p.Cap{
 			Name:    ETHCapName,
@@ -103,10 +104,32 @@ func SupportedEthCaps() []p2p.Cap {
 	return caps
 }
 
-func (c *Client) receiveHello(ctx context.Context, data []byte) (*Hello, error) {
+// decodeHello decodes a Hello message from RLP-encoded data.
+func decodeHello(data []byte) (*Hello, error) {
 	h := new(Hello)
 	if err := rlp.DecodeBytes(data, &h); err != nil {
 		return nil, fmt.Errorf("error decoding hello: %w", err)
+	}
+
+	return h, nil
+}
+
+// encodeHello encodes a Hello message to RLP bytes.
+func encodeHello(privateKey *ecdsa.PrivateKey, caps []p2p.Cap) ([]byte, error) {
+	pub0 := crypto.FromECDSAPub(&privateKey.PublicKey)[1:]
+	hello := &Hello{
+		Version: P2PProtocolVersion,
+		Caps:    caps,
+		ID:      pub0,
+	}
+
+	return rlp.EncodeToBytes(hello)
+}
+
+func (c *Client) receiveHello(ctx context.Context, data []byte) (*Hello, error) {
+	h, err := decodeHello(data)
+	if err != nil {
+		return nil, err
 	}
 
 	c.log.WithFields(logrus.Fields{
@@ -127,14 +150,7 @@ func (c *Client) sendHello(ctx context.Context) error {
 		"code": HelloCode,
 	}).Debug("sending Hello")
 
-	pub0 := crypto.FromECDSAPub(&c.privateKey.PublicKey)[1:]
-	hello := &Hello{
-		Version: P2PProtocolVersion,
-		Caps:    SupportedEthCaps(),
-		ID:      pub0,
-	}
-
-	encodedData, err := rlp.EncodeToBytes(hello)
+	encodedData, err := encodeHello(c.privateKey, SupportedEthCaps())
 	if err != nil {
 		return fmt.Errorf("error encoding hello: %w", err)
 	}

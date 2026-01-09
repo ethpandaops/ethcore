@@ -61,8 +61,9 @@ func (msg *Status69) GetForkIDHash() []byte { return msg.ForkID.Hash[:] }
 
 func (msg *Status69) GetForkIDNext() uint64 { return msg.ForkID.Next }
 
-func (c *Client) receiveStatus(ctx context.Context, data []byte) (Status, error) {
-	if c.ethCapVersion == 68 {
+// decodeStatus decodes a Status message from RLP-encoded data.
+func decodeStatus(data []byte, ethCapVersion uint) (Status, error) {
+	if ethCapVersion == 68 {
 		s := new(Status68)
 		if err := rlp.DecodeBytes(data, &s.StatusPacket68); err != nil {
 			return nil, fmt.Errorf("error decoding status68: %w", err)
@@ -80,6 +81,22 @@ func (c *Client) receiveStatus(ctx context.Context, data []byte) (Status, error)
 	return s, nil
 }
 
+// encodeStatus encodes a Status message to RLP bytes.
+func encodeStatus(status Status) ([]byte, error) {
+	switch s := status.(type) {
+	case *Status68:
+		return rlp.EncodeToBytes(&s.StatusPacket68)
+	case *Status69:
+		return rlp.EncodeToBytes(&s.StatusPacket69)
+	default:
+		return nil, fmt.Errorf("unsupported status type: %T", status)
+	}
+}
+
+func (c *Client) receiveStatus(ctx context.Context, data []byte) (Status, error) {
+	return decodeStatus(data, c.ethCapVersion)
+}
+
 func (c *Client) sendStatus(ctx context.Context, status Status) error {
 	c.log.WithFields(logrus.Fields{
 		"code":          StatusCode,
@@ -87,19 +104,7 @@ func (c *Client) sendStatus(ctx context.Context, status Status) error {
 		"ethCapVersion": c.ethCapVersion,
 	}).Debug("sending Status")
 
-	var encodedData []byte
-
-	var err error
-
-	switch s := status.(type) {
-	case *Status68:
-		encodedData, err = rlp.EncodeToBytes(&s.StatusPacket68)
-	case *Status69:
-		encodedData, err = rlp.EncodeToBytes(&s.StatusPacket69)
-	default:
-		return fmt.Errorf("unsupported status type: %T", status)
-	}
-
+	encodedData, err := encodeStatus(status)
 	if err != nil {
 		return fmt.Errorf("error encoding status: %w", err)
 	}

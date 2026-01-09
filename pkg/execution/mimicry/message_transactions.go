@@ -20,6 +20,16 @@ func (msg *Transactions) Code() int { return TransactionsCode }
 
 func (msg *Transactions) ReqID() uint64 { return 0 }
 
+// decodeTransactions decodes a Transactions message from RLP-encoded data.
+func decodeTransactions(data []byte) (*Transactions, error) {
+	s := new(Transactions)
+	if err := rlp.DecodeBytes(data, &s); err != nil {
+		return nil, fmt.Errorf("error decoding transactions: %w", err)
+	}
+
+	return s, nil
+}
+
 func (c *Client) receiveTransactions(ctx context.Context, data []byte) (*Transactions, error) {
 	s := new(Transactions)
 	if err := rlp.DecodeBytes(data, &s); err != nil {
