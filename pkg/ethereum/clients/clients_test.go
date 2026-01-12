@@ -380,6 +380,15 @@ func TestParseExecutionClientVersion(t *testing.T) {
 			versionMinor:   "8",
 			versionPatch:   "2",
 		},
+		{
+			name:           "ethrex with rustc version",
+			input:          "ethrex/v8.0.0-HEAD-8d83b00/x86_64-unknown-linux-gnu/rustc-v1.90.0",
+			implementation: "ethrex",
+			version:        "8.0.0-HEAD-8d83b00",
+			versionMajor:   "8",
+			versionMinor:   "0",
+			versionPatch:   "0",
+		},
 		// Edge cases
 		{
 			name:           "empty string",

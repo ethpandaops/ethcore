@@ -36,6 +36,8 @@ const (
 	ClientReth Client = "reth"
 	// ClientEthereumJS represents the EthereumJS execution client.
 	ClientEthereumJS Client = "ethereumjs"
+	// ClientEthrex represents the Ethrex execution client.
+	ClientEthrex Client = "ethrex"
 )
 
 // AllConsensusClients contains all known consensus client implementations.
@@ -58,6 +60,7 @@ var AllExecutionClients = []Client{
 	ClientErigon,
 	ClientReth,
 	ClientEthereumJS,
+	ClientEthrex,
 }
 
 // AllClients contains all known consensus+execution client implementations.
@@ -77,6 +80,7 @@ var AllClients = []Client{
 	ClientErigon,
 	ClientReth,
 	ClientEthereumJS,
+	ClientEthrex,
 }
 
 // clientIdentifiers maps client-specific strings to their respective Client type.
@@ -95,6 +99,7 @@ var clientIdentifiers = map[string]Client{
 	"erigon":     ClientErigon,
 	"reth":       ClientReth,
 	"ethereumjs": ClientEthereumJS,
+	"ethrex":     ClientEthrex,
 }
 
 // ClientFromString identifies a consensus client from a string identifier.
@@ -119,6 +124,7 @@ func ClientFromString(client string) Client {
 // - "Nethermind/v1.32.4+1c4c7c0a/linux-x64/dotnet9.0.7" (uses + for commit hash)
 // - "besu/v25.7.0/linux-x86_64/openjdk-java-21" (lowercase)
 // - "reth/v1.8.2-9c30bf7/x86_64-unknown-linux-gnu" (uses - for commit hash)
+// - "ethrex/v8.0.0-HEAD-8d83b00/x86_64-unknown-linux-gnu/rustc-v1.90.0"
 // Returns: implementation, version, versionMajor, versionMinor, versionPatch.
 func ParseExecutionClientVersion(clientVersion string) (implementation, version, versionMajor, versionMinor, versionPatch string) {
 	if clientVersion == "" {
