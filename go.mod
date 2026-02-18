@@ -10,12 +10,12 @@ require (
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0
 	github.com/ethereum/go-ethereum v1.16.7
 	github.com/ethpandaops/beacon v0.65.0
-	github.com/ethpandaops/ethereum-package-go v0.8.0
+	github.com/ethpandaops/ethereum-package-go v0.8.2-0.20260218210947-b86bea76c8e0
 	github.com/ethpandaops/ethwallclock v0.4.0
 	github.com/go-co-op/gocron/v2 v2.16.6
 	github.com/golang/snappy v1.0.0
 	github.com/jellydator/ttlcache/v3 v3.4.0
-	github.com/kurtosis-tech/kurtosis/api/golang v1.11.1
+	github.com/kurtosis-tech/kurtosis/api/golang v1.15.2
 	github.com/libp2p/go-libp2p v0.41.1
 	github.com/libp2p/go-libp2p-mplex v0.11.0
 	github.com/libp2p/go-libp2p-pubsub v0.14.2
