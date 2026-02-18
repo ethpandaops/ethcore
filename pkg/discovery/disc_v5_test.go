@@ -390,7 +390,11 @@ func TestDiscV5_ConcurrentOperations(t *testing.T) {
 }
 
 // Test concurrent Start/Stop operations.
+// Skipped under race detector due to upstream go-ethereum data race:
+// https://github.com/ethereum/go-ethereum/issues/31460
 func TestDiscV5_ConcurrentStartStop(t *testing.T) {
+	SkipIfRace(t)
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
