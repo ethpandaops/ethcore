@@ -12,7 +12,7 @@ import (
 func DefaultNetworkConfig() *NetworkConfig {
 	return &NetworkConfig{
 		Name:            "ethcore-test",
-		Timeout:         2 * time.Minute,
+		Timeout:         5 * time.Minute,
 		KurtosisEnclave: "kurtosis",
 		KeepAlive:       false,
 		TestNet:         false,

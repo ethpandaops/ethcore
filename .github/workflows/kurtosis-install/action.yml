@@ -12,9 +12,12 @@ runs:
         echo "Installing Kurtosis version: $KURTOSIS_VERSION"
         echo "KURTOSIS_VERSION=$KURTOSIS_VERSION" >> $GITHUB_ENV
 
-        echo "deb [trusted=yes] https://apt.fury.io/kurtosis-tech/ /" | sudo tee /etc/apt/sources.list.d/kurtosis.list
-        sudo apt update
-        sudo apt install kurtosis-cli=$KURTOSIS_VERSION -V
+        # Install from GitHub release tarball (apt.fury.io doesn't always have the latest version)
+        curl -sL "https://github.com/kurtosis-tech/kurtosis-cli-release-artifacts/releases/download/${KURTOSIS_VERSION}/kurtosis-cli_${KURTOSIS_VERSION}_linux_amd64.tar.gz" -o /tmp/kurtosis.tar.gz
+        tar -xzf /tmp/kurtosis.tar.gz -C /tmp
+        sudo mv /tmp/kurtosis /usr/local/bin/kurtosis
+        rm /tmp/kurtosis.tar.gz
+        echo "Installed kurtosis $(kurtosis version)"
         kurtosis analytics disable
         kurtosis engine start
 

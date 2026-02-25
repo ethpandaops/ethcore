@@ -112,7 +112,7 @@ func (r *ReqResp) WriteRequestBytes(ctx context.Context, stream network.Stream, 
 				break
 			}
 
-			varintBuf = append(varintBuf, byte(length&0x7F|0x80))
+			varintBuf = append(varintBuf, byte(length&0x7F|0x80)) //nolint:gosec // varint encoding intentionally uses low bits only
 			length >>= 7
 		}
 

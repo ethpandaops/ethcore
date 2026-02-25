@@ -49,7 +49,7 @@ func (c *Client) sendBlockHeaders(ctx context.Context, bh *BlockHeaders) error {
 	c.log.WithFields(logrus.Fields{
 		"code":          BlockHeadersCode,
 		"request_id":    bh.RequestId,
-		"headers_count": len(bh.BlockHeadersRequest),
+		"headers_count": bh.List.Len(),
 	}).Debug("sending BlockHeaders")
 
 	encodedData, err := rlp.EncodeToBytes(bh)

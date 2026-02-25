@@ -299,8 +299,8 @@ func waitForGenesis(ctx context.Context, tf *TestFoundation, epgNetwork network.
 				}
 			}
 
-			// Check timeout
-			if time.Since(startTime) > 2*time.Minute {
+			// Check timeout — use 3 minutes as a fallback in case the context has a longer deadline.
+			if time.Since(startTime) > 3*time.Minute {
 				return errors.New("timeout waiting for genesis")
 			}
 

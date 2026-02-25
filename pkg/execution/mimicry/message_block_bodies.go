@@ -24,7 +24,7 @@ func (c *Client) sendBlockBodies(ctx context.Context, bh *BlockBodies) error {
 	c.log.WithFields(logrus.Fields{
 		"code":         BlockBodiesCode,
 		"request_id":   bh.RequestId,
-		"bodies_count": len(bh.BlockBodiesResponse),
+		"bodies_count": bh.List.Len(),
 	}).Debug("sending BlockBodies")
 
 	encodedData, err := rlp.EncodeToBytes(bh)

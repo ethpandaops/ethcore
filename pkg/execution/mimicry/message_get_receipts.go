@@ -38,21 +38,24 @@ func (c *Client) handleGetReceipts(ctx context.Context, code uint64, data []byte
 	}
 
 	var receipts Receipts
+
 	if c.ethCapVersion == 68 {
-		receipts = &Receipts68{
-			ReceiptsPacket: eth.ReceiptsPacket[*eth.ReceiptList68]{
-				RequestId: blockBodies.RequestId,
-				List:      []*eth.ReceiptList68{eth.NewReceiptList68([]*types.Receipt{})},
-			},
+		pkt := eth.ReceiptsPacket[*eth.ReceiptList68]{RequestId: blockBodies.RequestId}
+
+		if appendErr := pkt.List.Append(eth.NewReceiptList68([]*types.Receipt{})); appendErr != nil {
+			return fmt.Errorf("error constructing empty receipts68: %w", appendErr)
 		}
+
+		receipts = &Receipts68{ReceiptsPacket: pkt}
 	} else {
 		// Default to eth/69
-		receipts = &Receipts69{
-			ReceiptsPacket: eth.ReceiptsPacket[*eth.ReceiptList69]{
-				RequestId: blockBodies.RequestId,
-				List:      []*eth.ReceiptList69{eth.NewReceiptList69([]*types.Receipt{})},
-			},
+		pkt := eth.ReceiptsPacket[*eth.ReceiptList69]{RequestId: blockBodies.RequestId}
+
+		if appendErr := pkt.List.Append(eth.NewReceiptList69([]*types.Receipt{})); appendErr != nil {
+			return fmt.Errorf("error constructing empty receipts69: %w", appendErr)
 		}
+
+		receipts = &Receipts69{ReceiptsPacket: pkt}
 	}
 
 	err = c.sendReceipts(ctx, receipts)
