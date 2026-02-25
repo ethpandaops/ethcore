@@ -38,18 +38,21 @@ func (c *Client) handleGetReceipts(ctx context.Context, code uint64, data []byte
 	}
 
 	var receipts Receipts
+
 	if c.ethCapVersion == 68 {
 		pkt := eth.ReceiptsPacket[*eth.ReceiptList68]{RequestId: blockBodies.RequestId}
-		if err := pkt.List.Append(eth.NewReceiptList68([]*types.Receipt{})); err != nil {
-			return fmt.Errorf("error constructing empty receipts68: %w", err)
+
+		if appendErr := pkt.List.Append(eth.NewReceiptList68([]*types.Receipt{})); appendErr != nil {
+			return fmt.Errorf("error constructing empty receipts68: %w", appendErr)
 		}
 
 		receipts = &Receipts68{ReceiptsPacket: pkt}
 	} else {
 		// Default to eth/69
 		pkt := eth.ReceiptsPacket[*eth.ReceiptList69]{RequestId: blockBodies.RequestId}
-		if err := pkt.List.Append(eth.NewReceiptList69([]*types.Receipt{})); err != nil {
-			return fmt.Errorf("error constructing empty receipts69: %w", err)
+
+		if appendErr := pkt.List.Append(eth.NewReceiptList69([]*types.Receipt{})); appendErr != nil {
+			return fmt.Errorf("error constructing empty receipts69: %w", appendErr)
 		}
 
 		receipts = &Receipts69{ReceiptsPacket: pkt}
