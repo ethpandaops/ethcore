@@ -37,8 +37,7 @@ func (c *Client) handleGetBlockBodies(ctx context.Context, code uint64, data []b
 	}
 
 	err = c.sendBlockBodies(ctx, &BlockBodies{
-		RequestId:           blockBodies.RequestId,
-		BlockBodiesResponse: []*eth.BlockBody{},
+		RequestId: blockBodies.RequestId,
 	})
 	if err != nil {
 		return err

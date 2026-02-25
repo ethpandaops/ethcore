@@ -48,11 +48,11 @@ func (c *Client) sendReceipts(ctx context.Context, r Receipts) error {
 	switch receipts := r.(type) {
 	case *Receipts68:
 		requestID = receipts.RequestId
-		listCount = len(receipts.List)
+		listCount = receipts.List.Len()
 		encodedData, err = rlp.EncodeToBytes(&receipts.ReceiptsPacket)
 	case *Receipts69:
 		requestID = receipts.RequestId
-		listCount = len(receipts.List)
+		listCount = receipts.List.Len()
 		encodedData, err = rlp.EncodeToBytes(&receipts.ReceiptsPacket)
 	default:
 		return fmt.Errorf("unsupported receipts type: %T", r)
