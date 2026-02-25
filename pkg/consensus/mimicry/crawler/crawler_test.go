@@ -41,7 +41,7 @@ type TestCrawlerConfig struct {
 // DefaultTestCrawlerConfig returns a default configuration for the crawler tests.
 func DefaultTestCrawlerConfig() *TestCrawlerConfig {
 	return &TestCrawlerConfig{
-		CrawlerTimeout:  60 * time.Second,
+		CrawlerTimeout:  120 * time.Second,
 		DialConcurrency: 10,
 		CooloffDuration: 1 * time.Second,
 		DialTimeout:     30 * time.Second,

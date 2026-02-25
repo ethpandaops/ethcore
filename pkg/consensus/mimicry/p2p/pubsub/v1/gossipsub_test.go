@@ -121,15 +121,16 @@ func (ti *TestInfrastructure) CreateNode(ctx context.Context, opts ...v1.Option)
 	nodeCtx, cancel := context.WithCancel(ctx)
 
 	// Create gossipsub instance with default options
-	defaultOpts := []v1.Option{
+	defaultOpts := make([]v1.Option, 0, 3+len(opts))
+	defaultOpts = append(defaultOpts,
 		v1.WithLogger(logrus.StandardLogger().WithField("test", "node").WithField("peer", h.ID().ShortString())),
-		v1.WithPublishTimeout(5 * time.Second),
+		v1.WithPublishTimeout(5*time.Second),
 		v1.WithPubsubOptions(
 			pubsub.WithMaxMessageSize(1<<20), // 1MB
 			pubsub.WithValidateWorkers(10),
 			pubsub.WithValidateThrottle(10),
 		),
-	}
+	)
 
 	// Append user options
 	defaultOpts = append(defaultOpts, opts...)

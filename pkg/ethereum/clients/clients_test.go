@@ -86,6 +86,16 @@ func TestClientFromString(t *testing.T) {
 			input:    "ethereumjs",
 			expected: ClientEthereumJS,
 		},
+		{
+			name:     "ethrex exact match",
+			input:    "ethrex",
+			expected: ClientEthrex,
+		},
+		{
+			name:     "tysm exact match",
+			input:    "tysm",
+			expected: ClientTysm,
+		},
 		// Partial matches (contains)
 		{
 			name:     "lighthouse in user agent",
@@ -176,12 +186,14 @@ func TestClientConstants(t *testing.T) {
 		ClientLodestar:   "lodestar",
 		ClientGrandine:   "grandine",
 		ClientCaplin:     "caplin",
+		ClientTysm:       "tysm",
 		ClientGeth:       "geth",
 		ClientBesu:       "besu",
 		ClientNethermind: "nethermind",
 		ClientErigon:     "erigon",
 		ClientReth:       "reth",
 		ClientEthereumJS: "ethereumjs",
+		ClientEthrex:     "ethrex",
 	}
 
 	for client, expected := range expectedConstants {
@@ -200,6 +212,7 @@ func TestAllConsensusClients(t *testing.T) {
 		ClientLodestar,
 		ClientGrandine,
 		ClientCaplin,
+		ClientTysm,
 	}
 
 	if len(AllConsensusClients) != len(expectedConsensusClients) {
@@ -221,6 +234,7 @@ func TestAllExecutionClients(t *testing.T) {
 		ClientErigon,
 		ClientReth,
 		ClientEthereumJS,
+		ClientEthrex,
 	}
 
 	if len(AllExecutionClients) != len(expectedExecutionClients) {
@@ -255,6 +269,7 @@ func TestAllClients(t *testing.T) {
 		ClientLodestar,
 		ClientGrandine,
 		ClientCaplin,
+		ClientTysm,
 	}
 
 	for _, client := range consensusOnlyClients {
@@ -270,8 +285,8 @@ func TestAllClients(t *testing.T) {
 		}
 	}
 
-	// Check expected total count (1 unknown + 7 consensus-only + 6 execution = 14)
-	expectedCount := 14
+	// Check expected total count (1 unknown + 8 consensus-only + 7 execution = 16)
+	expectedCount := 16
 	if len(AllClients) != expectedCount {
 		t.Errorf("AllClients length = %d, want %d", len(AllClients), expectedCount)
 	}
@@ -301,12 +316,14 @@ func TestClientIdentifiersConsistency(t *testing.T) {
 		ClientLodestar,
 		ClientGrandine,
 		ClientCaplin,
+		ClientTysm,
 		ClientGeth,
 		ClientBesu,
 		ClientNethermind,
 		ClientErigon,
 		ClientReth,
 		ClientEthereumJS,
+		ClientEthrex,
 	}
 
 	for _, client := range allDefinedClients {
