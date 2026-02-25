@@ -163,10 +163,6 @@ func setupKurtosisNetwork(ctx context.Context, config *NetworkConfig) (*TestFoun
 		opts = append(opts, ethereum.WithGlobalLogLevel("debug"))
 	}
 
-	// Pin ethereum-package to a known-good release for test stability.
-	// v6.0.0+ uses store_service_files(depends_on=...) which requires a newer Kurtosis CLI.
-	opts = append(opts, ethereum.WithPackageVersion("5.0.1"))
-
 	// Ensure we use pass-through cache.
 	opts = append(opts, ethereum.WithDockerCacheParams(true, "docker.ethquokkaops.io"))
 
