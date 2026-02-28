@@ -19,6 +19,16 @@ func (msg *NewPooledTransactionHashes) Code() int { return NewPooledTransactionH
 
 func (msg *NewPooledTransactionHashes) ReqID() uint64 { return 0 }
 
+// decodeNewPooledTransactionHashes decodes a NewPooledTransactionHashes message from RLP-encoded data.
+func decodeNewPooledTransactionHashes(data []byte) (*NewPooledTransactionHashes, error) {
+	s := new(NewPooledTransactionHashes)
+	if err := rlp.DecodeBytes(data, &s); err != nil {
+		return nil, fmt.Errorf("error decoding new pooled transaction hashes: %w", err)
+	}
+
+	return s, nil
+}
+
 func (c *Client) receiveNewPooledTransactionHashes(ctx context.Context, data []byte) (*NewPooledTransactionHashes, error) {
 	s := new(NewPooledTransactionHashes)
 	if err := rlp.DecodeBytes(data, &s); err != nil {

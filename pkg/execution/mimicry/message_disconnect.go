@@ -20,6 +20,25 @@ func (h *Disconnect) Code() int { return DisconnectCode }
 
 func (h *Disconnect) ReqID() uint64 { return 0 }
 
+// decodeDisconnect decodes a Disconnect message from RLP-encoded data.
+func decodeDisconnect(data []byte) (*Disconnect, error) {
+	d := new(p2p.DiscReason)
+
+	if len(data) > 0 {
+		reason := data[0:1]
+		// besu sends 2 byte disconnect message
+		if len(data) > 1 {
+			reason = data[1:2]
+		}
+
+		if err := rlp.DecodeBytes(reason, &d); err != nil {
+			return nil, err
+		}
+	}
+
+	return &Disconnect{Reason: *d}, nil
+}
+
 func (c *Client) receiveDisconnect(ctx context.Context, data []byte) *Disconnect {
 	d := new(p2p.DiscReason)
 
