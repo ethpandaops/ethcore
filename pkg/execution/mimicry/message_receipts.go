@@ -14,27 +14,19 @@ const (
 	ReceiptsCode = RLPXOffset + eth.ReceiptsMsg
 )
 
-// Receipts is a wrapper interface for both ReceiptsPacket68 and ReceiptsPacket69.
+// Receipts is a wrapper interface for ReceiptsPacket.
 type Receipts interface {
 	Code() int
 	ReqID() uint64
 }
 
-type Receipts68 struct {
-	eth.ReceiptsPacket[*eth.ReceiptList68]
+type ReceiptsData struct {
+	eth.ReceiptsPacket
 }
 
-type Receipts69 struct {
-	eth.ReceiptsPacket[*eth.ReceiptList69]
-}
+func (msg *ReceiptsData) Code() int { return ReceiptsCode }
 
-func (msg *Receipts68) Code() int { return ReceiptsCode }
-
-func (msg *Receipts68) ReqID() uint64 { return msg.RequestId }
-
-func (msg *Receipts69) Code() int { return ReceiptsCode }
-
-func (msg *Receipts69) ReqID() uint64 { return msg.RequestId }
+func (msg *ReceiptsData) ReqID() uint64 { return msg.RequestId }
 
 func (c *Client) sendReceipts(ctx context.Context, r Receipts) error {
 	var requestID uint64
@@ -46,11 +38,7 @@ func (c *Client) sendReceipts(ctx context.Context, r Receipts) error {
 	var err error
 
 	switch receipts := r.(type) {
-	case *Receipts68:
-		requestID = receipts.RequestId
-		listCount = receipts.List.Len()
-		encodedData, err = rlp.EncodeToBytes(&receipts.ReceiptsPacket)
-	case *Receipts69:
+	case *ReceiptsData:
 		requestID = receipts.RequestId
 		listCount = receipts.List.Len()
 		encodedData, err = rlp.EncodeToBytes(&receipts.ReceiptsPacket)

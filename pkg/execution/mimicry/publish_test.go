@@ -93,7 +93,7 @@ func TestOnHello(t *testing.T) {
 		Version: P2PProtocolVersion,
 		Name:    "peer-client",
 		Caps: []p2p.Cap{
-			{Name: ETHCapName, Version: 68},
+			{Name: ETHCapName, Version: 69},
 		},
 		ListenPort: 30303,
 		ID:         make([]byte, 64),
@@ -136,9 +136,9 @@ func TestOnStatus(t *testing.T) {
 	})
 
 	// Publish a status event
-	expectedStatus := &Status68{
-		StatusPacket68: eth.StatusPacket68{
-			ProtocolVersion: 68,
+	expectedStatus := &Status69{
+		StatusPacket: eth.StatusPacket{
+			ProtocolVersion: 69,
 			NetworkID:       1,
 		},
 	}

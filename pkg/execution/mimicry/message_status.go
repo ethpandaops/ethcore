@@ -14,7 +14,7 @@ const (
 	StatusCode = RLPXOffset + eth.StatusMsg
 )
 
-// Status is a wrapper interface for both StatusPacket68 and StatusPacket69.
+// Status is a wrapper interface for StatusPacket.
 type Status interface {
 	Code() int
 	ReqID() uint64
@@ -25,27 +25,9 @@ type Status interface {
 	GetForkIDNext() uint64
 }
 
-type Status68 struct {
-	eth.StatusPacket68
-}
-
 type Status69 struct {
-	eth.StatusPacket69
+	eth.StatusPacket
 }
-
-func (msg *Status68) Code() int { return StatusCode }
-
-func (msg *Status68) ReqID() uint64 { return 0 }
-
-func (msg *Status68) GetGenesis() []byte { return msg.Genesis[:] }
-
-func (msg *Status68) GetHead() []byte { return msg.Head[:] }
-
-func (msg *Status68) GetNetworkID() uint64 { return msg.NetworkID }
-
-func (msg *Status68) GetForkIDHash() []byte { return msg.ForkID.Hash[:] }
-
-func (msg *Status68) GetForkIDNext() uint64 { return msg.ForkID.Next }
 
 func (msg *Status69) Code() int { return StatusCode }
 
@@ -62,19 +44,9 @@ func (msg *Status69) GetForkIDHash() []byte { return msg.ForkID.Hash[:] }
 func (msg *Status69) GetForkIDNext() uint64 { return msg.ForkID.Next }
 
 func (c *Client) receiveStatus(ctx context.Context, data []byte) (Status, error) {
-	if c.ethCapVersion == 68 {
-		s := new(Status68)
-		if err := rlp.DecodeBytes(data, &s.StatusPacket68); err != nil {
-			return nil, fmt.Errorf("error decoding status68: %w", err)
-		}
-
-		return s, nil
-	}
-
-	// Default to eth/69
 	s := new(Status69)
-	if err := rlp.DecodeBytes(data, &s.StatusPacket69); err != nil {
-		return nil, fmt.Errorf("error decoding status69: %w", err)
+	if err := rlp.DecodeBytes(data, &s.StatusPacket); err != nil {
+		return nil, fmt.Errorf("error decoding status: %w", err)
 	}
 
 	return s, nil
@@ -92,10 +64,8 @@ func (c *Client) sendStatus(ctx context.Context, status Status) error {
 	var err error
 
 	switch s := status.(type) {
-	case *Status68:
-		encodedData, err = rlp.EncodeToBytes(&s.StatusPacket68)
 	case *Status69:
-		encodedData, err = rlp.EncodeToBytes(&s.StatusPacket69)
+		encodedData, err = rlp.EncodeToBytes(&s.StatusPacket)
 	default:
 		return fmt.Errorf("unsupported status type: %T", status)
 	}

@@ -15,7 +15,7 @@ const (
 	HelloCode             = 0x00
 	P2PProtocolVersion    = 5
 	minP2PProtocolVersion = 5
-	minETHProtocolVersion = uint(68)
+	minETHProtocolVersion = uint(69)
 	maxETHProtocolVersion = uint(69)
 	ETHCapName            = "eth"
 )
@@ -82,7 +82,7 @@ func (h *Hello) ETHProtocolVersion() uint {
 
 	for _, cap := range h.Caps {
 		if cap.Name == ETHCapName {
-			if cap.Version > highestETHProtocolVersion && cap.Version <= maxETHProtocolVersion {
+			if cap.Version >= minETHProtocolVersion && cap.Version > highestETHProtocolVersion && cap.Version <= maxETHProtocolVersion {
 				highestETHProtocolVersion = cap.Version
 			}
 		}

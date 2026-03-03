@@ -19,7 +19,7 @@ func TestP2PProtocolVersionConstants(t *testing.T) {
 }
 
 func TestETHProtocolVersionConstants(t *testing.T) {
-	assert.Equal(t, uint(68), minETHProtocolVersion)
+	assert.Equal(t, uint(69), minETHProtocolVersion)
 	assert.Equal(t, uint(69), maxETHProtocolVersion)
 }
 

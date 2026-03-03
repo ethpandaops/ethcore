@@ -28,53 +28,11 @@ func TestHelloValidate(t *testing.T) {
 		errMsg  string
 	}{
 		{
-			name: "valid hello with ETH 68",
+			name: "valid hello with ETH 69",
 			hello: &Hello{
 				Version: P2PProtocolVersion,
 				Name:    "test-client",
 				Caps: []p2p.Cap{
-					{Name: ETHCapName, Version: 68},
-				},
-				ListenPort: 30303,
-				ID:         make([]byte, 64),
-			},
-			wantErr: false,
-		},
-		{
-			name: "valid hello with ETH 68 and 69",
-			hello: &Hello{
-				Version: P2PProtocolVersion,
-				Name:    "test-client",
-				Caps: []p2p.Cap{
-					{Name: ETHCapName, Version: 68},
-					{Name: ETHCapName, Version: 69},
-				},
-				ListenPort: 30303,
-				ID:         make([]byte, 64),
-			},
-			wantErr: false,
-		},
-		{
-			name: "ETH 69 only without ETH 68 is invalid",
-			hello: &Hello{
-				Version: P2PProtocolVersion,
-				Name:    "test-client",
-				Caps: []p2p.Cap{
-					{Name: ETHCapName, Version: 69},
-				},
-				ListenPort: 30303,
-				ID:         make([]byte, 64),
-			},
-			wantErr: true,
-			errMsg:  "peer is using unsupported eth protocol version",
-		},
-		{
-			name: "valid hello with multiple ETH versions",
-			hello: &Hello{
-				Version: P2PProtocolVersion,
-				Name:    "test-client",
-				Caps: []p2p.Cap{
-					{Name: ETHCapName, Version: 68},
 					{Name: ETHCapName, Version: 69},
 				},
 				ListenPort: 30303,
@@ -89,7 +47,7 @@ func TestHelloValidate(t *testing.T) {
 				Name:    "test-client",
 				Caps: []p2p.Cap{
 					{Name: "snap", Version: 1},
-					{Name: ETHCapName, Version: 68},
+					{Name: ETHCapName, Version: 69},
 					{Name: "les", Version: 4},
 				},
 				ListenPort: 30303,
@@ -103,7 +61,7 @@ func TestHelloValidate(t *testing.T) {
 				Version: 4, // Less than minP2PProtocolVersion (5)
 				Name:    "test-client",
 				Caps: []p2p.Cap{
-					{Name: ETHCapName, Version: 68},
+					{Name: ETHCapName, Version: 69},
 				},
 				ListenPort: 30303,
 				ID:         make([]byte, 64),
@@ -144,7 +102,7 @@ func TestHelloValidate(t *testing.T) {
 				Version: P2PProtocolVersion,
 				Name:    "test-client",
 				Caps: []p2p.Cap{
-					{Name: ETHCapName, Version: 67}, // Below minETHProtocolVersion (68)
+					{Name: ETHCapName, Version: 67},
 				},
 				ListenPort: 30303,
 				ID:         make([]byte, 64),
@@ -159,6 +117,20 @@ func TestHelloValidate(t *testing.T) {
 				Name:    "test-client",
 				Caps: []p2p.Cap{
 					{Name: ETHCapName, Version: 70}, // Above maxETHProtocolVersion
+				},
+				ListenPort: 30303,
+				ID:         make([]byte, 64),
+			},
+			wantErr: true,
+			errMsg:  "peer is using unsupported eth protocol version",
+		},
+		{
+			name: "ETH 68 only is now invalid",
+			hello: &Hello{
+				Version: P2PProtocolVersion,
+				Name:    "test-client",
+				Caps: []p2p.Cap{
+					{Name: ETHCapName, Version: 68},
 				},
 				ListenPort: 30303,
 				ID:         make([]byte, 64),
@@ -189,13 +161,6 @@ func TestHelloETHProtocolVersion(t *testing.T) {
 		expected uint
 	}{
 		{
-			name: "ETH 68 only",
-			caps: []p2p.Cap{
-				{Name: ETHCapName, Version: 68},
-			},
-			expected: 68,
-		},
-		{
 			name: "ETH 69 only",
 			caps: []p2p.Cap{
 				{Name: ETHCapName, Version: 69},
@@ -203,17 +168,15 @@ func TestHelloETHProtocolVersion(t *testing.T) {
 			expected: 69,
 		},
 		{
-			name: "ETH 68 and 69 returns highest supported",
+			name: "ETH 68 is ignored since it exceeds max range",
 			caps: []p2p.Cap{
 				{Name: ETHCapName, Version: 68},
-				{Name: ETHCapName, Version: 69},
 			},
-			expected: 69,
+			expected: 0,
 		},
 		{
 			name: "ETH 70 unsupported returns max supported 69",
 			caps: []p2p.Cap{
-				{Name: ETHCapName, Version: 68},
 				{Name: ETHCapName, Version: 69},
 				{Name: ETHCapName, Version: 70},
 			},
@@ -243,10 +206,10 @@ func TestHelloETHProtocolVersion(t *testing.T) {
 			name: "mixed caps returns correct ETH version",
 			caps: []p2p.Cap{
 				{Name: "snap", Version: 1},
-				{Name: ETHCapName, Version: 68},
+				{Name: ETHCapName, Version: 69},
 				{Name: "les", Version: 4},
 			},
-			expected: 68,
+			expected: 69,
 		},
 	}
 
@@ -268,17 +231,9 @@ func TestHelloETHCap(t *testing.T) {
 		{
 			name: "returns ETH cap when present",
 			caps: []p2p.Cap{
-				{Name: ETHCapName, Version: 68},
-			},
-			expected: &p2p.Cap{Name: ETHCapName, Version: 68},
-		},
-		{
-			name: "returns first ETH cap when multiple present",
-			caps: []p2p.Cap{
-				{Name: ETHCapName, Version: 68},
 				{Name: ETHCapName, Version: 69},
 			},
-			expected: &p2p.Cap{Name: ETHCapName, Version: 68},
+			expected: &p2p.Cap{Name: ETHCapName, Version: 69},
 		},
 		{
 			name: "returns nil when no ETH cap",
@@ -321,13 +276,10 @@ func TestHelloETHCap(t *testing.T) {
 func TestSupportedEthCaps(t *testing.T) {
 	caps := SupportedEthCaps()
 
-	require.Len(t, caps, 2, "should support ETH 68 and 69")
+	require.Len(t, caps, 1, "should support ETH 69 only")
 
 	assert.Equal(t, ETHCapName, caps[0].Name)
-	assert.Equal(t, uint(68), caps[0].Version)
-
-	assert.Equal(t, ETHCapName, caps[1].Name)
-	assert.Equal(t, uint(69), caps[1].Version)
+	assert.Equal(t, uint(69), caps[0].Version)
 }
 
 func TestHelloRLPEncoding(t *testing.T) {
@@ -335,7 +287,6 @@ func TestHelloRLPEncoding(t *testing.T) {
 		Version: P2PProtocolVersion,
 		Name:    "test-client/v1.0.0",
 		Caps: []p2p.Cap{
-			{Name: ETHCapName, Version: 68},
 			{Name: ETHCapName, Version: 69},
 		},
 		ListenPort: 30303,
@@ -376,7 +327,7 @@ func TestHelloRLPEncodingWithRest(t *testing.T) {
 		Version: P2PProtocolVersion,
 		Name:    "test-client",
 		Caps: []p2p.Cap{
-			{Name: ETHCapName, Version: 68},
+			{Name: ETHCapName, Version: 69},
 		},
 		ListenPort: 30303,
 		ID:         make([]byte, 64),
