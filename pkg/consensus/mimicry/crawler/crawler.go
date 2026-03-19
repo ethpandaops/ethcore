@@ -133,7 +133,7 @@ func (c *Crawler) Start(ctx context.Context) error {
 	}).Info("Starting crawler")
 
 	// Create internal context for cancellation
-	c.ctx, c.cancel = context.WithCancel(ctx)
+	c.ctx, c.cancel = context.WithCancel(ctx) //nolint:gosec // cancel is stored in c.cancel and called in Stop()
 
 	// Start the duplicate cache
 	if err := c.duplicateCache.Start(c.ctx); err != nil {

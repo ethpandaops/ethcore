@@ -255,7 +255,7 @@ func waitForGenesis(ctx context.Context, tf *TestFoundation, epgNetwork network.
 
 	// Start the beacon node with a background context
 	// We'll stop it manually when we're done
-	go func() {
+	go func() { //nolint:gosec // intentionally using background context; beacon node is stopped manually via defer
 		if err := tempBeacon.Start(context.Background()); err != nil {
 			tf.Logger.WithError(err).Warn("Temporary beacon node error during genesis check")
 		}

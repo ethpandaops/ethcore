@@ -265,7 +265,7 @@ func newProcessor[T any](ctx context.Context, topic *Topic[T], handler *HandlerC
 	}
 
 	// Create a cancellable context for this processor
-	procCtx, cancel := context.WithCancel(ctx)
+	procCtx, cancel := context.WithCancel(ctx) //nolint:gosec // cancel is stored in processor.cancel and called on shutdown
 
 	p := &processor[T]{
 		handler:                     handler,

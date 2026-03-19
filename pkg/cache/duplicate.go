@@ -122,7 +122,7 @@ func NewDuplicateCache[K comparable, V any](log logrus.FieldLogger, ttl time.Dur
 
 // Start initializes the cache and begins background cleanup operations.
 func (d *duplicateCache[K, V]) Start(ctx context.Context) error {
-	ctx, d.cancel = context.WithCancel(ctx)
+	ctx, d.cancel = context.WithCancel(ctx) //nolint:gosec // cancel is stored in d.cancel and called in Stop()
 
 	go func() {
 		d.cache.Start()
