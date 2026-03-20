@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ethpandaops/ethcore/pkg/consensus/mimicry/p2p/eth"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/sirupsen/logrus"
@@ -28,16 +29,9 @@ func (c *Crawler) handleStatus(ctx context.Context, stream network.Stream) error
 		}
 	}()
 
-	var theirStatus common.Status
-
-	err := c.reqResp.ReadRequest(ctx, stream, &theirStatus)
+	// Decode the incoming status based on the negotiated protocol version.
+	theirStatus, err := c.readIncomingStatus(ctx, stream, logCtx)
 	if err != nil {
-		logCtx.WithError(err).Error("Failed to decode status message")
-
-		if errr := c.reqResp.WriteResponse(ctx, stream, nil, errors.New("failed to decode request body")); errr != nil {
-			logCtx.WithError(errr).Debug("Failed to send status response in response to decode error")
-		}
-
 		return err
 	}
 
@@ -74,7 +68,68 @@ func (c *Crawler) handleStatus(ctx context.Context, stream network.Stream) error
 		})
 	}
 
-	if err := c.reqResp.WriteResponse(ctx, stream, &status, nil); err != nil {
+	// Respond with our status in the same protocol version the peer used.
+	if err := c.writeStatusResponse(ctx, stream, &status, logCtx); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// readIncomingStatus decodes a status request from the stream, handling both v1 and v2.
+func (c *Crawler) readIncomingStatus(
+	ctx context.Context,
+	stream network.Stream,
+	logCtx *logrus.Entry,
+) (*common.Status, error) {
+	if stream.Protocol() == eth.StatusV2ProtocolID {
+		var v2 eth.StatusV2
+		if err := c.reqResp.ReadRequest(ctx, stream, &v2); err != nil {
+			logCtx.WithError(err).Error("Failed to decode status v2 message")
+
+			if errr := c.reqResp.WriteResponse(ctx, stream, nil, errors.New("failed to decode request body")); errr != nil {
+				logCtx.WithError(errr).Debug("Failed to send error response")
+			}
+
+			return nil, err
+		}
+
+		return v2.ToV1(), nil
+	}
+
+	var v1 common.Status
+	if err := c.reqResp.ReadRequest(ctx, stream, &v1); err != nil {
+		logCtx.WithError(err).Error("Failed to decode status message")
+
+		if errr := c.reqResp.WriteResponse(ctx, stream, nil, errors.New("failed to decode request body")); errr != nil {
+			logCtx.WithError(errr).Debug("Failed to send error response")
+		}
+
+		return nil, err
+	}
+
+	return &v1, nil
+}
+
+// writeStatusResponse writes our status in the protocol version the peer used.
+func (c *Crawler) writeStatusResponse(
+	ctx context.Context,
+	stream network.Stream,
+	status *common.Status,
+	logCtx *logrus.Entry,
+) error {
+	if stream.Protocol() == eth.StatusV2ProtocolID {
+		v2 := eth.StatusV2FromV1(status)
+		if err := c.reqResp.WriteResponse(ctx, stream, v2, nil); err != nil {
+			logCtx.WithError(err).Debug("Failed to send status v2 response")
+
+			return err
+		}
+
+		return nil
+	}
+
+	if err := c.reqResp.WriteResponse(ctx, stream, status, nil); err != nil {
 		logCtx.WithError(err).Debug("Failed to send status response")
 
 		return err
@@ -202,14 +257,24 @@ func (c *Crawler) handleMetadata(ctx context.Context, stream network.Stream) err
 		}
 	}()
 
-	// Metadata requests have no content per the Ethereum consensus spec
-	// The request opens and negotiates the stream without sending any request content
-	// We immediately respond with our local metadata
+	// Metadata requests have no content per the Ethereum consensus spec.
+	// Respond with the appropriate version based on the negotiated protocol.
 	logCtx.Debug("Received metadata request")
 
-	resp := c.metadata
+	if stream.Protocol() == eth.MetaDataV3ProtocolID {
+		v3 := eth.MetaDataV3FromV2(c.metadata)
+		v3.CustodyGroupCount = eth.DefaultCustodyGroupCount
 
-	if err := c.reqResp.WriteResponse(ctx, stream, resp, nil); err != nil {
+		if err := c.reqResp.WriteResponse(ctx, stream, v3, nil); err != nil {
+			logCtx.WithError(err).Debug("Failed to send metadata v3 response")
+
+			return err
+		}
+
+		return nil
+	}
+
+	if err := c.reqResp.WriteResponse(ctx, stream, c.metadata, nil); err != nil {
 		logCtx.WithError(err).Debug("Failed to send metadata response")
 
 		return err

@@ -27,6 +27,7 @@ import (
 	"github.com/go-co-op/gocron/v2"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/protolambda/ztyp/tree"
 	"github.com/sirupsen/logrus"
@@ -597,73 +598,151 @@ func (c *Crawler) DisconnectFromPeer(ctx context.Context, peerID peer.ID, reason
 	return c.node.DisconnectFromPeer(ctx, peerID)
 }
 
+// RequestStatusFromPeer requests the consensus status from a peer.
+// It tries status/2 (Fulu) first, falling back to status/1 if the peer
+// does not support it.
 func (c *Crawler) RequestStatusFromPeer(ctx context.Context, peerID peer.ID) (*common.Status, error) {
 	status := c.GetStatus()
+	statusV2 := eth.StatusV2FromV1(&status)
 
-	req := &p2p.Request{
+	// Try status/2 first.
+	rspV2 := &eth.StatusV2{}
+
+	err := c.reqResp.SendRequest(ctx, &p2p.Request{
+		ProtocolID: eth.StatusV2ProtocolID,
+		PeerID:     peerID,
+		Payload:    statusV2,
+		Timeout:    time.Second * 30,
+	}, rspV2)
+	if err == nil {
+		result := rspV2.ToV1()
+		if status.ForkDigest != result.ForkDigest {
+			c.emitPeerStatusUpdated(&PeerStatusUpdated{
+				PeerID: peerID,
+				ENR:    c.GetPeerENR(peerID),
+				Status: result,
+			})
+		}
+
+		return result, nil
+	}
+
+	// Fall back to status/1 if the peer doesn't support status/2.
+	if !isStreamCreationError(err) {
+		c.recordRequestError(eth.StatusV2ProtocolID, err)
+
+		return nil, fmt.Errorf("failed to send status v2 request: %w", err)
+	}
+
+	c.log.WithField("peer", peerID).Debug("Peer does not support status/2, falling back to status/1")
+
+	rspV1 := &common.Status{}
+
+	if err := c.reqResp.SendRequest(ctx, &p2p.Request{
 		ProtocolID: eth.StatusV1ProtocolID,
 		PeerID:     peerID,
 		Payload:    &status,
 		Timeout:    time.Second * 30,
+	}, rspV1); err != nil {
+		c.recordRequestError(eth.StatusV1ProtocolID, err)
+
+		return nil, fmt.Errorf("failed to send status v1 request: %w", err)
 	}
 
-	rsp := &common.Status{}
-
-	if err := c.reqResp.SendRequest(ctx, req, rsp); err != nil {
-		errType := &p2p.RequestError{}
-
-		if errors.As(err, &errType) {
-			c.metrics.RecordFailedRequest(string(req.ProtocolID), errType.Type)
-
-			return nil, fmt.Errorf("failed to send request: %w", err)
-		}
-
-		return nil, fmt.Errorf("failed to send request: %w", err)
-	}
-
-	if status.ForkDigest != rsp.ForkDigest {
+	if status.ForkDigest != rspV1.ForkDigest {
 		c.emitPeerStatusUpdated(&PeerStatusUpdated{
 			PeerID: peerID,
 			ENR:    c.GetPeerENR(peerID),
-			Status: rsp,
+			Status: rspV1,
 		})
 	}
 
-	return rsp, nil
+	return rspV1, nil
 }
 
+// RequestMetadataFromPeer requests metadata from a peer.
+// It tries metadata/3 (Fulu) first, falling back to metadata/2.
 func (c *Crawler) RequestMetadataFromPeer(ctx context.Context, peerID peer.ID) (*common.MetaData, error) {
 	c.log.WithField("peer", peerID.String()).Debug("Requesting metadata from peer")
 
-	// NOTE: Per the Ethereum consensus spec, metadata requests have NO payload.
-	// We must send nil as the payload to comply with the specification.
-	// See: https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/p2p-interface.md#getmetadata-v1
-	req := &p2p.Request{
-		ProtocolID: eth.MetaDataV2ProtocolID,
+	// Try metadata/3 first (no payload per spec).
+	rspV3 := &eth.MetaDataV3{}
+
+	err := c.reqResp.SendRequest(ctx, &p2p.Request{
+		ProtocolID: eth.MetaDataV3ProtocolID,
 		PeerID:     peerID,
-		Payload:    nil, // Metadata requests have no payload per spec
+		Payload:    nil,
 		Timeout:    time.Second * 30,
+	}, rspV3)
+	if err == nil {
+		result := rspV3.ToV2()
+
+		c.log.WithFields(logrus.Fields{
+			"peer":                peerID.String(),
+			"seq_number":          result.SeqNumber,
+			"attnets":             fmt.Sprintf("%x", result.Attnets),
+			"custody_group_count": rspV3.CustodyGroupCount,
+		}).Debug("Successfully received metadata v3")
+
+		c.emitMetadataReceived(&MetadataReceived{
+			PeerID:   peerID,
+			ENR:      c.GetPeerENR(peerID),
+			Metadata: result,
+		})
+
+		return result, nil
 	}
 
-	rsp := &common.MetaData{}
+	// Fall back to metadata/2 if the peer doesn't support metadata/3.
+	if !isStreamCreationError(err) {
+		return nil, fmt.Errorf("failed to send metadata v3 request: %w", err)
+	}
 
-	if err := c.reqResp.SendRequest(ctx, req, rsp); err != nil {
-		return nil, fmt.Errorf("failed to send request: %w", err)
+	c.log.WithField("peer", peerID).Debug("Peer does not support metadata/3, falling back to metadata/2")
+
+	rspV2 := &common.MetaData{}
+
+	if err := c.reqResp.SendRequest(ctx, &p2p.Request{
+		ProtocolID: eth.MetaDataV2ProtocolID,
+		PeerID:     peerID,
+		Payload:    nil,
+		Timeout:    time.Second * 30,
+	}, rspV2); err != nil {
+		return nil, fmt.Errorf("failed to send metadata v2 request: %w", err)
 	}
 
 	c.log.WithFields(logrus.Fields{
 		"peer":       peerID.String(),
-		"seq_number": rsp.SeqNumber,
-		"attnets":    fmt.Sprintf("%x", rsp.Attnets),
-	}).Debug("Successfully received metadata")
+		"seq_number": rspV2.SeqNumber,
+		"attnets":    fmt.Sprintf("%x", rspV2.Attnets),
+	}).Debug("Successfully received metadata v2")
 
 	c.emitMetadataReceived(&MetadataReceived{
 		PeerID:   peerID,
 		ENR:      c.GetPeerENR(peerID),
-		Metadata: rsp,
+		Metadata: rspV2,
 	})
 
-	return rsp, nil
+	return rspV2, nil
+}
+
+// isStreamCreationError returns true if the error is a protocol negotiation
+// failure (peer doesn't support the requested protocol version).
+func isStreamCreationError(err error) bool {
+	var reqErr *p2p.RequestError
+	if errors.As(err, &reqErr) {
+		return reqErr.Type == p2p.ErrFailedToCreateStream.Type
+	}
+
+	return false
+}
+
+// recordRequestError records a failed request metric if the error is a RequestError.
+func (c *Crawler) recordRequestError(protocolID protocol.ID, err error) {
+	var reqErr *p2p.RequestError
+	if errors.As(err, &reqErr) {
+		c.metrics.RecordFailedRequest(string(protocolID), reqErr.Type)
+	}
 }
 
 func (c *Crawler) GetPeerAgentVersion(peerID peer.ID) string {
