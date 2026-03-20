@@ -82,23 +82,22 @@ func (c *Crawler) readIncomingStatus(
 	stream network.Stream,
 	logCtx *logrus.Entry,
 ) (*common.Status, error) {
+	var (
+		payload common.SSZObj
+		toV1    func() *common.Status
+	)
+
 	if stream.Protocol() == eth.StatusV2ProtocolID {
-		var v2 eth.StatusV2
-		if err := c.reqResp.ReadRequest(ctx, stream, &v2); err != nil {
-			logCtx.WithError(err).Error("Failed to decode status v2 message")
-
-			if errr := c.reqResp.WriteResponse(ctx, stream, nil, errors.New("failed to decode request body")); errr != nil {
-				logCtx.WithError(errr).Debug("Failed to send error response")
-			}
-
-			return nil, err
-		}
-
-		return v2.ToV1(), nil
+		v2 := &eth.StatusV2{}
+		payload = v2
+		toV1 = v2.ToV1
+	} else {
+		v1 := &common.Status{}
+		payload = v1
+		toV1 = func() *common.Status { return v1 }
 	}
 
-	var v1 common.Status
-	if err := c.reqResp.ReadRequest(ctx, stream, &v1); err != nil {
+	if err := c.reqResp.ReadRequest(ctx, stream, payload); err != nil {
 		logCtx.WithError(err).Error("Failed to decode status message")
 
 		if errr := c.reqResp.WriteResponse(ctx, stream, nil, errors.New("failed to decode request body")); errr != nil {
@@ -108,7 +107,7 @@ func (c *Crawler) readIncomingStatus(
 		return nil, err
 	}
 
-	return &v1, nil
+	return toV1(), nil
 }
 
 // writeStatusResponse writes our status in the protocol version the peer used.
@@ -118,18 +117,13 @@ func (c *Crawler) writeStatusResponse(
 	status *common.Status,
 	logCtx *logrus.Entry,
 ) error {
+	var payload common.SSZObj = status
+
 	if stream.Protocol() == eth.StatusV2ProtocolID {
-		v2 := eth.StatusV2FromV1(status)
-		if err := c.reqResp.WriteResponse(ctx, stream, v2, nil); err != nil {
-			logCtx.WithError(err).Debug("Failed to send status v2 response")
-
-			return err
-		}
-
-		return nil
+		payload = eth.StatusV2FromV1(status)
 	}
 
-	if err := c.reqResp.WriteResponse(ctx, stream, status, nil); err != nil {
+	if err := c.reqResp.WriteResponse(ctx, stream, payload, nil); err != nil {
 		logCtx.WithError(err).Debug("Failed to send status response")
 
 		return err
@@ -263,7 +257,6 @@ func (c *Crawler) handleMetadata(ctx context.Context, stream network.Stream) err
 
 	if stream.Protocol() == eth.MetaDataV3ProtocolID {
 		v3 := eth.MetaDataV3FromV2(c.metadata)
-		v3.CustodyGroupCount = eth.DefaultCustodyGroupCount
 
 		if err := c.reqResp.WriteResponse(ctx, stream, v3, nil); err != nil {
 			logCtx.WithError(err).Debug("Failed to send metadata v3 response")

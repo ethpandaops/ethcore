@@ -90,12 +90,13 @@ func (m *MetaDataV3) ToV2() *common.MetaData {
 	}
 }
 
-// MetaDataV3FromV2 converts a common.MetaData to a MetaDataV3, defaulting CustodyGroupCount to 0.
+// MetaDataV3FromV2 converts a common.MetaData to a MetaDataV3,
+// defaulting CustodyGroupCount to DefaultCustodyGroupCount.
 func MetaDataV3FromV2(m *common.MetaData) *MetaDataV3 {
 	return &MetaDataV3{
 		SeqNumber:         m.SeqNumber,
 		Attnets:           m.Attnets,
 		Syncnets:          m.Syncnets,
-		CustodyGroupCount: CustodyGroupCount(0),
+		CustodyGroupCount: DefaultCustodyGroupCount,
 	}
 }

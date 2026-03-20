@@ -69,7 +69,7 @@ func TestMetaDataV3FromV2(t *testing.T) {
 	assert.Equal(t, v2.SeqNumber, v3.SeqNumber)
 	assert.Equal(t, v2.Attnets, v3.Attnets)
 	assert.Equal(t, v2.Syncnets, v3.Syncnets)
-	assert.Equal(t, eth.CustodyGroupCount(0), v3.CustodyGroupCount)
+	assert.Equal(t, eth.DefaultCustodyGroupCount, v3.CustodyGroupCount)
 }
 
 func TestMetaDataV3_RoundTrip(t *testing.T) {
