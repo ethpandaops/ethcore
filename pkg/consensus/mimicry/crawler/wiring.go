@@ -190,6 +190,9 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 		default:
 		}
 
+		// Disconnect from the peer so the retry mechanism can re-dial.
+		c.disconnectAfterFailure(conn.RemotePeer(), c.log.WithField("peer", conn.RemotePeer()))
+
 		c.handleCrawlFailure(conn.RemotePeer(), ErrCrawlIdentifyTimeout)
 
 		return
