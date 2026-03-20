@@ -421,11 +421,13 @@ func cleanupNetwork(t *testing.T, config *NetworkConfig) error {
 
 // createParticipantConfig creates participant configuration based on NetworkConfig.
 func createParticipantConfig(config *NetworkConfig) []epgconfig.ParticipantConfig {
-	// Default participant configuration with diverse client types
+	// Default participant configuration with diverse client types.
+	// Note: Prysm v7+ post-Fulu only supports status/2, which the crawler
+	// doesn't yet implement. Use lodestar instead until status/2 is added.
 	participants := []epgconfig.ParticipantConfig{
 		{ELType: "geth", CLType: "lighthouse", Count: 2},
 		{ELType: "geth", CLType: "teku", Count: 1},
-		{ELType: "geth", CLType: "prysm", Count: 1},
+		{ELType: "geth", CLType: "lodestar", Count: 1},
 	}
 
 	// Adjust based on the number of participants requested
