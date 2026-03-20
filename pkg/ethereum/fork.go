@@ -23,7 +23,7 @@ func ComputeForkDigest(genesisValidatorsRoot phase0.Root, forkVersion phase0.Ver
 	// For Fulu fork and later, modify the fork digest with blob parameters
 	if blobParams != nil {
 		// serialize epoch and max_blobs_per_block as uint64 little-endian
-		epochBytes := make([]byte, 8)
+		epochBytes := make([]byte, 8, 16)
 		maxBlobsBytes := make([]byte, 8)
 
 		for i := 0; i < 8; i++ {

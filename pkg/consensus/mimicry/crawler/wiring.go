@@ -12,6 +12,7 @@ import (
 	"github.com/ethpandaops/ethcore/pkg/discovery"
 	"github.com/ethpandaops/ethcore/pkg/ethereum/clients"
 	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/sirupsen/logrus"
 )
 
@@ -42,7 +43,11 @@ func (c *Crawler) wireUpComponents(ctx context.Context) error {
 
 	// Wire up the req/resp
 	if err := c.reqResp.RegisterHandler(ctx, eth.StatusV1ProtocolID, c.handleStatus); err != nil {
-		return fmt.Errorf("failed to register status handler: %w", err)
+		return fmt.Errorf("failed to register status v1 handler: %w", err)
+	}
+
+	if err := c.reqResp.RegisterHandler(ctx, eth.StatusV2ProtocolID, c.handleStatus); err != nil {
+		return fmt.Errorf("failed to register status v2 handler: %w", err)
 	}
 
 	if err := c.reqResp.RegisterHandler(ctx, eth.GoodbyeV1ProtocolID, c.handleGoodbye); err != nil {
@@ -54,7 +59,11 @@ func (c *Crawler) wireUpComponents(ctx context.Context) error {
 	}
 
 	if err := c.reqResp.RegisterHandler(ctx, eth.MetaDataV2ProtocolID, c.handleMetadata); err != nil {
-		return fmt.Errorf("failed to register metadata handler: %w", err)
+		return fmt.Errorf("failed to register metadata v2 handler: %w", err)
+	}
+
+	if err := c.reqResp.RegisterHandler(ctx, eth.MetaDataV3ProtocolID, c.handleMetadata); err != nil {
+		return fmt.Errorf("failed to register metadata v3 handler: %w", err)
 	}
 
 	// Register dummy RPC handlers for the ones we don't implement yet
@@ -189,6 +198,9 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 		default:
 		}
 
+		// Disconnect from the peer so the retry mechanism can re-dial.
+		c.disconnectAfterFailure(conn.RemotePeer(), c.log.WithField("peer", conn.RemotePeer()))
+
 		c.handleCrawlFailure(conn.RemotePeer(), ErrCrawlIdentifyTimeout)
 
 		return
@@ -214,6 +226,11 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 		}
 
 		logCtx.WithError(err).Debug("Failed to request status from peer")
+
+		// Disconnect from the peer so the retry mechanism can re-dial.
+		// Without this, the peer stays connected and ConnectToPeer's
+		// "already connected" check silently drops subsequent retry attempts.
+		c.disconnectAfterFailure(conn.RemotePeer(), logCtx)
 
 		c.handleCrawlFailure(conn.RemotePeer(), ErrCrawlFailedToRequestStatus)
 
@@ -253,6 +270,9 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 		}
 
 		logCtx.WithError(err).Debug("Failed to request metadata from peer")
+
+		// Disconnect from the peer so the retry mechanism can re-dial.
+		c.disconnectAfterFailure(conn.RemotePeer(), logCtx)
 
 		c.handleCrawlFailure(conn.RemotePeer(), ErrCrawlFailedToRequestMetadata)
 
@@ -324,6 +344,20 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 			logCtx.WithError(err).Debug("Failed to disconnect from peer after successful crawl")
 		} else {
 			logCtx.Debug("Successfully disconnected from peer after crawl completion")
+		}
+	}
+}
+
+// disconnectAfterFailure disconnects from a peer after a crawl failure so that
+// the retry mechanism can re-dial. Without this, the peer stays connected and
+// ConnectToPeer's "already connected" check silently drops retry attempts.
+func (c *Crawler) disconnectAfterFailure(peerID peer.ID, logCtx *logrus.Entry) {
+	if c.node.Connectedness(peerID) == network.Connected {
+		disconnectCtx, disconnectCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer disconnectCancel()
+
+		if err := c.node.DisconnectFromPeer(disconnectCtx, peerID); err != nil {
+			logCtx.WithError(err).Debug("Failed to disconnect from peer after crawl failure")
 		}
 	}
 }

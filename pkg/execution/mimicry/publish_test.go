@@ -136,9 +136,9 @@ func TestOnStatus(t *testing.T) {
 	})
 
 	// Publish a status event
-	expectedStatus := &Status68{
-		StatusPacket68: eth.StatusPacket68{
-			ProtocolVersion: 68,
+	expectedStatus := &Status69{
+		StatusPacket: eth.StatusPacket{
+			ProtocolVersion: 69,
 			NetworkID:       1,
 		},
 	}

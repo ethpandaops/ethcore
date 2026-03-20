@@ -8,16 +8,19 @@ const (
 	ProtocolSuffix    = encoder.ProtocolSuffixSSZSnappy
 	ProtocolVersionV1 = "1"
 	ProtocolVersionV2 = "2"
+	ProtocolVersionV3 = "3"
 )
 
 // Request-Response Protocol IDs.
 const (
 	StatusV1ProtocolID  = "/eth2/beacon_chain/req/status/" + ProtocolVersionV1 + "/" + ProtocolSuffix
+	StatusV2ProtocolID  = "/eth2/beacon_chain/req/status/" + ProtocolVersionV2 + "/" + ProtocolSuffix
 	GoodbyeV1ProtocolID = "/eth2/beacon_chain/req/goodbye/" + ProtocolVersionV1 + "/" + ProtocolSuffix
 	PingV1ProtocolID    = "/eth2/beacon_chain/req/ping/" + ProtocolVersionV1 + "/" + ProtocolSuffix
 
 	MetaDataV1ProtocolID = "/eth2/beacon_chain/req/metadata/" + ProtocolVersionV1 + "/" + ProtocolSuffix
 	MetaDataV2ProtocolID = "/eth2/beacon_chain/req/metadata/" + ProtocolVersionV2 + "/" + ProtocolSuffix
+	MetaDataV3ProtocolID = "/eth2/beacon_chain/req/metadata/" + ProtocolVersionV3 + "/" + ProtocolSuffix
 
 	BeaconBlocksByRangeV1ProtocolID = "/eth2/beacon_chain/req/beacon_blocks_by_range/" + ProtocolVersionV1 + "/" + ProtocolSuffix
 	BeaconBlocksByRangeV2ProtocolID = "/eth2/beacon_chain/req/beacon_blocks_by_range/" + ProtocolVersionV2 + "/" + ProtocolSuffix

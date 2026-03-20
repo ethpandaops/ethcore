@@ -255,7 +255,7 @@ func waitForGenesis(ctx context.Context, tf *TestFoundation, epgNetwork network.
 
 	// Start the beacon node with a background context
 	// We'll stop it manually when we're done
-	go func() {
+	go func() { //nolint:gosec // intentionally using background context; beacon node is stopped manually via defer
 		if err := tempBeacon.Start(context.Background()); err != nil {
 			tf.Logger.WithError(err).Warn("Temporary beacon node error during genesis check")
 		}
@@ -421,11 +421,12 @@ func cleanupNetwork(t *testing.T, config *NetworkConfig) error {
 
 // createParticipantConfig creates participant configuration based on NetworkConfig.
 func createParticipantConfig(config *NetworkConfig) []epgconfig.ParticipantConfig {
-	// Default participant configuration with diverse client types
+	// Default participant configuration with diverse client types.
 	participants := []epgconfig.ParticipantConfig{
-		{ELType: "geth", CLType: "lighthouse", Count: 2},
+		{ELType: "geth", CLType: "lighthouse", Count: 1},
 		{ELType: "geth", CLType: "teku", Count: 1},
 		{ELType: "geth", CLType: "prysm", Count: 1},
+		{ELType: "geth", CLType: "lodestar", Count: 1},
 	}
 
 	// Adjust based on the number of participants requested
