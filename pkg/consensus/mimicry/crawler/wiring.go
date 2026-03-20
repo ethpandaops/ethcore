@@ -43,7 +43,11 @@ func (c *Crawler) wireUpComponents(ctx context.Context) error {
 
 	// Wire up the req/resp
 	if err := c.reqResp.RegisterHandler(ctx, eth.StatusV1ProtocolID, c.handleStatus); err != nil {
-		return fmt.Errorf("failed to register status handler: %w", err)
+		return fmt.Errorf("failed to register status v1 handler: %w", err)
+	}
+
+	if err := c.reqResp.RegisterHandler(ctx, eth.StatusV2ProtocolID, c.handleStatus); err != nil {
+		return fmt.Errorf("failed to register status v2 handler: %w", err)
 	}
 
 	if err := c.reqResp.RegisterHandler(ctx, eth.GoodbyeV1ProtocolID, c.handleGoodbye); err != nil {
@@ -55,7 +59,11 @@ func (c *Crawler) wireUpComponents(ctx context.Context) error {
 	}
 
 	if err := c.reqResp.RegisterHandler(ctx, eth.MetaDataV2ProtocolID, c.handleMetadata); err != nil {
-		return fmt.Errorf("failed to register metadata handler: %w", err)
+		return fmt.Errorf("failed to register metadata v2 handler: %w", err)
+	}
+
+	if err := c.reqResp.RegisterHandler(ctx, eth.MetaDataV3ProtocolID, c.handleMetadata); err != nil {
+		return fmt.Errorf("failed to register metadata v3 handler: %w", err)
 	}
 
 	// Register dummy RPC handlers for the ones we don't implement yet
