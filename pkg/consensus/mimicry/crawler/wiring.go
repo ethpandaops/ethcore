@@ -12,6 +12,7 @@ import (
 	"github.com/ethpandaops/ethcore/pkg/discovery"
 	"github.com/ethpandaops/ethcore/pkg/ethereum/clients"
 	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/sirupsen/logrus"
 )
 
@@ -215,6 +216,11 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 
 		logCtx.WithError(err).Debug("Failed to request status from peer")
 
+		// Disconnect from the peer so the retry mechanism can re-dial.
+		// Without this, the peer stays connected and ConnectToPeer's
+		// "already connected" check silently drops subsequent retry attempts.
+		c.disconnectAfterFailure(conn.RemotePeer(), logCtx)
+
 		c.handleCrawlFailure(conn.RemotePeer(), ErrCrawlFailedToRequestStatus)
 
 		return
@@ -253,6 +259,9 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 		}
 
 		logCtx.WithError(err).Debug("Failed to request metadata from peer")
+
+		// Disconnect from the peer so the retry mechanism can re-dial.
+		c.disconnectAfterFailure(conn.RemotePeer(), logCtx)
 
 		c.handleCrawlFailure(conn.RemotePeer(), ErrCrawlFailedToRequestMetadata)
 
@@ -324,6 +333,20 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 			logCtx.WithError(err).Debug("Failed to disconnect from peer after successful crawl")
 		} else {
 			logCtx.Debug("Successfully disconnected from peer after crawl completion")
+		}
+	}
+}
+
+// disconnectAfterFailure disconnects from a peer after a crawl failure so that
+// the retry mechanism can re-dial. Without this, the peer stays connected and
+// ConnectToPeer's "already connected" check silently drops retry attempts.
+func (c *Crawler) disconnectAfterFailure(peerID peer.ID, logCtx *logrus.Entry) {
+	if c.node.Connectedness(peerID) == network.Connected {
+		disconnectCtx, disconnectCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer disconnectCancel()
+
+		if err := c.node.DisconnectFromPeer(disconnectCtx, peerID); err != nil {
+			logCtx.WithError(err).Debug("Failed to disconnect from peer after crawl failure")
 		}
 	}
 }
