@@ -143,3 +143,39 @@ func TestComputeForkDigest_WithBlobParams(t *testing.T) {
 	t.Logf("Digest with blobs (epoch=0, max=6): 0x%x", digestWithBlobs)
 	t.Logf("Digest with blobs (epoch=10, max=8): 0x%x", digestWithDifferentBlobs)
 }
+
+func TestComputeForkDigest_Gloas(t *testing.T) {
+	// Test Gloas (Glamsterdam) fork digest computation with blob parameters.
+	// Gloas continues the blob schedule behavior from Fulu, so the digest
+	// should incorporate blob parameters via XOR with the blob param hash.
+	genesisValidatorsRoot := phase0.Root{0xe6, 0xf9, 0x2d, 0x48, 0x6d, 0x5d, 0x64, 0xc6, 0xd4, 0x43, 0x42, 0x90, 0x6b, 0x56, 0x74, 0x13, 0x77, 0x33, 0xa4, 0x8b, 0xae, 0x65, 0xa6, 0xe0, 0xd7, 0x5d, 0xc4, 0xfb, 0x4d, 0xec, 0x03, 0x0d}
+
+	// Hypothetical Gloas fork version (following pattern: Electra 0x60, Fulu 0x70, Gloas 0x80)
+	gloasForkVersion := [4]byte{0x80, 0x93, 0x75, 0x44}
+
+	// Without blob parameters
+	digestWithoutBlobs := ComputeForkDigest(genesisValidatorsRoot, gloasForkVersion, nil)
+
+	// With blob parameters (Gloas inherits blob schedule from Fulu)
+	blobParams := &BlobScheduleEntry{
+		Epoch:            0,
+		MaxBlobsPerBlock: 6,
+	}
+	digestWithBlobs := ComputeForkDigest(genesisValidatorsRoot, gloasForkVersion, blobParams)
+
+	// Blob parameters should modify the digest
+	assert.NotEqual(t, digestWithoutBlobs, digestWithBlobs, "Gloas fork digest should be different with blob parameters")
+
+	// Gloas digest should differ from Fulu with the same blob parameters
+	fuluForkVersion := [4]byte{0x70, 0x93, 0x75, 0x44}
+	fuluDigestWithBlobs := ComputeForkDigest(genesisValidatorsRoot, fuluForkVersion, blobParams)
+	assert.NotEqual(t, fuluDigestWithBlobs, digestWithBlobs, "Gloas and Fulu fork digests should differ even with same blob parameters")
+
+	// Determinism check
+	digestWithBlobs2 := ComputeForkDigest(genesisValidatorsRoot, gloasForkVersion, blobParams)
+	assert.Equal(t, digestWithBlobs, digestWithBlobs2, "Gloas fork digest should be deterministic")
+
+	t.Logf("Gloas digest without blobs: 0x%x", digestWithoutBlobs)
+	t.Logf("Gloas digest with blobs (epoch=0, max=6): 0x%x", digestWithBlobs)
+	t.Logf("Fulu digest with blobs (epoch=0, max=6): 0x%x", fuluDigestWithBlobs)
+}
