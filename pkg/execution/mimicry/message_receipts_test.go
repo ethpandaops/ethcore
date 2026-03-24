@@ -15,7 +15,7 @@ func TestReceipts69Code(t *testing.T) {
 
 func TestReceipts69ReqID(t *testing.T) {
 	msg := &Receipts69{
-		ReceiptsPacket: eth.ReceiptsPacket{
+		ReceiptsPacket69: eth.ReceiptsPacket69{
 			RequestId: 66666,
 		},
 	}

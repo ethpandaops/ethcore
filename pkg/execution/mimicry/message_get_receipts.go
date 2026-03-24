@@ -14,7 +14,7 @@ const (
 	GetReceiptsCode = RLPXOffset + eth.GetReceiptsMsg
 )
 
-type GetReceipts eth.GetReceiptsPacket
+type GetReceipts eth.GetReceiptsPacket69
 
 func (msg *GetReceipts) Code() int { return GetReceiptsCode }
 
@@ -37,13 +37,13 @@ func (c *Client) handleGetReceipts(ctx context.Context, code uint64, data []byte
 		return err
 	}
 
-	pkt := eth.ReceiptsPacket{RequestId: blockBodies.RequestId}
+	pkt := eth.ReceiptsPacket69{RequestId: blockBodies.RequestId}
 
 	if appendErr := pkt.List.Append(eth.NewReceiptList([]*types.Receipt{})); appendErr != nil {
 		return fmt.Errorf("error constructing empty receipts: %w", appendErr)
 	}
 
-	receipts := &Receipts69{ReceiptsPacket: pkt}
+	receipts := &Receipts69{ReceiptsPacket69: pkt}
 
 	err = c.sendReceipts(ctx, receipts)
 	if err != nil {
