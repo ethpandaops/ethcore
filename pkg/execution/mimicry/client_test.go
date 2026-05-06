@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -191,4 +192,23 @@ func TestNew(t *testing.T) {
 
 func TestClientConstants(t *testing.T) {
 	assert.Equal(t, 0x10, RLPXOffset, "RLPXOffset should be 0x10 per RLPx spec")
+}
+
+func TestDefaultNodePrivateKeyIsProcessStable(t *testing.T) {
+	first, err := defaultNodePrivateKey()
+	require.NoError(t, err)
+	second, err := defaultNodePrivateKey()
+	require.NoError(t, err)
+
+	assert.Same(t, first, second)
+}
+
+func TestWithPrivateKey(t *testing.T) {
+	key, err := crypto.GenerateKey()
+	require.NoError(t, err)
+
+	client := &Client{}
+	WithPrivateKey(key)(client)
+
+	assert.Same(t, key, client.privateKey)
 }

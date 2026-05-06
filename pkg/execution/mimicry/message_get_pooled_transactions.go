@@ -23,20 +23,42 @@ func (msg *GetPooledTransactions) Code() int { return GetPooledTransactionsCode 
 
 func (msg *GetPooledTransactions) ReqID() uint64 { return msg.RequestId }
 
+func (c *Client) receiveGetPooledTransactions(ctx context.Context, data []byte) (*GetPooledTransactions, error) {
+	s := new(GetPooledTransactions)
+	if err := rlp.DecodeBytes(data, &s); err != nil {
+		return nil, fmt.Errorf("error decoding get pooled transactions: %w", err)
+	}
+
+	return s, nil
+}
+
+func (c *Client) handleGetPooledTransactions(ctx context.Context, code uint64, data []byte) error {
+	c.log.WithField(logFieldCode, code).Debug("received GetPooledTransactions")
+
+	txs, err := c.receiveGetPooledTransactions(ctx, data)
+	if err != nil {
+		return err
+	}
+
+	return c.sendPooledTransactions(ctx, &PooledTransactions{
+		RequestId: txs.RequestId,
+	})
+}
+
 func (c *Client) sendGetPooledTransactions(ctx context.Context, pt *GetPooledTransactions) error {
 	c.log.WithFields(logrus.Fields{
-		"code":       GetPooledTransactionsCode,
-		"request_id": pt.RequestId,
-		"txs_count":  len(pt.GetPooledTransactionsRequest),
+		logFieldCode:      GetPooledTransactionsCode,
+		logFieldRequestID: pt.RequestId,
+		"txs_count":       len(pt.GetPooledTransactionsRequest),
 	}).Debug("sending GetPooledTransactions")
 
 	encodedData, err := rlp.EncodeToBytes(pt)
 	if err != nil {
-		return fmt.Errorf("error encoding get block headers: %w", err)
+		return fmt.Errorf("error encoding get pooled transactions: %w", err)
 	}
 
-	if _, err := c.rlpxConn.Write(GetPooledTransactionsCode, encodedData); err != nil {
-		return fmt.Errorf("error sending get block headers: %w", err)
+	if err := c.writeRLPx(GetPooledTransactionsCode, encodedData); err != nil {
+		return fmt.Errorf("error sending get pooled transactions: %w", err)
 	}
 
 	return nil

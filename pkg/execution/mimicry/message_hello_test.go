@@ -56,7 +56,7 @@ func TestHelloValidate(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "ETH 68 only is invalid",
+			name: "valid hello with ETH 68 only",
 			hello: &Hello{
 				Version: P2PProtocolVersion,
 				Name:    "test-client",
@@ -66,8 +66,7 @@ func TestHelloValidate(t *testing.T) {
 				ListenPort: 30303,
 				ID:         make([]byte, 64),
 			},
-			wantErr: true,
-			errMsg:  "peer is using unsupported eth protocol version",
+			wantErr: false,
 		},
 		{
 			name: "invalid P2P protocol version",
@@ -125,12 +124,25 @@ func TestHelloValidate(t *testing.T) {
 			errMsg:  "peer is using unsupported eth protocol version",
 		},
 		{
-			name: "only future unsupported ETH version",
+			name: "valid hello with ETH 70 only",
 			hello: &Hello{
 				Version: P2PProtocolVersion,
 				Name:    "test-client",
 				Caps: []p2p.Cap{
 					{Name: ETHCapName, Version: 70},
+				},
+				ListenPort: 30303,
+				ID:         make([]byte, 64),
+			},
+			wantErr: false,
+		},
+		{
+			name: "only future unsupported ETH version",
+			hello: &Hello{
+				Version: P2PProtocolVersion,
+				Name:    "test-client",
+				Caps: []p2p.Cap{
+					{Name: ETHCapName, Version: 71},
 				},
 				ListenPort: 30303,
 				ID:         make([]byte, 64),
@@ -168,26 +180,26 @@ func TestHelloETHProtocolVersion(t *testing.T) {
 			expected: 69,
 		},
 		{
-			name: "ETH 68 returns 0 since below min",
+			name: "ETH 68 only",
 			caps: []p2p.Cap{
 				{Name: ETHCapName, Version: 68},
 			},
-			expected: 0,
+			expected: 68,
 		},
 		{
-			name: "ETH 70 unsupported returns 69 if present",
+			name: "ETH 70 returns highest supported version",
 			caps: []p2p.Cap{
 				{Name: ETHCapName, Version: 69},
 				{Name: ETHCapName, Version: 70},
 			},
-			expected: 69,
+			expected: 70,
 		},
 		{
-			name: "only ETH 70 returns 0 since it exceeds max",
+			name: "only ETH 70 returns 70",
 			caps: []p2p.Cap{
 				{Name: ETHCapName, Version: 70},
 			},
-			expected: 0,
+			expected: 70,
 		},
 		{
 			name:     "no ETH caps returns 0",
@@ -284,10 +296,14 @@ func TestHelloETHCap(t *testing.T) {
 func TestSupportedEthCaps(t *testing.T) {
 	caps := SupportedEthCaps()
 
-	require.Len(t, caps, 1, "should support ETH 69 only")
+	require.Len(t, caps, 3, "should support ETH 70, ETH 69, and ETH 68")
 
 	assert.Equal(t, ETHCapName, caps[0].Name)
-	assert.Equal(t, uint(69), caps[0].Version)
+	assert.Equal(t, uint(70), caps[0].Version)
+	assert.Equal(t, ETHCapName, caps[1].Name)
+	assert.Equal(t, uint(69), caps[1].Version)
+	assert.Equal(t, ETHCapName, caps[2].Name)
+	assert.Equal(t, uint(68), caps[2].Version)
 }
 
 func TestHelloRLPEncoding(t *testing.T) {

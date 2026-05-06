@@ -22,9 +22,9 @@ func (msg *BlockBodies) ReqID() uint64 { return msg.RequestId }
 
 func (c *Client) sendBlockBodies(ctx context.Context, bh *BlockBodies) error {
 	c.log.WithFields(logrus.Fields{
-		"code":         BlockBodiesCode,
-		"request_id":   bh.RequestId,
-		"bodies_count": bh.List.Len(),
+		logFieldCode:      BlockBodiesCode,
+		logFieldRequestID: bh.RequestId,
+		"bodies_count":    bh.List.Len(),
 	}).Debug("sending BlockBodies")
 
 	encodedData, err := rlp.EncodeToBytes(bh)
@@ -32,7 +32,7 @@ func (c *Client) sendBlockBodies(ctx context.Context, bh *BlockBodies) error {
 		return fmt.Errorf("error encoding block bodies: %w", err)
 	}
 
-	if _, err := c.rlpxConn.Write(BlockBodiesCode, encodedData); err != nil {
+	if err := c.writeRLPx(BlockBodiesCode, encodedData); err != nil {
 		return fmt.Errorf("error sending block bodies: %w", err)
 	}
 

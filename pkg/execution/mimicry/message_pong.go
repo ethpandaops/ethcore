@@ -20,10 +20,10 @@ func (h *Pong) ReqID() uint64 { return 0 }
 
 func (c *Client) sendPong(ctx context.Context) error {
 	c.log.WithFields(logrus.Fields{
-		"code": PongCode,
+		logFieldCode: PongCode,
 	}).Debug("sending Pong")
 
-	if _, err := c.rlpxConn.Write(PongCode, []byte{}); err != nil {
+	if err := c.writeRLPx(PongCode, []byte{}); err != nil {
 		return fmt.Errorf("error sending pong: %w", err)
 	}
 
