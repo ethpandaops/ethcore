@@ -3,7 +3,7 @@ package ethereum
 import (
 	"crypto/sha256"
 
-	"github.com/attestantio/go-eth2-client/spec/phase0"
+	"github.com/ethpandaops/go-eth2-client/spec/phase0"
 )
 
 // BlobScheduleEntry represents a blob parameter configuration for a specific epoch.
