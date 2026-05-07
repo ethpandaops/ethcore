@@ -29,7 +29,7 @@ func (c *Client) receiveNewPooledTransactionHashes(ctx context.Context, data []b
 }
 
 func (c *Client) handleNewPooledTransactionHashes(ctx context.Context, code uint64, data []byte) error {
-	c.log.WithField("code", code).Debug("received NewPooledTransactionHashes")
+	c.log.WithField(logFieldCode, code).Debug("received NewPooledTransactionHashes")
 
 	hashes, err := c.receiveNewPooledTransactionHashes(ctx, data)
 	if err != nil {

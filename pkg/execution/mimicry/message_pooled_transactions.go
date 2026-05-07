@@ -7,6 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/eth/protocols/eth"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -29,7 +30,7 @@ func (c *Client) receivePooledTransactions(ctx context.Context, data []byte) (*P
 }
 
 func (c *Client) handlePooledTransactions(ctx context.Context, code uint64, data []byte) error {
-	c.log.WithField("code", code).Debug("received PooledTransactions")
+	c.log.WithField(logFieldCode, code).Debug("received PooledTransactions")
 
 	txs, err := c.receivePooledTransactions(ctx, data)
 	if err != nil {
@@ -42,6 +43,25 @@ func (c *Client) handlePooledTransactions(ctx context.Context, code uint64, data
 	channel, exists := c.pooledTransactionsMap[txs.ReqID()]
 	if exists && channel != nil {
 		channel <- txs
+	}
+
+	return nil
+}
+
+func (c *Client) sendPooledTransactions(ctx context.Context, txs *PooledTransactions) error {
+	c.log.WithFields(logrus.Fields{
+		logFieldCode:      PooledTransactionsCode,
+		logFieldRequestID: txs.RequestId,
+		"txs_count":       txs.List.Len(),
+	}).Debug("sending PooledTransactions")
+
+	encodedData, err := rlp.EncodeToBytes(txs)
+	if err != nil {
+		return fmt.Errorf("error encoding pooled transactions: %w", err)
+	}
+
+	if err := c.writeRLPx(PooledTransactionsCode, encodedData); err != nil {
+		return fmt.Errorf("error sending pooled transactions: %w", err)
 	}
 
 	return nil

@@ -25,10 +25,8 @@ func TestMain(m *testing.M) {
 
 	// Start with default configuration
 	defaultConfig := kurtosis.DefaultNetworkConfig()
-	// Use shared enclave name for all tests
-	defaultConfig.Name = "ethcore-test"
-	// Use same port offset since we're sharing the same enclave
-	defaultConfig.PortOffset = 0
+	defaultConfig.Name = "ethcore-crawler-test"
+	defaultConfig.PortOffset = 1000
 
 	// Get configuration from environment
 	envConfig, err := kurtosis.ConfigFromEnvironment()

@@ -15,8 +15,8 @@ const (
 	HelloCode             = 0x00
 	P2PProtocolVersion    = 5
 	minP2PProtocolVersion = 5
-	minETHProtocolVersion = uint(69)
-	maxETHProtocolVersion = uint(69)
+	minETHProtocolVersion = uint(68)
+	maxETHProtocolVersion = uint(70)
 	ETHCapName            = "eth"
 )
 
@@ -51,13 +51,13 @@ func (h *Hello) Validate() error {
 		return fmt.Errorf("peer is using unsupported p2p protocol version: %d", h.Version)
 	}
 
-	supportsOurETHProtocolVersion := false
+	supportsSupportedETHProtocolVersion := false
 	highestETHProtocolVersion := uint(0)
 
 	for _, cap := range h.Caps {
 		if cap.Name == ETHCapName {
-			if cap.Version == minETHProtocolVersion {
-				supportsOurETHProtocolVersion = true
+			if cap.Version >= minETHProtocolVersion && cap.Version <= maxETHProtocolVersion {
+				supportsSupportedETHProtocolVersion = true
 			}
 
 			if cap.Version > highestETHProtocolVersion {
@@ -70,8 +70,8 @@ func (h *Hello) Validate() error {
 		return fmt.Errorf("peer does not support eth protocol")
 	}
 
-	if !supportsOurETHProtocolVersion {
-		return fmt.Errorf("peer is using unsupported eth protocol version: %d", minETHProtocolVersion)
+	if !supportsSupportedETHProtocolVersion {
+		return fmt.Errorf("peer is using unsupported eth protocol version: %d", highestETHProtocolVersion)
 	}
 
 	return nil
@@ -93,11 +93,15 @@ func (h *Hello) ETHProtocolVersion() uint {
 
 func SupportedEthCaps() []p2p.Cap {
 	caps := []p2p.Cap{}
-	for i := minETHProtocolVersion; i <= maxETHProtocolVersion; i++ {
+	for i := maxETHProtocolVersion; i >= minETHProtocolVersion; i-- {
 		caps = append(caps, p2p.Cap{
 			Name:    ETHCapName,
 			Version: i,
 		})
+
+		if i == 0 {
+			break
+		}
 	}
 
 	return caps
@@ -124,14 +128,16 @@ func (c *Client) receiveHello(ctx context.Context, data []byte) (*Hello, error) 
 
 func (c *Client) sendHello(ctx context.Context) error {
 	c.log.WithFields(logrus.Fields{
-		"code": HelloCode,
+		logFieldCode: HelloCode,
 	}).Debug("sending Hello")
 
 	pub0 := crypto.FromECDSAPub(&c.privateKey.PublicKey)[1:]
 	hello := &Hello{
-		Version: P2PProtocolVersion,
-		Caps:    SupportedEthCaps(),
-		ID:      pub0,
+		Version:    P2PProtocolVersion,
+		Name:       c.name,
+		Caps:       SupportedEthCaps(),
+		ListenPort: 0,
+		ID:         pub0,
 	}
 
 	encodedData, err := rlp.EncodeToBytes(hello)
@@ -139,7 +145,7 @@ func (c *Client) sendHello(ctx context.Context) error {
 		return fmt.Errorf("error encoding hello: %w", err)
 	}
 
-	if _, err := c.rlpxConn.Write(HelloCode, encodedData); err != nil {
+	if err := c.writeRLPx(HelloCode, encodedData); err != nil {
 		return fmt.Errorf("error sending hello: %w", err)
 	}
 
@@ -147,7 +153,7 @@ func (c *Client) sendHello(ctx context.Context) error {
 }
 
 func (c *Client) handleHello(ctx context.Context, code uint64, data []byte) error {
-	c.log.WithField("code", code).Debug("received Hello")
+	c.log.WithField(logFieldCode, code).Debug("received Hello")
 
 	hello, err := c.receiveHello(ctx, data)
 	if err != nil {
@@ -160,6 +166,19 @@ func (c *Client) handleHello(ctx context.Context, code uint64, data []byte) erro
 
 	// always enable snappy to avoid jank
 	c.rlpxConn.SetSnappy(true)
+
+	if c.statusProvider != nil && !c.statusSent {
+		status, err := c.statusProvider(ctx, c.ethCapVersion, nil)
+		if err != nil {
+			return fmt.Errorf("failed to build initial provided Status: %w", err)
+		}
+
+		if status != nil {
+			if err := c.sendStatus(ctx, status); err != nil {
+				return err
+			}
+		}
+	}
 
 	return nil
 }

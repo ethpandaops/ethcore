@@ -21,6 +21,11 @@ import (
 
 const (
 	RLPXOffset = 0x10 // https://github.com/ethereum/devp2p/blob/master/rlpx.md#message-id-based-multiplexing
+
+	logFieldCode         = "code"
+	logFieldRequestID    = "request_id"
+	logFieldHeadersCount = "headers_count"
+	logFieldETHCap       = "ethCapVersion"
 )
 
 type Client struct {
@@ -38,11 +43,32 @@ type Client struct {
 
 	conn     net.Conn
 	rlpxConn *rlpx.Conn
+	writeMu  sync.Mutex
 
 	pooledTransactionsMap map[uint64]chan *PooledTransactions
 	pooledTransactionsMux sync.Mutex
 
 	ethCapVersion uint
+	statusSent    bool
+
+	statusProvider  StatusProvider
+	headerProvider  HeaderProvider
+	bodyProvider    BodyProvider
+	receiptProvider ReceiptProvider
+}
+
+var defaultPrivateKey = struct {
+	sync.Once
+	key *ecdsa.PrivateKey
+	err error
+}{}
+
+func defaultNodePrivateKey() (*ecdsa.PrivateKey, error) {
+	defaultPrivateKey.Do(func() {
+		defaultPrivateKey.key, defaultPrivateKey.err = crypto.GenerateKey()
+	})
+
+	return defaultPrivateKey.key, defaultPrivateKey.err
 }
 
 func parseNodeRecord(record string) (*enode.Node, error) {
@@ -53,19 +79,25 @@ func parseNodeRecord(record string) (*enode.Node, error) {
 	return enode.Parse(enode.ValidSchemes, record)
 }
 
-func New(ctx context.Context, log logrus.FieldLogger, record, name string) (*Client, error) {
+func New(ctx context.Context, log logrus.FieldLogger, record, name string, opts ...Option) (*Client, error) {
 	nodeRecord, err := parseNodeRecord(record)
 	if err != nil {
 		return nil, err
 	}
 
-	return &Client{
+	client := &Client{
 		log:                   log.WithField("node_record", nodeRecord.String()),
 		nodeRecord:            nodeRecord,
 		name:                  name,
 		broker:                emission.NewEmitter(),
 		pooledTransactionsMap: map[uint64]chan *PooledTransactions{},
-	}, nil
+	}
+
+	for _, opt := range opts {
+		opt(client)
+	}
+
+	return client, nil
 }
 
 func (c *Client) Start(ctx context.Context) error {
@@ -98,7 +130,12 @@ func (c *Client) Start(ctx context.Context) error {
 		return err
 	}
 
-	c.privateKey, _ = crypto.GenerateKey()
+	if c.privateKey == nil {
+		c.privateKey, err = defaultNodePrivateKey()
+		if err != nil {
+			return err
+		}
+	}
 
 	peerPublicKey, err := c.rlpxConn.Handshake(c.privateKey)
 	if err != nil {
@@ -150,6 +187,21 @@ func (c *Client) Stop(ctx context.Context) error {
 func (c *Client) handleSessionError(ctx context.Context, err error) {
 	c.log.WithError(err).Debug("error handling session")
 	c.disconnect(ctx, nil)
+}
+
+func (c *Client) writeRLPx(code uint64, data []byte) error {
+	c.writeMu.Lock()
+	defer c.writeMu.Unlock()
+
+	if c.rlpxConn == nil {
+		return fmt.Errorf("rlpx connection is not initialized")
+	}
+
+	if _, err := c.rlpxConn.Write(code, data); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (c *Client) disconnect(ctx context.Context, reason *Disconnect) {
@@ -234,6 +286,12 @@ func (c *Client) startSession(ctx context.Context) {
 
 				return
 			}
+		case GetPooledTransactionsCode:
+			if err := c.handleGetPooledTransactions(ctx, code, data); err != nil {
+				c.handleSessionError(ctx, err)
+
+				return
+			}
 		case PooledTransactionsCode:
 			if err := c.handlePooledTransactions(ctx, code, data); err != nil {
 				c.handleSessionError(ctx, err)
@@ -253,7 +311,7 @@ func (c *Client) startSession(ctx context.Context) {
 				return
 			}
 		default:
-			c.log.WithField("code", code).Debug("received unhandled message code")
+			c.log.WithField(logFieldCode, code).Debug("received unhandled message code")
 		}
 	}
 }

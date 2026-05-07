@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/eth/protocols/eth"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/sirupsen/logrus"
@@ -30,35 +31,43 @@ func (c *Client) receiveGetBlockHeaders(ctx context.Context, data []byte) (*GetB
 }
 
 func (c *Client) handleGetBlockHeaders(ctx context.Context, code uint64, data []byte) error {
-	c.log.WithField("code", code).Debug("received GetBlockHeaders")
+	c.log.WithField(logFieldCode, code).Debug("received GetBlockHeaders")
 
 	blockHeaders, err := c.receiveGetBlockHeaders(ctx, data)
 	if err != nil {
 		return err
 	}
 
-	err = c.sendGetBlockHeaders(ctx, blockHeaders)
+	var headersList rlp.RawList[*types.Header]
+
+	if c.headerProvider != nil && blockHeaders.GetBlockHeadersRequest != nil {
+		headers, herr := c.headerProvider(ctx, blockHeaders.GetBlockHeadersRequest)
+		if herr != nil {
+			c.log.WithError(herr).Debug("failed to provide block headers")
+		} else {
+			headersList, err = rlp.EncodeToRawList(headers)
+			if err != nil {
+				return fmt.Errorf("error encoding provided block headers: %w", err)
+			}
+		}
+	}
+
+	c.log.WithFields(logrus.Fields{
+		logFieldRequestID:    blockHeaders.RequestId,
+		logFieldHeadersCount: headersList.Len(),
+		"amount":             blockHeaders.Amount,
+		"origin_hash":        blockHeaders.Origin.Hash,
+		"origin_number":      blockHeaders.Origin.Number,
+		"skip":               blockHeaders.Skip,
+		"reverse":            blockHeaders.Reverse,
+	}).Debug("responding to GetBlockHeaders")
+
+	err = c.sendBlockHeaders(ctx, &BlockHeaders{
+		RequestId: blockHeaders.RequestId,
+		List:      headersList,
+	})
 	if err != nil {
 		return err
-	}
-
-	return nil
-}
-
-func (c *Client) sendGetBlockHeaders(ctx context.Context, bh *GetBlockHeaders) error {
-	c.log.WithFields(logrus.Fields{
-		"code":       GetBlockHeadersCode,
-		"request_id": bh.RequestId,
-		"headers":    bh.GetBlockHeadersRequest,
-	}).Debug("sending GetBlockHeaders")
-
-	encodedData, err := rlp.EncodeToBytes(bh)
-	if err != nil {
-		return fmt.Errorf("error encoding get block headers: %w", err)
-	}
-
-	if _, err := c.rlpxConn.Write(GetBlockHeadersCode, encodedData); err != nil {
-		return fmt.Errorf("error sending get block headers: %w", err)
 	}
 
 	return nil

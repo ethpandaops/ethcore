@@ -14,7 +14,7 @@ func (h *Ping) Code() int { return PingCode }
 func (h *Ping) ReqID() uint64 { return 0 }
 
 func (c *Client) handlePing(ctx context.Context, code uint64, data []byte) error {
-	c.log.WithField("code", code).Debug("received Ping")
+	c.log.WithField(logFieldCode, code).Debug("received Ping")
 
 	if err := c.sendPong(ctx); err != nil {
 		return err

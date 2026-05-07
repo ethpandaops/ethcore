@@ -30,7 +30,7 @@ func (c *Client) receiveTransactions(ctx context.Context, data []byte) (*Transac
 }
 
 func (c *Client) handleTransactions(ctx context.Context, code uint64, data []byte) error {
-	c.log.WithField("code", code).Debug("received Transactions")
+	c.log.WithField(logFieldCode, code).Debug("received Transactions")
 
 	txs, err := c.receiveTransactions(ctx, data)
 	if err != nil {
@@ -44,7 +44,7 @@ func (c *Client) handleTransactions(ctx context.Context, code uint64, data []byt
 
 func (c *Client) sendTransactions(ctx context.Context, transactions *Transactions) error {
 	c.log.WithFields(logrus.Fields{
-		"code":         TransactionsCode,
+		logFieldCode:   TransactionsCode,
 		"transactions": transactions,
 	}).Debug("sending Transactions")
 
@@ -53,7 +53,7 @@ func (c *Client) sendTransactions(ctx context.Context, transactions *Transaction
 		return fmt.Errorf("error encoding transactions: %w", err)
 	}
 
-	if _, err := c.rlpxConn.Write(TransactionsCode, encodedData); err != nil {
+	if err := c.writeRLPx(TransactionsCode, encodedData); err != nil {
 		return fmt.Errorf("error sending transactions: %w", err)
 	}
 
