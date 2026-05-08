@@ -37,6 +37,8 @@ var defaultManager = &networkManager{
 	instances: make(map[string]*managedNetwork),
 }
 
+const ethereumPackageVersion = "6.0.0"
+
 // GetNetwork retrieves or creates a Kurtosis network based on the provided configuration.
 // It reuses existing networks when possible to improve test performance.
 // Note: This returns a TestFoundation, not just an EnclaveContext, because ethereum-package-go
@@ -114,7 +116,9 @@ func setupKurtosisNetwork(ctx context.Context, config *NetworkConfig) (*TestFoun
 	time.Sleep(500 * time.Millisecond)
 
 	// Configure network options
-	var opts []ethereum.RunOption
+	opts := []ethereum.RunOption{
+		ethereum.WithPackageVersion(ethereumPackageVersion),
+	}
 
 	// Handle KeepAlive configuration
 	if config.KeepAlive {

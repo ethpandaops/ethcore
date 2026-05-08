@@ -30,26 +30,26 @@ func (c *Client) receiveBlockHeaders(ctx context.Context, data []byte) (*BlockHe
 }
 
 func (c *Client) handleBlockHeaders(ctx context.Context, code uint64, data []byte) error {
-	c.log.WithField("code", code).Debug("received BlockHeaders")
+	c.log.WithField(logFieldCode, code).Debug("received BlockHeaders")
 
 	blockHeaders, err := c.receiveBlockHeaders(ctx, data)
 	if err != nil {
 		return err
 	}
 
-	err = c.sendBlockHeaders(ctx, blockHeaders)
-	if err != nil {
-		return err
-	}
+	c.log.WithFields(logrus.Fields{
+		logFieldRequestID:    blockHeaders.RequestId,
+		logFieldHeadersCount: blockHeaders.List.Len(),
+	}).Debug("ignoring unsolicited BlockHeaders")
 
 	return nil
 }
 
 func (c *Client) sendBlockHeaders(ctx context.Context, bh *BlockHeaders) error {
 	c.log.WithFields(logrus.Fields{
-		"code":          BlockHeadersCode,
-		"request_id":    bh.RequestId,
-		"headers_count": bh.List.Len(),
+		logFieldCode:         BlockHeadersCode,
+		logFieldRequestID:    bh.RequestId,
+		logFieldHeadersCount: bh.List.Len(),
 	}).Debug("sending BlockHeaders")
 
 	encodedData, err := rlp.EncodeToBytes(bh)
@@ -57,7 +57,7 @@ func (c *Client) sendBlockHeaders(ctx context.Context, bh *BlockHeaders) error {
 		return fmt.Errorf("error encoding block headers: %w", err)
 	}
 
-	if _, err := c.rlpxConn.Write(BlockHeadersCode, encodedData); err != nil {
+	if err := c.writeRLPx(BlockHeadersCode, encodedData); err != nil {
 		return fmt.Errorf("error sending block headers: %w", err)
 	}
 

@@ -28,6 +28,20 @@ func (msg *Receipts69) Code() int { return ReceiptsCode }
 
 func (msg *Receipts69) ReqID() uint64 { return msg.RequestId }
 
+type Receipts70Packet struct {
+	RequestId           uint64
+	LastBlockIncomplete bool
+	List                rlp.RawList[*eth.ReceiptList]
+}
+
+type Receipts70 struct {
+	Receipts70Packet
+}
+
+func (msg *Receipts70) Code() int { return ReceiptsCode }
+
+func (msg *Receipts70) ReqID() uint64 { return msg.RequestId }
+
 func (c *Client) sendReceipts(ctx context.Context, r Receipts) error {
 	var requestID uint64
 
@@ -42,22 +56,26 @@ func (c *Client) sendReceipts(ctx context.Context, r Receipts) error {
 		requestID = receipts.RequestId
 		listCount = receipts.List.Len()
 		encodedData, err = rlp.EncodeToBytes(&receipts.ReceiptsPacket69)
+	case *Receipts70:
+		requestID = receipts.RequestId
+		listCount = receipts.List.Len()
+		encodedData, err = rlp.EncodeToBytes(&receipts.Receipts70Packet)
 	default:
 		return fmt.Errorf("unsupported receipts type: %T", r)
 	}
 
 	c.log.WithFields(logrus.Fields{
-		"code":           ReceiptsCode,
-		"request_id":     requestID,
-		"receipts_count": listCount,
-		"ethCapVersion":  c.ethCapVersion,
+		logFieldCode:      ReceiptsCode,
+		logFieldRequestID: requestID,
+		"receipts_count":  listCount,
+		logFieldETHCap:    c.ethCapVersion,
 	}).Debug("sending Receipts")
 
 	if err != nil {
 		return fmt.Errorf("error encoding block receipts: %w", err)
 	}
 
-	if _, err := c.rlpxConn.Write(ReceiptsCode, encodedData); err != nil {
+	if err := c.writeRLPx(ReceiptsCode, encodedData); err != nil {
 		return fmt.Errorf("error sending block receipts: %w", err)
 	}
 

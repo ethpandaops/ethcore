@@ -28,7 +28,7 @@ func (c *Client) receiveBlockRangeUpdate(ctx context.Context, data []byte) (*Blo
 }
 
 func (c *Client) handleBlockRangeUpdate(ctx context.Context, code uint64, data []byte) error {
-	c.log.WithField("code", code).Debug("received BlockRangeUpdate")
+	c.log.WithField(logFieldCode, code).Debug("received BlockRangeUpdate")
 
 	blockRangeUpdate, err := c.receiveBlockRangeUpdate(ctx, data)
 	if err != nil {
