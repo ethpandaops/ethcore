@@ -8,11 +8,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/attestantio/go-eth2-client/spec"
-	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/ethpandaops/beacon/pkg/beacon"
 	"github.com/ethpandaops/ethcore/pkg/ethereum/beacon/services"
 	"github.com/ethpandaops/ethwallclock"
+	"github.com/ethpandaops/go-eth2-client/spec"
+	"github.com/ethpandaops/go-eth2-client/spec/phase0"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
