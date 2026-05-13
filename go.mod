@@ -8,10 +8,10 @@ require (
 	github.com/chuckpreslar/emission v0.0.0-20170206194824-a7ddd980baf9
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0
 	github.com/ethereum/go-ethereum v1.17.2-0.20260324190457-8f361e342cb9
-	github.com/ethpandaops/beacon v0.67.1-0.20260507021101-bdc1647be069
+	github.com/ethpandaops/beacon v0.68.1-0.20260513233739-0260912e4454
 	github.com/ethpandaops/ethereum-package-go v0.8.1
 	github.com/ethpandaops/ethwallclock v0.4.0
-	github.com/ethpandaops/go-eth2-client v0.1.2-0.20260501105559-03ed5eacf583
+	github.com/ethpandaops/go-eth2-client v0.1.2
 	github.com/go-co-op/gocron/v2 v2.16.6
 	github.com/golang/snappy v1.0.0
 	github.com/jellydator/ttlcache/v3 v3.4.0
@@ -82,7 +82,7 @@ require (
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/go-yaml/yaml v2.1.0+incompatible // indirect
-	github.com/goccy/go-yaml v1.17.1 // indirect
+	github.com/goccy/go-yaml v1.19.2 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/gofrs/flock v0.12.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
@@ -181,7 +181,7 @@ require (
 	github.com/pion/transport/v3 v3.0.7 // indirect
 	github.com/pion/turn/v4 v4.0.1 // indirect
 	github.com/pion/webrtc/v4 v4.1.0 // indirect
-	github.com/pk910/dynamic-ssz v1.3.1 // indirect
+	github.com/pk910/dynamic-ssz v1.3.2-0.20260505131440-111bcb265c8f // indirect
 	github.com/pk910/hashtree-bindings v0.1.0 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
