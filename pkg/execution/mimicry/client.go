@@ -107,7 +107,10 @@ func (c *Client) Start(ctx context.Context) error {
 	_, msgPipe := p2p.MsgPipe()
 	c.msgPipe = msgPipe
 
-	c.ethPeer = eth.NewPeer(maxETHProtocolVersion, c.peer, c.msgPipe, nil)
+	// chainConfig is fork-aware (Amsterdam timestamp check inside go-ethereum); pass nil
+	// because the mimicry client only observes Status handshakes and doesn't drive
+	// Amsterdam-aware behavior. go-ethereum's peer code handles nil defensively.
+	c.ethPeer = eth.NewPeer(maxETHProtocolVersion, c.peer, c.msgPipe, nil, nil)
 
 	address := c.nodeRecord.IP().String() + ":" + strconv.Itoa(c.nodeRecord.TCP())
 	c.log.WithField("address", address).Debug("dialing peer")
