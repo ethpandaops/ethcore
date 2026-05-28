@@ -107,7 +107,7 @@ func (c *Client) Start(ctx context.Context) error {
 	_, msgPipe := p2p.MsgPipe()
 	c.msgPipe = msgPipe
 
-	c.ethPeer = eth.NewPeer(maxETHProtocolVersion, c.peer, c.msgPipe, nil)
+	c.ethPeer = eth.NewPeer(maxETHProtocolVersion, c.peer, c.msgPipe, nil, nil)
 
 	address := c.nodeRecord.IP().String() + ":" + strconv.Itoa(c.nodeRecord.TCP())
 	c.log.WithField("address", address).Debug("dialing peer")

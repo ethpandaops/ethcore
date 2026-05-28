@@ -14,7 +14,7 @@ const (
 	GetReceiptsCode = RLPXOffset + eth.GetReceiptsMsg
 )
 
-type GetReceipts eth.GetReceiptsPacket
+type GetReceipts eth.GetReceiptsPacket69
 
 func (msg *GetReceipts) Code() int { return GetReceiptsCode }
 
@@ -111,7 +111,7 @@ func (c *Client) handleGetReceipts(ctx context.Context, code uint64, data []byte
 			List:                list,
 		}}
 	} else {
-		receipts = &Receipts69{ReceiptsPacket: eth.ReceiptsPacket{
+		receipts = &Receipts69{ReceiptsPacket69: eth.ReceiptsPacket69{
 			RequestId: request.ReqID(),
 			List:      list,
 		}}

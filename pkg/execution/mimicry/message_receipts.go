@@ -21,7 +21,7 @@ type Receipts interface {
 }
 
 type Receipts69 struct {
-	eth.ReceiptsPacket
+	eth.ReceiptsPacket69
 }
 
 func (msg *Receipts69) Code() int { return ReceiptsCode }
@@ -55,7 +55,7 @@ func (c *Client) sendReceipts(ctx context.Context, r Receipts) error {
 	case *Receipts69:
 		requestID = receipts.RequestId
 		listCount = receipts.List.Len()
-		encodedData, err = rlp.EncodeToBytes(&receipts.ReceiptsPacket)
+		encodedData, err = rlp.EncodeToBytes(&receipts.ReceiptsPacket69)
 	case *Receipts70:
 		requestID = receipts.RequestId
 		listCount = receipts.List.Len()

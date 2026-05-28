@@ -547,9 +547,12 @@ func TestGossipsubUnsubscribe(t *testing.T) {
 	// Wait for mesh
 	WaitForGossipsubReady(t, nodes, topic.Name(), 3)
 
-	// Unsubscribe node 2
+	// Unsubscribe node 2. The gossipsub mesh re-converges on heartbeats (1s
+	// default), so wait long enough for at least two ticks before publishing.
+	// With only three nodes the mesh is fragile and a publish made too soon
+	// after the PRUNE can end up with no mesh peer to fan out to.
 	subscriptions[2].Cancel()
-	time.Sleep(500 * time.Millisecond) // Allow unsubscribe to propagate
+	time.Sleep(2500 * time.Millisecond)
 
 	// Publish message from node 0
 	msg := GossipTestMessage{
@@ -561,11 +564,14 @@ func TestGossipsubUnsubscribe(t *testing.T) {
 	err = v1.Publish(nodes[0].Gossipsub, topic, msg)
 	require.NoError(t, err)
 
-	// Wait a bit for propagation
-	time.Sleep(1 * time.Second)
+	// Wait for node 1 to receive the message. CI scheduling and mesh maintenance
+	// can take noticeably longer than a local run, so poll generously.
+	require.Eventually(t, func() bool {
+		return collectors[1].GetMessageCount() == 1
+	}, 10*time.Second, 100*time.Millisecond, "Node 1 should receive the message")
 
-	// Verify only node 1 received the message
-	assert.Equal(t, 1, collectors[1].GetMessageCount(), "Node 1 should receive the message")
+	// Give any straggler delivery a chance before asserting node 2 stayed at zero.
+	time.Sleep(500 * time.Millisecond)
 	assert.Equal(t, 0, collectors[2].GetMessageCount(), "Node 2 should not receive the message after unsubscribe")
 
 	messages := collectors[1].GetMessages()
