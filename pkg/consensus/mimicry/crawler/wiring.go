@@ -408,7 +408,6 @@ func (c *Crawler) startDialer(ctx context.Context) error {
 		workerID := i
 
 		c.dialerWg.Go(func() {
-
 			for {
 				select {
 				case node, ok := <-c.peersToDial:
@@ -460,7 +459,6 @@ func (c *Crawler) startRetryWorker(ctx context.Context) error {
 	}).Info("Starting retry worker")
 
 	c.dialerWg.Go(func() {
-
 		for {
 			select {
 			case retryInfo, ok := <-c.retryQueue:
