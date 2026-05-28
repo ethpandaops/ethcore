@@ -1,6 +1,6 @@
 module github.com/ethpandaops/ethcore
 
-go 1.26.0
+go 1.26.1
 
 require (
 	github.com/OffchainLabs/prysm/v6 v6.1.4
@@ -18,7 +18,7 @@ require (
 	github.com/kurtosis-tech/kurtosis/api/golang v1.18.1
 	github.com/libp2p/go-libp2p v0.41.1
 	github.com/libp2p/go-libp2p-mplex v0.11.0
-	github.com/libp2p/go-libp2p-pubsub v0.16.0
+	github.com/libp2p/go-libp2p-pubsub v0.14.2
 	github.com/multiformats/go-multiaddr v0.16.1
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.23.2
