@@ -561,11 +561,15 @@ func TestGossipsubUnsubscribe(t *testing.T) {
 	err = v1.Publish(nodes[0].Gossipsub, topic, msg)
 	require.NoError(t, err)
 
-	// Wait a bit for propagation
-	time.Sleep(1 * time.Second)
+	// Wait for node 1 to receive the message. Mesh stabilisation after node 2
+	// unsubscribes can be slow under CI load, so poll rather than relying on a
+	// fixed sleep.
+	require.Eventually(t, func() bool {
+		return collectors[1].GetMessageCount() == 1
+	}, 5*time.Second, 50*time.Millisecond, "Node 1 should receive the message")
 
-	// Verify only node 1 received the message
-	assert.Equal(t, 1, collectors[1].GetMessageCount(), "Node 1 should receive the message")
+	// Give any straggler delivery a chance before asserting node 2 stayed at zero.
+	time.Sleep(500 * time.Millisecond)
 	assert.Equal(t, 0, collectors[2].GetMessageCount(), "Node 2 should not receive the message after unsubscribe")
 
 	messages := collectors[1].GetMessages()
