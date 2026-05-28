@@ -547,9 +547,23 @@ func TestGossipsubUnsubscribe(t *testing.T) {
 	// Wait for mesh
 	WaitForGossipsubReady(t, nodes, topic.Name(), 3)
 
-	// Unsubscribe node 2
+	// Unsubscribe node 2 and wait for the mesh to settle. Gossipsub heartbeats
+	// default to 1s, so we need at least one tick after the UNSUBSCRIBE
+	// announcement propagates before publishing.
 	subscriptions[2].Cancel()
-	time.Sleep(500 * time.Millisecond) // Allow unsubscribe to propagate
+
+	// Wait for node 0 to drop node 2 from its topic peer list, so the publish
+	// only fans out to node 1's mesh edge.
+	require.Eventually(t, func() bool {
+		peers := nodes[0].Gossipsub.GetPubSub().ListPeers(topic.Name())
+		for _, p := range peers {
+			if p == nodes[2].ID {
+				return false
+			}
+		}
+
+		return true
+	}, 5*time.Second, 100*time.Millisecond, "Node 0 should observe node 2's unsubscribe")
 
 	// Publish message from node 0
 	msg := GossipTestMessage{
@@ -561,12 +575,11 @@ func TestGossipsubUnsubscribe(t *testing.T) {
 	err = v1.Publish(nodes[0].Gossipsub, topic, msg)
 	require.NoError(t, err)
 
-	// Wait for node 1 to receive the message. Mesh stabilisation after node 2
-	// unsubscribes can be slow under CI load, so poll rather than relying on a
-	// fixed sleep.
+	// Wait for node 1 to receive the message. CI scheduling and mesh maintenance
+	// can take noticeably longer than a local run, so poll generously.
 	require.Eventually(t, func() bool {
 		return collectors[1].GetMessageCount() == 1
-	}, 5*time.Second, 50*time.Millisecond, "Node 1 should receive the message")
+	}, 10*time.Second, 100*time.Millisecond, "Node 1 should receive the message")
 
 	// Give any straggler delivery a chance before asserting node 2 stayed at zero.
 	time.Sleep(500 * time.Millisecond)
