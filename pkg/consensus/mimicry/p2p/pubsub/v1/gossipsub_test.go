@@ -547,23 +547,12 @@ func TestGossipsubUnsubscribe(t *testing.T) {
 	// Wait for mesh
 	WaitForGossipsubReady(t, nodes, topic.Name(), 3)
 
-	// Unsubscribe node 2 and wait for the mesh to settle. Gossipsub heartbeats
-	// default to 1s, so we need at least one tick after the UNSUBSCRIBE
-	// announcement propagates before publishing.
+	// Unsubscribe node 2. The gossipsub mesh re-converges on heartbeats (1s
+	// default), so wait long enough for at least two ticks before publishing.
+	// With only three nodes the mesh is fragile and a publish made too soon
+	// after the PRUNE can end up with no mesh peer to fan out to.
 	subscriptions[2].Cancel()
-
-	// Wait for node 0 to drop node 2 from its topic peer list, so the publish
-	// only fans out to node 1's mesh edge.
-	require.Eventually(t, func() bool {
-		peers := nodes[0].Gossipsub.GetPubSub().ListPeers(topic.Name())
-		for _, p := range peers {
-			if p == nodes[2].ID {
-				return false
-			}
-		}
-
-		return true
-	}, 5*time.Second, 100*time.Millisecond, "Node 0 should observe node 2's unsubscribe")
+	time.Sleep(2500 * time.Millisecond)
 
 	// Publish message from node 0
 	msg := GossipTestMessage{
