@@ -418,7 +418,7 @@ func TestMetrics_ThreadSafety(t *testing.T) {
 
 	done := make(chan bool)
 	go func() {
-		for i := 0; i < 100; i++ {
+		for range 100 {
 			_ = m.Register(registry)
 			m.Unregister(registry)
 		}
@@ -426,7 +426,7 @@ func TestMetrics_ThreadSafety(t *testing.T) {
 	}()
 
 	go func() {
-		for i := 0; i < 100; i++ {
+		for range 100 {
 			_ = m.Register(registry)
 			m.Unregister(registry)
 		}

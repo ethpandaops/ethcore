@@ -1,7 +1,6 @@
 package v1_test
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -13,8 +12,7 @@ import (
 
 // TestWithPubsubOptions tests that custom pubsub options can be provided.
 func TestWithPubsubOptions(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	// Create test infrastructure
 	ti := NewTestInfrastructure(t)
@@ -39,8 +37,7 @@ func TestWithPubsubOptions(t *testing.T) {
 
 // TestWithPubsubOptionsMultiple tests that multiple WithPubsubOptions calls append options.
 func TestWithPubsubOptionsMultiple(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	// Create test infrastructure
 	ti := NewTestInfrastructure(t)
@@ -61,8 +58,7 @@ func TestWithPubsubOptionsMultiple(t *testing.T) {
 
 // TestWithPubsubOptionsScoring tests providing peer scoring options.
 func TestWithPubsubOptionsScoring(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	// Create test infrastructure
 	ti := NewTestInfrastructure(t)
@@ -100,8 +96,7 @@ func TestWithPubsubOptionsScoring(t *testing.T) {
 
 // TestWithPubsubOptionsIntegration tests pubsub options work with actual pub/sub.
 func TestWithPubsubOptionsIntegration(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	// Create test infrastructure
 	ti := NewTestInfrastructure(t)

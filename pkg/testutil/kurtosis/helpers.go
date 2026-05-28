@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"net"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -231,7 +232,7 @@ func AssertNetworkHealth(t *testing.T, ctx context.Context, foundation *TestFoun
 	// Collect results
 	var unhealthyNodes []string
 
-	for i := 0; i < len(consensusClients); i++ {
+	for range consensusClients {
 		result := <-results
 		if result.err != nil {
 			unhealthyNodes = append(unhealthyNodes, fmt.Sprintf("%s: %v", result.name, result.err))
@@ -287,12 +288,10 @@ func GetBeaconClientByType(foundation *TestFoundation, epgNetwork network.Networ
 			// Verify this client is in the foundation's list
 			foundation.mu.Lock()
 
-			for _, beaconClient := range foundation.BeaconClients {
-				if beaconClient == consensusClient.Name() {
-					foundation.mu.Unlock()
+			if slices.Contains(foundation.BeaconClients, consensusClient.Name()) {
+				foundation.mu.Unlock()
 
-					return consensusClient.Name(), nil
-				}
+				return consensusClient.Name(), nil
 			}
 
 			foundation.mu.Unlock()

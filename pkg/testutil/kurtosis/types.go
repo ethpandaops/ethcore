@@ -23,7 +23,7 @@ type TestFoundation struct {
 	// EPGNetwork is the ethereum-package-go network instance.
 	// This is stored as interface{} to avoid circular dependencies,
 	// but should be cast to network.Network when used.
-	EPGNetwork interface{}
+	EPGNetwork any
 
 	// BeaconClients contains the list of beacon client identifiers used in the test
 	BeaconClients []string

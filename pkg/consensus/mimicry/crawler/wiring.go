@@ -407,10 +407,7 @@ func (c *Crawler) startDialer(ctx context.Context) error {
 	for i := 0; i < c.config.DialConcurrency; i++ {
 		workerID := i
 
-		c.dialerWg.Add(1)
-
-		go func() {
-			defer c.dialerWg.Done()
+		c.dialerWg.Go(func() {
 
 			for {
 				select {
@@ -449,7 +446,7 @@ func (c *Crawler) startDialer(ctx context.Context) error {
 					return
 				}
 			}
-		}()
+		})
 	}
 
 	return nil
@@ -462,10 +459,7 @@ func (c *Crawler) startRetryWorker(ctx context.Context) error {
 		"backoff":      c.config.RetryBackoff,
 	}).Info("Starting retry worker")
 
-	c.dialerWg.Add(1)
-
-	go func() {
-		defer c.dialerWg.Done()
+	c.dialerWg.Go(func() {
 
 		for {
 			select {
@@ -515,7 +509,7 @@ func (c *Crawler) startRetryWorker(ctx context.Context) error {
 				return
 			}
 		}
-	}()
+	})
 
 	return nil
 }

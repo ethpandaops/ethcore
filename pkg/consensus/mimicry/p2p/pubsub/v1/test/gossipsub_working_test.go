@@ -12,8 +12,7 @@ import (
 )
 
 func TestWorkingMessage(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	// Create test infrastructure
 	ti := NewTestInfrastructure(t)

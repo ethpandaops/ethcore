@@ -250,7 +250,7 @@ func TestMultipleSubscribers(t *testing.T) {
 	wg.Add(3)
 
 	// Register multiple handlers for the same event
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		client.OnDisconnect(ctx, func(ctx context.Context, reason *Disconnect) error {
 			mu.Lock()
 			count++
