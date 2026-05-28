@@ -127,7 +127,7 @@ func (m *Metrics) Register(registerer prometheus.Registerer) error {
 	for _, c := range collectors {
 		if err := registerer.Register(c); err != nil {
 			// Try to unregister any previously registered collectors
-			for i := 0; i < len(collectors); i++ {
+			for i := range collectors {
 				registerer.Unregister(collectors[i])
 			}
 

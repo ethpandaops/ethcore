@@ -95,7 +95,7 @@ func TestMetrics_RecordNodeProcessed(t *testing.T) {
 	assert.Equal(t, float64(1), testutil.ToFloat64(m.NodesProcessed))
 
 	// Record multiple nodes
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		m.RecordNodeProcessed()
 	}
 	assert.Equal(t, float64(6), testutil.ToFloat64(m.NodesProcessed))
@@ -178,7 +178,7 @@ func TestMetrics_RecordSuccessfulCrawl(t *testing.T) {
 	}
 
 	// Test incrementing same agent multiple times
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		m.RecordSuccessfulCrawl("lighthouse")
 	}
 	counter, err := m.SuccessfulCrawls.GetMetricWithLabelValues("lighthouse")
@@ -232,11 +232,11 @@ func TestMetrics_ConcurrentAccess(t *testing.T) {
 	workers := 10
 	iterations := 100
 
-	for i := 0; i < workers; i++ {
+	for i := range workers {
 		go func(workerID int) {
 			defer func() { done <- struct{}{} }()
 
-			for j := 0; j < iterations; j++ {
+			for range iterations {
 				m.RecordNodeProcessed()
 				m.RecordPendingDials(workerID)
 				m.RecordFailedCrawl("concurrent_test")
@@ -247,7 +247,7 @@ func TestMetrics_ConcurrentAccess(t *testing.T) {
 	}
 
 	// Wait for all workers to complete
-	for i := 0; i < workers; i++ {
+	for range workers {
 		<-done
 	}
 

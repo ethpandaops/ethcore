@@ -26,7 +26,7 @@ func ComputeForkDigest(genesisValidatorsRoot phase0.Root, forkVersion phase0.Ver
 		epochBytes := make([]byte, 8, 16)
 		maxBlobsBytes := make([]byte, 8)
 
-		for i := 0; i < 8; i++ {
+		for i := range 8 {
 			epochBytes[i] = byte((blobParams.Epoch >> (8 * i)) & 0xff)
 			maxBlobsBytes[i] = byte((blobParams.MaxBlobsPerBlock >> (8 * i)) & 0xff)
 		}
@@ -42,7 +42,7 @@ func ComputeForkDigest(genesisValidatorsRoot phase0.Root, forkVersion phase0.Ver
 
 		// xor baseDigest with first 4 bytes of blobParamHash
 		forkDigest := make([]byte, 4)
-		for i := 0; i < 4; i++ {
+		for i := range 4 {
 			forkDigest[i] = forkDataRoot[i] ^ blobParamHash[i]
 		}
 

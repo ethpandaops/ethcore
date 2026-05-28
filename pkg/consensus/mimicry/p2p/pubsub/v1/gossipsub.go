@@ -299,15 +299,12 @@ func Subscribe[T any](ctx context.Context, g *Gossipsub, topic *Topic[T]) (*Subs
 	}
 
 	// Start processor in background
-	g.wg.Add(1)
 
-	go func() {
-		defer g.wg.Done()
-
+	g.wg.Go(func() {
 		<-subCtx.Done()
 
 		g.removeProcessor(topicName)
-	}()
+	})
 
 	// Start the processor
 	proc.start(procCtx)

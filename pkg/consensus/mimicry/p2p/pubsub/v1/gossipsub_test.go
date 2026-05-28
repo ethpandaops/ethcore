@@ -194,7 +194,7 @@ func (ti *TestInfrastructure) CreateFullyConnectedNetwork(ctx context.Context, n
 	nodes := make([]*TestNode, n)
 
 	// Create all nodes
-	for i := 0; i < n; i++ {
+	for i := range n {
 		node, err := ti.CreateNode(ctx, opts...)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create node %d: %w", i, err)
@@ -203,7 +203,7 @@ func (ti *TestInfrastructure) CreateFullyConnectedNetwork(ctx context.Context, n
 	}
 
 	// Connect all nodes to each other
-	for i := 0; i < n; i++ {
+	for i := range n {
 		for j := i + 1; j < n; j++ {
 			if err := ti.ConnectNodes(nodes[i], nodes[j]); err != nil {
 				return nil, fmt.Errorf("failed to connect node %d to node %d: %w", i, j, err)
@@ -319,8 +319,7 @@ func WaitForGossipsubReady(t *testing.T, nodes []*TestNode, topicName string, ex
 }
 
 func TestGossipsubThreeNodeMessagePropagation(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	// Create test infrastructure
 	ti := NewTestInfrastructure(t)
@@ -429,8 +428,7 @@ func TestGossipsubThreeNodeMessagePropagation(t *testing.T) {
 }
 
 func TestGossipsubMultipleMessages(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	// Create test infrastructure
 	ti := NewTestInfrastructure(t)
@@ -488,7 +486,7 @@ func TestGossipsubMultipleMessages(t *testing.T) {
 
 	// Track which nodes received which messages
 	messageReceipts := make(map[string]map[string]bool) // messageID -> nodeID -> received
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		messageReceipts[fmt.Sprintf("msg-%d", i)] = make(map[string]bool)
 	}
 
@@ -513,8 +511,7 @@ func TestGossipsubMultipleMessages(t *testing.T) {
 }
 
 func TestGossipsubUnsubscribe(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	// Create test infrastructure
 	ti := NewTestInfrastructure(t)
@@ -580,8 +577,7 @@ func TestGossipsubUnsubscribe(t *testing.T) {
 }
 
 func TestGossipsubTopicIsolation(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	// Create test infrastructure
 	ti := NewTestInfrastructure(t)

@@ -142,10 +142,7 @@ func multiNoteTest(t *testing.T, logger *logrus.Logger, epgNetwork network.Netwo
 
 	// Get all consensus clients from network
 	consensusClients := epgNetwork.ConsensusClients().All()
-	numNodes := len(consensusClients)
-	if numNodes > 3 {
-		numNodes = 3
-	}
+	numNodes := min(len(consensusClients), 3)
 
 	var (
 		nodes []*ethereum.BeaconNode
