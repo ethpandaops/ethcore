@@ -357,13 +357,13 @@ func TestParseIPAddresses(t *testing.T) {
 		{
 			name:        "Valid ENR with IPv4 address",
 			enr:         "enr:-Iq4QCxbKw-XHdkvUcbd5-bJ8vEtyJr5jD3sg3XCwnkWXWwOEcuWWTrev8TnIcSsatTVd2LseQy1wH8u97vPGlxismiGAZerck1AgmlkgnY0gmlwhKdHDm2Jc2VjcDI1NmsxoQJJ3h8aUO3GJHv-bdvHtsQZ2OEisutelYfGjXO4lSg8BYN1ZHCCIzI",
-			expectedIP4: stringPtr("167.71.14.109"),
+			expectedIP4: new("167.71.14.109"),
 			expectedIP6: nil,
 		},
 		{
 			name:        "Different ENR with IPv4 address",
 			enr:         "enr:-MG4QGk5z8hpTrGM3uosvLuGmdL381IMXvmeBJBRxJUreV_cemmE-cJ6ftJRggPjM_tX6uhSEsO3mbqYpaSVTx4aYdYHh2F0dG5ldHOIAAAAAIABAACDY2djgYCEZXRoMpCBABMacJN1RAABAAAAAAAAgmlkgnY0gmlwhKdHDm2DbmZkhDafifeJc2VjcDI1NmsxoQN2BhqrvYI0XsXGaCnPcgLDwrwIL_szGrhtPGtb9_-AeYN0Y3CCIyiDdWRwgiMo",
-			expectedIP4: stringPtr("167.71.14.109"),
+			expectedIP4: new("167.71.14.109"),
 			expectedIP6: nil,
 		},
 	}
@@ -657,12 +657,14 @@ func TestParseFieldsWithMissingData(t *testing.T) {
 	assert.Nil(t, result.GetNFD(), "GetNFD() should return nil when not present")
 }
 
+//go:fix inline
 func stringPtr(s string) *string {
-	return &s
+	return new(s)
 }
 
+//go:fix inline
 func uint32Ptr(u uint32) *uint32 {
-	return &u
+	return new(u)
 }
 
 func TestParseIP6Logic(t *testing.T) {

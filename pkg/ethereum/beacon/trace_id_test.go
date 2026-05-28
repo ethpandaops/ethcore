@@ -200,7 +200,7 @@ func TestGenerateBeaconTraceIDs_LargeScale(t *testing.T) {
 	const numAddresses = 1000
 	addresses := make([]string, numAddresses)
 
-	for i := 0; i < numAddresses/2; i++ {
+	for i := range numAddresses / 2 {
 		addresses[i] = "http://same-beacon:5052"
 	}
 

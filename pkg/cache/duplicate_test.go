@@ -254,7 +254,7 @@ func TestDuplicateCache_ConcurrentAccess(t *testing.T) {
 	// Test concurrent writes
 	done := make(chan bool)
 	nodes := cache.GetCache()
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		go func(idx int) {
 			key := fmt.Sprintf("node%d", idx)
 			nodes.Set(key, time.Now(), ttlcache.DefaultTTL)
@@ -263,12 +263,12 @@ func TestDuplicateCache_ConcurrentAccess(t *testing.T) {
 	}
 
 	// Wait for all goroutines to complete
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		<-done
 	}
 
 	// Verify all items were set
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		key := fmt.Sprintf("node%d", i)
 		item := nodes.Get(key)
 		assert.NotNil(t, item, "Expected item for key %s", key)

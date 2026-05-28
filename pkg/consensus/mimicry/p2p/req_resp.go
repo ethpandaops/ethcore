@@ -3,6 +3,7 @@ package p2p
 import (
 	"context"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/OffchainLabs/prysm/v6/beacon-chain/p2p/encoder"
@@ -43,10 +44,8 @@ func (r *ReqResp) SupportedProtocols() []protocol.ID {
 func (r *ReqResp) RegisterHandler(ctx context.Context, proto protocol.ID, handler func(ctx context.Context, stream network.Stream) error) error {
 	r.log.WithField("protocol", proto).Info("Registering protocol handler")
 
-	for _, p := range r.protocols {
-		if p == proto {
-			return fmt.Errorf("protocol already registered: %s", proto)
-		}
+	if slices.Contains(r.protocols, proto) {
+		return fmt.Errorf("protocol already registered: %s", proto)
 	}
 
 	r.protocols = append(r.protocols, proto)

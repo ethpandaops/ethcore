@@ -108,7 +108,7 @@ func TestManual_MultipleNodes(t *testing.T) {
 
 	// Add multiple nodes
 	numNodes := 5
-	for i := 0; i < numNodes; i++ {
+	for i := range numNodes {
 		privKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
 

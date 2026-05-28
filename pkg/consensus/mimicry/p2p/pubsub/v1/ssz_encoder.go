@@ -36,7 +36,7 @@ func (e *SSZEncoder[T]) Decode(data []byte) (T, error) {
 
 	// Create a new instance
 	var target reflect.Value
-	if msgType.Kind() == reflect.Ptr {
+	if msgType.Kind() == reflect.Pointer {
 		// T is already a pointer type (e.g., *MyStruct)
 		target = reflect.New(msgType.Elem())
 	} else {
@@ -56,7 +56,7 @@ func (e *SSZEncoder[T]) Decode(data []byte) (T, error) {
 	}
 
 	// Return the appropriate value
-	if msgType.Kind() == reflect.Ptr {
+	if msgType.Kind() == reflect.Pointer {
 		val, convertOk := target.Interface().(T)
 		if !convertOk {
 			return zero, fmt.Errorf("failed to convert to target type")

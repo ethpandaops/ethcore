@@ -36,18 +36,18 @@ func (m *SSZTestMessage) MarshalSSZ() ([]byte, error) {
 	buf := make([]byte, 8+4+4+len(m.Data))
 
 	// ID (8 bytes)
-	for i := 0; i < 8; i++ {
+	for i := range 8 {
 		buf[i] = byte(m.ID >> (i * 8))
 	}
 
 	// Value (4 bytes)
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		buf[8+i] = byte(m.Value >> (i * 8))
 	}
 
 	// Content length (4 bytes)
 	contentLen := uint32(len(m.Data))
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		buf[12+i] = byte(contentLen >> (i * 8))
 	}
 
@@ -65,19 +65,19 @@ func (m *SSZTestMessage) UnmarshalSSZ(buf []byte) error {
 
 	// ID (8 bytes)
 	m.ID = 0
-	for i := 0; i < 8; i++ {
+	for i := range 8 {
 		m.ID |= uint64(buf[i]) << (i * 8)
 	}
 
 	// Value (4 bytes)
 	m.Value = 0
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		m.Value |= uint32(buf[8+i]) << (i * 8)
 	}
 
 	// Content length (4 bytes)
 	var contentLen uint32
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		contentLen |= uint32(buf[12+i]) << (i * 8)
 	}
 
@@ -105,18 +105,18 @@ func (m *SSZTestMessage) MarshalSSZTo(dst []byte) ([]byte, error) {
 	}
 
 	// ID (8 bytes)
-	for i := 0; i < 8; i++ {
+	for i := range 8 {
 		dst[i] = byte(m.ID >> (i * 8))
 	}
 
 	// Value (4 bytes)
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		dst[8+i] = byte(m.Value >> (i * 8))
 	}
 
 	// Content length (4 bytes)
 	contentLen := uint32(len(m.Data))
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		dst[12+i] = byte(contentLen >> (i * 8))
 	}
 
@@ -244,7 +244,7 @@ func (ti *TestInfrastructure) CreateFullyConnectedNetwork(ctx context.Context, c
 	nodes := make([]*TestNode, count)
 
 	// Create all nodes
-	for i := 0; i < count; i++ {
+	for i := range count {
 		node, err := ti.CreateNode(ctx, opts...)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create node %d: %w", i, err)
@@ -253,7 +253,7 @@ func (ti *TestInfrastructure) CreateFullyConnectedNetwork(ctx context.Context, c
 	}
 
 	// Connect all nodes to each other
-	for i := 0; i < count; i++ {
+	for i := range count {
 		for j := i + 1; j < count; j++ {
 			if err := ti.connectNodes(ctx, nodes[i], nodes[j]); err != nil {
 				return nil, fmt.Errorf("failed to connect nodes %d and %d: %w", i, j, err)

@@ -331,7 +331,7 @@ func TestDiscV4_ConcurrentOperations(t *testing.T) {
 		// Multiple goroutines updating boot nodes
 		go func() {
 			defer wg.Done()
-			for i := 0; i < 20; i++ {
+			for range 20 {
 				err := disc.UpdateBootNodes([]string{
 					"enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@10.0.0.1:30303",
 				})
@@ -341,7 +341,7 @@ func TestDiscV4_ConcurrentOperations(t *testing.T) {
 
 		go func() {
 			defer wg.Done()
-			for i := 0; i < 20; i++ {
+			for range 20 {
 				err := disc.UpdateBootNodes([]string{
 					"enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@10.0.0.2:30303",
 				})
@@ -351,7 +351,7 @@ func TestDiscV4_ConcurrentOperations(t *testing.T) {
 
 		go func() {
 			defer wg.Done()
-			for i := 0; i < 20; i++ {
+			for range 20 {
 				err := disc.UpdateBootNodes([]string{
 					"enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@10.0.0.3:30303",
 					"enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@10.0.0.4:30303",
@@ -369,7 +369,7 @@ func TestDiscV4_ConcurrentOperations(t *testing.T) {
 	// Test multiple instances don't interfere
 	t.Run("multiple instances", func(t *testing.T) {
 		instances := make([]*DiscV4, 3)
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			instances[i] = NewDiscV4(ctx, 1*time.Hour, logger)
 		}
 
@@ -379,7 +379,7 @@ func TestDiscV4_ConcurrentOperations(t *testing.T) {
 		for idx, disc := range instances {
 			go func(d *DiscV4, i int) {
 				defer wg.Done()
-				for j := 0; j < 10; j++ {
+				for range 10 {
 					err := d.UpdateBootNodes([]string{
 						fmt.Sprintf("enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@10.0.%d.1:30303", i),
 					})
@@ -414,7 +414,7 @@ func TestDiscV4_ConcurrentStartStop(t *testing.T) {
 	// Start goroutine
 	go func() {
 		defer wg.Done()
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			err := disc.Start(ctx)
 			assert.NoError(t, err)
 			time.Sleep(10 * time.Millisecond)
@@ -424,7 +424,7 @@ func TestDiscV4_ConcurrentStartStop(t *testing.T) {
 	// Stop goroutine
 	go func() {
 		defer wg.Done()
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			err := disc.Stop(ctx)
 			assert.NoError(t, err)
 			time.Sleep(10 * time.Millisecond)
@@ -434,7 +434,7 @@ func TestDiscV4_ConcurrentStartStop(t *testing.T) {
 	// UpdateBootNodes goroutine
 	go func() {
 		defer wg.Done()
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			err := disc.UpdateBootNodes([]string{
 				"enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@10.0.0.1:30303",
 			})

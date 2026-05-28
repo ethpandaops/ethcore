@@ -70,7 +70,7 @@ func TestCrawler_ENRConcurrency(t *testing.T) {
 	peers := make([]peer.ID, numPeers)
 	nodes := make([]*enode.Node, numPeers)
 
-	for i := 0; i < numPeers; i++ {
+	for i := range numPeers {
 		privKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
 
@@ -94,7 +94,7 @@ func TestCrawler_ENRConcurrency(t *testing.T) {
 
 	// Writer goroutine
 	go func() {
-		for i := 0; i < numPeers; i++ {
+		for i := range numPeers {
 			c.peerENRsMu.Lock()
 			c.peerENRs[peers[i]] = nodes[i]
 			c.peerENRsMu.Unlock()
@@ -104,8 +104,8 @@ func TestCrawler_ENRConcurrency(t *testing.T) {
 
 	// Reader goroutine
 	go func() {
-		for i := 0; i < 100; i++ {
-			for j := 0; j < numPeers; j++ {
+		for range 100 {
+			for j := range numPeers {
 				_ = c.GetPeerENR(peers[j])
 			}
 		}
@@ -115,7 +115,7 @@ func TestCrawler_ENRConcurrency(t *testing.T) {
 	<-done
 
 	// Verify all ENRs were stored correctly
-	for i := 0; i < numPeers; i++ {
+	for i := range numPeers {
 		enr := c.GetPeerENR(peers[i])
 		assert.NotNil(t, enr)
 		assert.Equal(t, nodes[i].ID().String(), enr.ID().String())
