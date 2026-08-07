@@ -107,6 +107,9 @@ func (c *Client) Start(ctx context.Context) error {
 	_, msgPipe := p2p.MsgPipe()
 	c.msgPipe = msgPipe
 
+	// txpool, blobpool and chainConfig are nil: the mimicry client only observes
+	// Status handshakes and doesn't drive fork-aware behavior. go-ethereum's peer
+	// code handles nil defensively.
 	c.ethPeer = eth.NewPeer(maxETHProtocolVersion, c.peer, c.msgPipe, nil, nil, nil)
 
 	address := c.nodeRecord.IP().String() + ":" + strconv.Itoa(c.nodeRecord.TCP())
