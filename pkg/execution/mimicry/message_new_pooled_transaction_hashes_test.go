@@ -31,7 +31,7 @@ func TestNewPooledTransactionHashesRLPEncoding(t *testing.T) {
 	hash1 := common.HexToHash("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef")
 	hash2 := common.HexToHash("0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890")
 
-	original := eth.NewPooledTransactionHashesPacket{
+	original := eth.NewPooledTransactionHashesPacket71{
 		Types:  []byte{0x02, 0x02},
 		Sizes:  []uint32{100, 200},
 		Hashes: []common.Hash{hash1, hash2},
@@ -43,7 +43,7 @@ func TestNewPooledTransactionHashesRLPEncoding(t *testing.T) {
 	require.NotEmpty(t, encoded)
 
 	// Decode
-	var decoded eth.NewPooledTransactionHashesPacket
+	var decoded eth.NewPooledTransactionHashesPacket71
 	err = rlp.DecodeBytes(encoded, &decoded)
 	require.NoError(t, err)
 
