@@ -13,7 +13,7 @@ const (
 	NewPooledTransactionHashesCode = RLPXOffset + eth.NewPooledTransactionHashesMsg
 )
 
-type NewPooledTransactionHashes eth.NewPooledTransactionHashesPacket
+type NewPooledTransactionHashes eth.NewPooledTransactionHashesPacket71
 
 func (msg *NewPooledTransactionHashes) Code() int { return NewPooledTransactionHashesCode }
 
