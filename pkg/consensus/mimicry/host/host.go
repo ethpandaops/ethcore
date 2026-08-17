@@ -58,6 +58,7 @@ type Node struct {
 	listenIP       net.IP
 	host           host.Host
 	broker         *emission.Emitter
+	emitSem        chan struct{}
 	DerivedPrivKey *crypto.Secp256k1PrivateKey
 	metrics        *Metrics
 }
@@ -67,6 +68,7 @@ func NewNode(_ context.Context, log logrus.FieldLogger, config *Config, namespac
 		log:       log.WithField("module", "ethcore/consensus/host"),
 		config:    config,
 		broker:    emission.NewEmitter(),
+		emitSem:   make(chan struct{}, 100),
 		userAgent: userAgent,
 		metrics:   NewMetrics(namespace),
 	}, nil
