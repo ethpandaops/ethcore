@@ -28,6 +28,12 @@ const (
 	logFieldETHCap       = "ethCapVersion"
 )
 
+// writeTimeout bounds every write to the rlpx connection. Without it, a
+// peer that stops draining its socket can stall Write forever while
+// writeRLPx holds writeMu, wedging the session and every other sender. A
+// var (not const) so tests can shrink it instead of waiting out 30s.
+var writeTimeout = 30 * time.Second
+
 type Client struct {
 	log logrus.FieldLogger
 
@@ -198,6 +204,10 @@ func (c *Client) writeRLPx(code uint64, data []byte) error {
 
 	if c.rlpxConn == nil {
 		return fmt.Errorf("rlpx connection is not initialized")
+	}
+
+	if err := c.conn.SetWriteDeadline(time.Now().Add(writeTimeout)); err != nil {
+		return fmt.Errorf("error setting rlpx write deadline: %w", err)
 	}
 
 	if _, err := c.rlpxConn.Write(code, data); err != nil {
