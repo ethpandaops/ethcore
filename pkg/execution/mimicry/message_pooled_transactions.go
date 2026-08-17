@@ -42,7 +42,15 @@ func (c *Client) handlePooledTransactions(ctx context.Context, code uint64, data
 
 	channel, exists := c.pooledTransactionsMap[txs.ReqID()]
 	if exists && channel != nil {
-		channel <- txs
+		// Non-blocking: a peer that sends a second (duplicate or replayed)
+		// response for a request ID whose channel is already full must not
+		// be able to block this send while holding pooledTransactionsMux,
+		// which would wedge the session read loop and every other caller
+		// waiting on the same mutex. The extra reply is simply dropped.
+		select {
+		case channel <- txs:
+		default:
+		}
 	}
 
 	return nil
