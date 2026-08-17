@@ -40,18 +40,32 @@ func (n *Node) AfterPeerDisconnect(callback AfterPeerDisconnectCallback) {
 	n.broker.On(AfterPeerDisconnectEvent, callback)
 }
 
+// emit runs the broker emit on a bounded background goroutine. Emits happen
+// from libp2p notifiees, which run synchronously on the swarm's connection
+// setup path: blocking there stalls inbound stream handling on the new
+// connection, so slow event handlers must never block the notifiee.
+func (n *Node) emit(event string, arguments ...any) {
+	n.emitSem <- struct{}{}
+
+	go func() {
+		defer func() { <-n.emitSem }()
+
+		n.broker.Emit(event, arguments...)
+	}()
+}
+
 func (n *Node) emitBeforePeerConnect(peerID peer.ID) {
-	n.broker.Emit(BeforePeerConnectEvent, peerID)
+	n.emit(BeforePeerConnectEvent, peerID)
 }
 
 func (n *Node) emitAfterPeerConnect(net network.Network, conn network.Conn) {
-	n.broker.Emit(AfterPeerConnectEvent, net, conn)
+	n.emit(AfterPeerConnectEvent, net, conn)
 }
 
 func (n *Node) emitBeforePeerDisconnect(peerID peer.ID) {
-	n.broker.Emit(BeforePeerDisconnectEvent, peerID)
+	n.emit(BeforePeerDisconnectEvent, peerID)
 }
 
 func (n *Node) emitAfterPeerDisconnect(net network.Network, conn network.Conn) {
-	n.broker.Emit(AfterPeerDisconnectEvent, net, conn)
+	n.emit(AfterPeerDisconnectEvent, net, conn)
 }
