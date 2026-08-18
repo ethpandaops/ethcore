@@ -157,6 +157,10 @@ func (r *ReqResp) SendRequest(ctx context.Context, req *Request, rsp common.SSZO
 		}
 	}()
 
+	if err := stream.SetWriteDeadline(time.Now().Add(r.config.WriteTimeout)); err != nil {
+		return ErrFailedToCreateStream.Add(err.Error())
+	}
+
 	// Send the request payload only if one exists
 	// IMPORTANT: Some requests (like metadata) have no payload per the Ethereum consensus spec.
 	// Sending a payload when none is expected will cause the request to be rejected by some clients.
@@ -175,6 +179,10 @@ func (r *ReqResp) SendRequest(ctx context.Context, req *Request, rsp common.SSZO
 		}
 
 		writeStreamClosed = true
+	}
+
+	if err := stream.SetReadDeadline(time.Now().Add(r.config.ReadTimeout)); err != nil {
+		return ErrFailedToReadResponse.Add(err.Error())
 	}
 
 	// Wait for the response
