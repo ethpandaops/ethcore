@@ -139,10 +139,13 @@ func (m *MetadataService) Start(ctx context.Context) error {
 		}
 
 		if err := m.DeriveNetwork(ctx); err != nil {
-			// Fatally panic if we can't derive the network
+			// A beacon node is untrusted input: a spec we can't derive a
+			// network from must not take down the embedding process.
+			// Network stays at its NetworkNameNone default, so Ready()
+			// reports not-ready until a later refresh succeeds.
 			m.log.WithFields(logrus.Fields{
 				"error": err,
-			}).Fatal("Failed to derive network")
+			}).Error("Failed to derive network")
 		}
 
 		if err := m.Ready(ctx); err != nil {
@@ -195,6 +198,10 @@ func (m *MetadataService) Ready(ctx context.Context) error {
 
 	if m.Spec == nil {
 		return errors.New("spec is not available")
+	}
+
+	if m.Network == nil || m.Network.Name == networks.NetworkNameNone {
+		return errors.New("network has not been derived")
 	}
 
 	if m.GetNodeVersion(ctx) == "" {
