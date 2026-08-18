@@ -68,8 +68,10 @@ func (c *Client) GetPooledTransactions(ctx context.Context, hashes []common.Hash
 	//nolint:gosec // not a security issue
 	requestID := uint64(rand.Uint32())<<32 + uint64(rand.Uint32())
 
+	// Buffered so a reply can always be delivered without the sender
+	// blocking, even if this goroutine hasn't reached the select below yet.
 	c.pooledTransactionsMux.Lock()
-	c.pooledTransactionsMap[requestID] = make(chan *PooledTransactions)
+	c.pooledTransactionsMap[requestID] = make(chan *PooledTransactions, 1)
 	c.pooledTransactionsMux.Unlock()
 
 	defer func() {
