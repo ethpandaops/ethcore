@@ -289,9 +289,11 @@ func Subscribe[T any](ctx context.Context, g *Gossipsub, topic *Topic[T]) (*Subs
 		cancel: cancel,
 	}
 
-	// Store subscription and processor
+	// Store the subscription. The processor is already stored by
+	// createProcessor above, under procMutex -- g.processors must never be
+	// written while holding only subMutex (that's the two locks racing on
+	// the same map that used to cause a fatal concurrent map write).
 	g.subscriptions[topicName] = sub
-	g.processors[topicName] = proc
 
 	// Update metrics
 	if g.metrics != nil {
@@ -501,9 +503,17 @@ func (g *Gossipsub) Stop() error {
 	// Wait for all goroutines to finish
 	g.wg.Wait()
 
-	// Clear maps
+	// Clear maps. startMu alone does not exclude a Subscribe call that is
+	// already past the g.started check and about to write to these same
+	// maps under subMutex/procMutex, so the reassignment itself must take
+	// those same locks too.
+	g.subMutex.Lock()
 	g.subscriptions = make(map[string]*Subscription)
+	g.subMutex.Unlock()
+
+	g.procMutex.Lock()
 	g.processors = make(map[string]*processor[any])
+	g.procMutex.Unlock()
 
 	g.started = false
 	g.log.Info("Gossipsub stopped")
