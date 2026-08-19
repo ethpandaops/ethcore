@@ -89,8 +89,18 @@ func (c *Client) GetPooledTransactions(ctx context.Context, hashes []common.Hash
 		return nil, err
 	}
 
+	// Read the channel reference under the lock rather than indexing the
+	// map directly inside the select: the map is also written (creation
+	// above, delete in the deferred cleanup) under this same mutex, and a
+	// second concurrent GetPooledTransactions call reaching either of
+	// those while this select evaluates the map index unlocked is a fatal
+	// concurrent map read/write.
+	c.pooledTransactionsMux.Lock()
+	ch := c.pooledTransactionsMap[requestID]
+	c.pooledTransactionsMux.Unlock()
+
 	select {
-	case res := <-c.pooledTransactionsMap[requestID]:
+	case res := <-ch:
 		return res, nil
 	case <-time.After(10 * time.Second):
 		return nil, fmt.Errorf("timeout")
