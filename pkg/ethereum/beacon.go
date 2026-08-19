@@ -289,13 +289,26 @@ func (b *BeaconNode) ForkDigest() (phase0.ForkDigest, error) {
 
 func (b *BeaconNode) startServices(ctx context.Context, errs chan error) error {
 	serviceReady := make(chan struct{})
+	// callbackErr is local to this call, unlike errs: it exists so this
+	// function's own select below can unblock immediately on a callback
+	// failure without racing the caller's separate select on errs.
+	callbackErr := make(chan error, 1)
 
 	b.metadataSvc.OnReady(ctx, func(ctx context.Context) error {
 		b.log.WithField("service", b.metadataSvc.Name()).Debug("Service is ready")
 
 		hashed, err := b.metadataSvc.GetNodeIDHash()
 		if err != nil {
-			return err
+			wrapped := fmt.Errorf("failed to get node ID hash after service became ready: %w", err)
+
+			// MetadataService.Start only logs a callback's returned error,
+			// it never retries or surfaces it. Without pushing it here
+			// ourselves, serviceReady would never close and this call
+			// would hang until ctx is done, however long that takes.
+			errs <- wrapped
+			callbackErr <- wrapped
+
+			return wrapped
 		}
 
 		b.log.WithFields(logrus.Fields{
@@ -324,6 +337,8 @@ func (b *BeaconNode) startServices(ctx context.Context, errs chan error) error {
 	select {
 	case <-serviceReady:
 		return nil
+	case err := <-callbackErr:
+		return err
 	case <-ctx.Done():
 		return ctx.Err()
 	}
