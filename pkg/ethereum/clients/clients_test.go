@@ -96,6 +96,11 @@ func TestClientFromString(t *testing.T) {
 			input:    "tysm",
 			expected: ClientTysm,
 		},
+		{
+			name:     "silver exact match",
+			input:    "silver",
+			expected: ClientSilver,
+		},
 		// Partial matches (contains)
 		{
 			name:     "lighthouse in user agent",
@@ -116,6 +121,11 @@ func TestClientFromString(t *testing.T) {
 			name:     "prysm with metadata",
 			input:    "Prysm/v4.0.8/b1234567",
 			expected: ClientPrysm,
+		},
+		{
+			name:     "silver node version",
+			input:    "silver/v0.0.1/x86_64-linux",
+			expected: ClientSilver,
 		},
 		{
 			name:     "geth in full string",
@@ -187,6 +197,7 @@ func TestClientConstants(t *testing.T) {
 		ClientGrandine:   "grandine",
 		ClientCaplin:     "caplin",
 		ClientTysm:       "tysm",
+		ClientSilver:     "silver",
 		ClientGeth:       "geth",
 		ClientBesu:       "besu",
 		ClientNethermind: "nethermind",
@@ -213,6 +224,7 @@ func TestAllConsensusClients(t *testing.T) {
 		ClientGrandine,
 		ClientCaplin,
 		ClientTysm,
+		ClientSilver,
 	}
 
 	if len(AllConsensusClients) != len(expectedConsensusClients) {
@@ -270,6 +282,7 @@ func TestAllClients(t *testing.T) {
 		ClientGrandine,
 		ClientCaplin,
 		ClientTysm,
+		ClientSilver,
 	}
 
 	for _, client := range consensusOnlyClients {
@@ -285,8 +298,8 @@ func TestAllClients(t *testing.T) {
 		}
 	}
 
-	// Check expected total count (1 unknown + 8 consensus-only + 7 execution = 16)
-	expectedCount := 16
+	// Check expected total count (1 unknown + 9 consensus-only + 7 execution = 17)
+	expectedCount := 17
 	if len(AllClients) != expectedCount {
 		t.Errorf("AllClients length = %d, want %d", len(AllClients), expectedCount)
 	}
@@ -317,6 +330,7 @@ func TestClientIdentifiersConsistency(t *testing.T) {
 		ClientGrandine,
 		ClientCaplin,
 		ClientTysm,
+		ClientSilver,
 		ClientGeth,
 		ClientBesu,
 		ClientNethermind,
