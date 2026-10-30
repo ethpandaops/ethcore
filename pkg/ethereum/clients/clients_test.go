@@ -97,8 +97,8 @@ func TestClientFromString(t *testing.T) {
 			expected: ClientTysm,
 		},
 		{
-			name:     "silver exact match",
-			input:    "silver",
+			name:     "silver uppercase",
+			input:    "SILVER",
 			expected: ClientSilver,
 		},
 		// Partial matches (contains)
