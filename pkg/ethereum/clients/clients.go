@@ -16,6 +16,8 @@ const (
 	ClientTeku Client = "teku"
 	// ClientTysm represents the Tysm consensus client.
 	ClientTysm Client = "tysm"
+	// ClientSilver represents the Silver consensus client.
+	ClientSilver Client = "silver"
 	// ClientPrysm represents the Prysm consensus client.
 	ClientPrysm Client = "prysm"
 	// ClientLodestar represents the Lodestar consensus client.
@@ -50,6 +52,7 @@ var AllConsensusClients = []Client{
 	ClientGrandine,
 	ClientCaplin,
 	ClientTysm,
+	ClientSilver,
 }
 
 // AllExecutionClients contains all known execution client implementations.
@@ -74,6 +77,7 @@ var AllClients = []Client{
 	ClientGrandine,
 	ClientCaplin,
 	ClientTysm,
+	ClientSilver,
 	ClientGeth,
 	ClientBesu,
 	ClientNethermind,
@@ -93,6 +97,7 @@ var clientIdentifiers = map[string]Client{
 	"grandine":   ClientGrandine,
 	"caplin":     ClientCaplin,
 	"tysm":       ClientTysm,
+	"silver":     ClientSilver,
 	"geth":       ClientGeth,
 	"besu":       ClientBesu,
 	"nethermind": ClientNethermind,
