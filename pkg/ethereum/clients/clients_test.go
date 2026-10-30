@@ -101,6 +101,11 @@ func TestClientFromString(t *testing.T) {
 			input:    "SILVER",
 			expected: ClientSilver,
 		},
+		{
+			name:     "ethlambda uppercase",
+			input:    "ETHLAMBDA",
+			expected: ClientEthlambda,
+		},
 		// Partial matches (contains)
 		{
 			name:     "lighthouse in user agent",
@@ -126,6 +131,11 @@ func TestClientFromString(t *testing.T) {
 			name:     "silver node version",
 			input:    "silver/v0.0.1/x86_64-linux",
 			expected: ClientSilver,
+		},
+		{
+			name:     "ethlambda node version",
+			input:    "ethlambda/v1.0.0-rc.2-4244d71/x86_64-unknown-linux-gnu/rustc-v1.97.1",
+			expected: ClientEthlambda,
 		},
 		{
 			name:     "geth in full string",
@@ -198,6 +208,7 @@ func TestClientConstants(t *testing.T) {
 		ClientCaplin:     "caplin",
 		ClientTysm:       "tysm",
 		ClientSilver:     "silver",
+		ClientEthlambda:  "ethlambda",
 		ClientGeth:       "geth",
 		ClientBesu:       "besu",
 		ClientNethermind: "nethermind",
@@ -225,6 +236,7 @@ func TestAllConsensusClients(t *testing.T) {
 		ClientCaplin,
 		ClientTysm,
 		ClientSilver,
+		ClientEthlambda,
 	}
 
 	if len(AllConsensusClients) != len(expectedConsensusClients) {
@@ -283,6 +295,7 @@ func TestAllClients(t *testing.T) {
 		ClientCaplin,
 		ClientTysm,
 		ClientSilver,
+		ClientEthlambda,
 	}
 
 	for _, client := range consensusOnlyClients {
@@ -298,8 +311,8 @@ func TestAllClients(t *testing.T) {
 		}
 	}
 
-	// Check expected total count (1 unknown + 9 consensus-only + 7 execution = 17)
-	expectedCount := 17
+	// Check expected total count (1 unknown + 10 consensus-only + 7 execution = 18)
+	expectedCount := 18
 	if len(AllClients) != expectedCount {
 		t.Errorf("AllClients length = %d, want %d", len(AllClients), expectedCount)
 	}
@@ -331,6 +344,7 @@ func TestClientIdentifiersConsistency(t *testing.T) {
 		ClientCaplin,
 		ClientTysm,
 		ClientSilver,
+		ClientEthlambda,
 		ClientGeth,
 		ClientBesu,
 		ClientNethermind,
