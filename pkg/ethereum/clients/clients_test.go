@@ -1,6 +1,7 @@
 package clients
 
 import (
+	"slices"
 	"testing"
 )
 
@@ -164,9 +165,36 @@ func TestClientFromString(t *testing.T) {
 			expected: ClientUnknown,
 		},
 		{
-			name:     "random string",
-			input:    "Mozilla/5.0 Firefox/120.0",
+			name:     "name without a version",
+			input:    "proxy/beacon",
 			expected: ClientUnknown,
+		},
+		{
+			name:     "free text",
+			input:    "Ethereum beacon node",
+			expected: ClientUnknown,
+		},
+		// Unlisted clients report their own name
+		{
+			name:     "unlisted client node version",
+			input:    "ethlambda/v1.0.0-stable-f4503df/x86_64-unknown-linux-gnu/rustc-v1.90.0",
+			expected: Client("ethlambda"),
+		},
+		{
+			name:     "unlisted client without v prefix",
+			input:    "Lantern/0.3.1",
+			expected: Client("lantern"),
+		},
+		// A string naming two clients resolves to the first listed
+		{
+			name:     "tysm build of prysm",
+			input:    "Prysm/v7.1.8-tysm-ac0714a (linux amd64)",
+			expected: ClientTysm,
+		},
+		{
+			name:     "caplin inside erigon",
+			input:    "erigon/caplin/3.8.1-cf6f1413",
+			expected: ClientCaplin,
 		},
 		// Edge cases
 		{
@@ -306,51 +334,18 @@ func TestAllClients(t *testing.T) {
 }
 
 func TestClientIdentifiersConsistency(t *testing.T) {
-	// Verify that clientIdentifiers map is consistent with Client constants
-	for identifier, client := range clientIdentifiers {
-		// The identifier should match the client string value
-		if identifier != string(client) {
-			t.Errorf("Inconsistent mapping: identifier %q maps to client %q", identifier, string(client))
+	// Every known client except unknown is an identifier, and finds itself.
+	for _, client := range AllClients {
+		if client == ClientUnknown {
+			continue
 		}
 
-		// ClientFromString should return the correct client for the identifier
-		result := ClientFromString(identifier)
-		if result != client {
-			t.Errorf("ClientFromString(%q) = %v, but clientIdentifiers maps to %v", identifier, result, client)
+		if !slices.Contains(clientIdentifiers, client) {
+			t.Errorf("Client %v is not present in clientIdentifiers", client)
 		}
-	}
 
-	// Verify all clients (except unknown) are in clientIdentifiers
-	allDefinedClients := []Client{
-		ClientLighthouse,
-		ClientNimbus,
-		ClientTeku,
-		ClientPrysm,
-		ClientLodestar,
-		ClientGrandine,
-		ClientCaplin,
-		ClientTysm,
-		ClientSilver,
-		ClientGeth,
-		ClientBesu,
-		ClientNethermind,
-		ClientErigon,
-		ClientReth,
-		ClientEthereumJS,
-		ClientEthrex,
-	}
-
-	for _, client := range allDefinedClients {
-		found := false
-		for _, mappedClient := range clientIdentifiers {
-			if mappedClient == client {
-				found = true
-
-				break
-			}
-		}
-		if !found {
-			t.Errorf("Client %v is not present in clientIdentifiers map", client)
+		if result := ClientFromString(string(client)); result != client {
+			t.Errorf("ClientFromString(%q) = %v, want %v", client, result, client)
 		}
 	}
 }

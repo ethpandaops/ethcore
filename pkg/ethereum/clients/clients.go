@@ -1,6 +1,9 @@
 package clients
 
-import "strings"
+import (
+	"regexp"
+	"strings"
+)
 
 // Client represents an Ethereum client implementation.
 type Client string
@@ -87,36 +90,49 @@ var AllClients = []Client{
 	ClientEthrex,
 }
 
-// clientIdentifiers maps client-specific strings to their respective Client type.
-var clientIdentifiers = map[string]Client{
-	"lighthouse": ClientLighthouse,
-	"nimbus":     ClientNimbus,
-	"teku":       ClientTeku,
-	"prysm":      ClientPrysm,
-	"lodestar":   ClientLodestar,
-	"grandine":   ClientGrandine,
-	"caplin":     ClientCaplin,
-	"tysm":       ClientTysm,
-	"silver":     ClientSilver,
-	"geth":       ClientGeth,
-	"besu":       ClientBesu,
-	"nethermind": ClientNethermind,
-	"erigon":     ClientErigon,
-	"reth":       ClientReth,
-	"ethereumjs": ClientEthereumJS,
-	"ethrex":     ClientEthrex,
+// clientIdentifiers is checked in order and the first one contained in the
+// string wins, so a fork that also names its base client resolves to the fork
+// (tysm builds on prysm, caplin ships inside erigon). A map would make that
+// choice random.
+var clientIdentifiers = []Client{
+	ClientTysm,
+	ClientCaplin,
+	ClientLighthouse,
+	ClientNimbus,
+	ClientTeku,
+	ClientPrysm,
+	ClientLodestar,
+	ClientGrandine,
+	ClientSilver,
+	ClientGeth,
+	ClientBesu,
+	ClientNethermind,
+	ClientErigon,
+	ClientReth,
+	ClientEthereumJS,
+	ClientEthrex,
 }
 
-// ClientFromString identifies a consensus client from a string identifier.
-// It performs a case-insensitive search for known client names within the input string.
-// Returns ClientUnknown if no known client is identified.
+// nameVersionPattern matches the "<name>/<version>" prefix every client puts
+// in its node and agent version, e.g. "ethlambda/v1.0.0-stable-abcd/...".
+var nameVersionPattern = regexp.MustCompile(`^([a-z][a-z0-9_-]{1,31})/v?[0-9]`)
+
+// ClientFromString identifies a client from a node version, agent version or
+// name. It looks for a known client name anywhere in the string, case
+// insensitively. Failing that, a string shaped "<name>/<version>" returns
+// <name>, so a client that is not listed still reports its own name rather
+// than ClientUnknown. Anything else returns ClientUnknown.
 func ClientFromString(client string) Client {
 	asLower := strings.ToLower(client)
 
-	for identifier, clientType := range clientIdentifiers {
-		if strings.Contains(asLower, identifier) {
-			return clientType
+	for _, identifier := range clientIdentifiers {
+		if strings.Contains(asLower, string(identifier)) {
+			return identifier
 		}
+	}
+
+	if match := nameVersionPattern.FindStringSubmatch(asLower); match != nil {
+		return Client(match[1])
 	}
 
 	return ClientUnknown
