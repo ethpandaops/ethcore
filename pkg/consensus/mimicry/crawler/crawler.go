@@ -25,6 +25,7 @@ import (
 	"github.com/ethpandaops/go-eth2-client/api"
 	"github.com/ethpandaops/go-eth2-client/spec/phase0"
 	"github.com/go-co-op/gocron/v2"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
@@ -211,6 +212,10 @@ func (c *Crawler) Start(ctx context.Context) error {
 		}
 
 		c.log.Info("Successfully started libp2p node")
+
+		if _, err := pubsub.NewGossipSub(c.ctx, libp2pHost); err != nil {
+			c.log.WithError(err).Fatal("Failed to start gossipsub")
+		}
 
 		// Register our req/resp handler
 		c.reqResp = p2p.NewReqResp(c.log, libp2pHost, sszNetworkEncoder, &p2p.ReqRespConfig{

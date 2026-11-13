@@ -19,7 +19,9 @@ import (
 // wireUpComponents wires up the components of the crawler so it can function.
 func (c *Crawler) wireUpComponents(ctx context.Context) error {
 	// Wire up the libp2p host
-	c.node.AfterPeerConnect(c.handlePeerConnected)
+	c.node.AfterPeerConnect(func(net network.Network, conn network.Conn) {
+		go c.handlePeerConnected(net, conn)
+	})
 	c.node.AfterPeerDisconnect(c.handlePeerDisconnected)
 
 	// Wire up the beacon node
@@ -134,6 +136,12 @@ func (c *Crawler) handlePeerConnected(net network.Network, conn network.Conn) {
 	c.log.WithFields(logrus.Fields{
 		"peer": peerID.String(),
 	}).Info("Peer connected")
+
+	defer func() {
+		c.peerENRsMu.Lock()
+		delete(c.peerENRs, peerID)
+		c.peerENRsMu.Unlock()
+	}()
 
 	// Wait for libp2p identify protocol to complete.
 	// The identify protocol exchanges peer information like agent version, protocols, etc.
@@ -367,11 +375,6 @@ func (c *Crawler) handlePeerDisconnected(net network.Network, conn network.Conn)
 		"peer":          conn.RemotePeer(),
 		"agent_version": c.GetPeerAgentVersion(conn.RemotePeer()),
 	}).Debug("Disconnected from peer")
-
-	// Clean up ENR storage for naturally disconnected peers
-	c.peerENRsMu.Lock()
-	delete(c.peerENRs, conn.RemotePeer())
-	c.peerENRsMu.Unlock()
 }
 
 //nolint:unused // Will revisit if not-needed.
