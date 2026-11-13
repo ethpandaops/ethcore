@@ -37,7 +37,7 @@ var defaultManager = &networkManager{
 	instances: make(map[string]*managedNetwork),
 }
 
-const ethereumPackageVersion = "6.0.0"
+const ethereumPackageVersion = "74cdb681a14a46c7177df17c0ea186f0aa184015"
 
 // GetNetwork retrieves or creates a Kurtosis network based on the provided configuration.
 // It reuses existing networks when possible to improve test performance.
